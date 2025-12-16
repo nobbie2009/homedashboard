@@ -1,3 +1,4 @@
+import express from 'express';
 import cors from 'cors';
 import { Edupage } from 'edupage-api';
 import dotenv from 'dotenv';
