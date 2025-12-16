@@ -54,7 +54,7 @@ pct create $CT_ID local:vztmpl/$TEMPLATE \
     --storage $STORAGE \
     --password "$CT_PASSWORD" \
     --features nesting=1 \
-    --unprivileged 1 \
+    --unprivileged 0 \
     --start 1
 
 echo "Container started. Waiting 10 seconds for network..."
