@@ -27,44 +27,30 @@ app.get('/api/edupage', async (req, res) => {
         const edupage = new Edupage();
         await edupage.login(user, pass);
 
-        // Prepare response array
+        // Debug: Log available methods to container logs
+        const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(edupage));
+        console.log("Edupage Methods Available:", methods);
+
         const studentsData = [];
+        let timetable = [];
 
-        // Check for linked students (Note: API structure assumptions)
-        // If edupage.students exists, we iterate. Otherwise we use the main user.
-        // We log the structure to help debugging if it differs.
-        console.log("Edupage User:", edupage.user);
-        // console.log("Edupage Students:", edupage.students);
-
-        // Fetch Timetable for 'Today' and 'Tomorrow'
-        // We implement a helper to fetch data for a specific "context" if possible
-        // Currently assuming 'getTimetable' works for the active context.
-
-        const today = new Date();
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-
-        // Fetch basic timetable
-        const timetable = await edupage.getTimetable();
-
-        // Fetch homework/exams if available
-        // const homework = await edupage.getHomework(); // Function name guess, check docs?
-        // 'getTests', 'getNotes'? 
-        // We start with Timetable which is standard.
-
-        // If we can identify students, push them.
-        // For now, wrap the single result in an array to support the frontend structure.
-        // If edupage-api supports multiple students, we would iterate here.
-        // But since we can't test, we deliver the main one.
+        // Try different methods for timetable
+        if (typeof edupage.getTimetable === 'function') {
+            timetable = await edupage.getTimetable();
+        } else if (typeof edupage.getDailyPlan === 'function') {
+            // Some versions might use this
+            timetable = await edupage.getDailyPlan(new Date());
+        } else {
+            console.error("No known timetable method found!");
+            // Return debug info to frontend error
+            throw new Error(`Method 'getTimetable' not found. Available: ${methods.join(', ')}`);
+        }
 
         studentsData.push({
             name: edupage.user.firstName || edupage.user.name || "Schüler",
             timetable: timetable,
-            homework: [] // Placeholder
+            homework: []
         });
-
-        // Debug: access other students?
-        // if (edupage.students) { ... }
 
         res.json({
             students: studentsData
