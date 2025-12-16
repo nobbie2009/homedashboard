@@ -120,7 +120,7 @@ const SchoolView: React.FC = () => {
         <div className="h-full bg-slate-900 p-6 text-slate-100 overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-3xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
-                    Schule
+                    Schule <span className="text-xs text-slate-500 font-normal">v1.1</span>
                 </h2>
                 <button onClick={fetchData} className="p-2 hover:bg-slate-800 rounded-full transition" disabled={loading}>
                     <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
