@@ -35,7 +35,19 @@ app.get('/api/edupage', async (req, res) => {
         tomorrow.setDate(tomorrow.getDate() + 1);
 
         // Fetch Timetable using verified method
-        const timetable = await edupage.getTimetableForDate(today);
+        const rawTimetable = await edupage.getTimetableForDate(today);
+
+        // Sanitize data to avoid Circular Structure error
+        const timetable = rawTimetable.map(lesson => ({
+            id: lesson.id,
+            startTime: lesson.startTime,
+            endTime: lesson.endTime,
+            date: lesson.date,
+            subject: lesson.subject ? { name: lesson.subject.name, short: lesson.subject.short } : { name: '?', short: '?' },
+            classroom: lesson.classroom ? { name: lesson.classroom.name } : { name: '' },
+            teacher: lesson.teacher ? { name: lesson.teacher.name } : { name: '' },
+            class: lesson.class ? { name: lesson.class.name } : { name: '' }
+        }));
 
         studentsData.push({
             name: edupage.user.firstName || edupage.user.name || "Schüler",
