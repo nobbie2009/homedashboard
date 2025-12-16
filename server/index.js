@@ -144,7 +144,18 @@ app.get('/api/edupage', async (req, res) => {
                 // Process Homework
                 if (edupage.homeworks) {
                     if (edupage.homeworks.length > 0) {
-                        console.log("DEBUG HOMEWORK ITEM [0]:", JSON.stringify(edupage.homeworks[0], null, 2));
+                        try {
+                            const sample = edupage.homeworks[0];
+                            // Avoid circular reference by logging shallow clone with limited depth or just keys
+                            console.log("DEBUG HOMEWORK ITEM [0] KEYS:", Object.keys(sample));
+                            console.log("DEBUG HOMEWORK ITEM [0] DATA:", {
+                                id: sample.id,
+                                title: sample.title,
+                                studentID: sample.studentID,
+                                student: sample.student,
+                                owner: sample.owner
+                            });
+                        } catch (e) { console.log("Log error:", e); }
                     }
                     homework = edupage.homeworks.map(hw => ({
                         id: hw.id,
