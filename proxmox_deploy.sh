@@ -53,7 +53,7 @@ pct create $CT_ID local:vztmpl/$TEMPLATE \
     --net0 name=eth0,bridge=$BRIDGE,ip=$NET_IP \
     --storage $STORAGE \
     --password "$CT_PASSWORD" \
-    --features nesting=1,keyctl=1 \
+    --features nesting=1 \
     --unprivileged 1 \
     --start 1
 
