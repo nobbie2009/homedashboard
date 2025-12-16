@@ -38,7 +38,18 @@ app.get('/api/edupage', async (req, res) => {
         const rawTimetable = await edupage.getTimetableForDate(today);
 
         // Sanitize data to avoid Circular Structure error
-        const timetable = rawTimetable.map(lesson => ({
+        let lessons = [];
+        if (Array.isArray(rawTimetable)) {
+            lessons = rawTimetable;
+        } else if (rawTimetable && Array.isArray(rawTimetable.lessons)) {
+            lessons = rawTimetable.lessons;
+        } else {
+            console.log("Raw Timetable Type:", typeof rawTimetable);
+            console.log("Raw Timetable Keys:", Object.keys(rawTimetable || {}));
+            // throw new Error("Timetable is not an array. Check logs.");
+        }
+
+        const timetable = lessons.map(lesson => ({
             id: lesson.id,
             startTime: lesson.startTime,
             endTime: lesson.endTime,
