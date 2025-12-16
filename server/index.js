@@ -135,10 +135,50 @@ app.get('/api/edupage', async (req, res) => {
                 name = edupage.user.firstname || edupage.user.firstName || edupage.user.name || name;
             }
 
+            // Fetch Timeline (Homework + Messages)
+            let homework = [];
+            let inbox = [];
+            try {
+                await edupage.refreshTimeline();
+
+                // Process Homework
+                if (edupage.homeworks) {
+                    homework = edupage.homeworks.map(hw => ({
+                        id: hw.id,
+                        title: hw.title || "Hausaufgabe",
+                        subject: hw.subject ? hw.subject.name : "Unbekannt",
+                        date: hw.date, // Due date
+                        done: hw.done || false
+                    }));
+                }
+
+                // Process Inbox (Messages)
+                if (edupage.timeline) {
+                    // Filter simply for now, maybe all timeline items are interesting?
+                    // The user specifically asked for "Posteingang" (Inbox).
+                    // Usually type 'message' is what we want.
+                    inbox = edupage.timeline
+                        .filter(item => item.type === 'message' || item.type === 'notice')
+                        .map(msg => ({
+                            id: msg.id,
+                            title: msg.title || msg.subject || "Nachricht",
+                            body: msg.body || msg.text || "",
+                            sender: msg.sender ? msg.sender.name : "Unbekannt",
+                            date: msg.date,
+                            limitDate: msg.limitDate
+                        }));
+                }
+                console.log(`Fetched ${homework.length} homeworks and ${inbox.length} messages for GPID ${gpid}`);
+
+            } catch (err) {
+                console.error(`Error fetching timeline for GPID ${gpid}:`, err);
+            }
+
             studentsData.push({
                 name: name,
                 timetable: timetable,
-                homework: []
+                homework: homework,
+                inbox: inbox
             });
         }
 
