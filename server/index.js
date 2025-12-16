@@ -128,10 +128,11 @@ app.get('/api/edupage', async (req, res) => {
             let name = `Schüler ${gpid || (i + 1)}`;
 
             if (studentObj) {
-                name = studentObj.firstName || studentObj.name || studentObj.lastname || name;
+                // FIXED: Check lowercase 'firstname' as well
+                name = studentObj.firstname || studentObj.firstName || studentObj.name || studentObj.lastname || name;
             } else if (i === 0 && edupage.user) {
                 // Fallback to user name if only one student or default
-                name = edupage.user.firstName || edupage.user.name || name;
+                name = edupage.user.firstname || edupage.user.firstName || edupage.user.name || name;
             }
 
             studentsData.push({
