@@ -26,12 +26,15 @@ const CalendarView: React.FC = () => {
     const [now, setNow] = useState(new Date());
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-    // Initial scroll to start hour
+    // Initial scroll to current time
     useEffect(() => {
         if (scrollContainerRef.current) {
-            scrollContainerRef.current.scrollTop = START_HOUR * HOUR_HEIGHT;
+            const now = new Date();
+            const startMinutes = getHours(now) * 60 + getMinutes(now);
+            const scrollPos = (startMinutes / 60) * HOUR_HEIGHT - 300; // Center (approx half screen height)
+            scrollContainerRef.current.scrollTop = Math.max(0, scrollPos);
         }
-    }, []);
+    }, [scrollContainerRef]);
 
     // Update "now" every minute
     useEffect(() => {
