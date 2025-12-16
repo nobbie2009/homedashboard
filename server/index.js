@@ -27,24 +27,15 @@ app.get('/api/edupage', async (req, res) => {
         const edupage = new Edupage();
         await edupage.login(user, pass);
 
-        // Debug: Log available methods to container logs
-        const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(edupage));
-        console.log("Edupage Methods Available:", methods);
-
+        // Prepare response array
         const studentsData = [];
-        let timetable = [];
 
-        // Try different methods for timetable
-        if (typeof edupage.getTimetable === 'function') {
-            timetable = await edupage.getTimetable();
-        } else if (typeof edupage.getDailyPlan === 'function') {
-            // Some versions might use this
-            timetable = await edupage.getDailyPlan(new Date());
-        } else {
-            console.error("No known timetable method found!");
-            // Return debug info to frontend error
-            throw new Error(`Method 'getTimetable' not found. Available: ${methods.join(', ')}`);
-        }
+        const today = new Date();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        // Fetch Timetable using verified method
+        const timetable = await edupage.getTimetableForDate(today);
 
         studentsData.push({
             name: edupage.user.firstName || edupage.user.name || "Schüler",
