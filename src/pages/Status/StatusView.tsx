@@ -18,7 +18,7 @@ import clsx from 'clsx';
 
 // Constants for layout
 const HOUR_HEIGHT = 60; // pixels per hour
-const START_HOUR = 6;   // Start scroll at 6:00
+
 
 
 const CalendarView: React.FC = () => {

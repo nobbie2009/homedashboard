@@ -6,3 +6,17 @@ services:
     ports:
       - "80:80"
     restart: always
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "3001:3001"
+    restart: always
+    environment:
+      - PORT=3001
+      # - EDUPAGE_USER=your_user  # Can be set here or in .env
+      # - EDUPAGE_PASSWORD=your_pass
