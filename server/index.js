@@ -75,6 +75,23 @@ app.get('/api/edupage', async (req, res) => {
 
         console.log("Found GPIDs (ASC):", gpids);
 
+        // Helper to fetch days
+        const fetchDays = async () => {
+            const daysToFetch = 3; // Today + 2 days
+            const lessons = [];
+            for (let i = 0; i < daysToFetch; i++) {
+                const d = new Date(today);
+                d.setDate(today.getDate() + i);
+                try {
+                    const raw = await edupage.getTimetableForDate(d);
+                    lessons.push(...mapLessons(raw));
+                } catch (err) {
+                    console.error(`Failed to fetch date ${d}:`, err);
+                }
+            }
+            return lessons;
+        };
+
         // Fallback: If no GPIDs in ASC, check if we have students in edupage.students
         // and try to use their IDs.
         const studentObjects = edupage.students || [];
@@ -103,6 +120,13 @@ app.get('/api/edupage', async (req, res) => {
         }
 
         console.log("Effective GPIDs to process:", effectiveGpids);
+
+        // Limit to 5 students to avoid massive fetching if class list is returned
+        const maxStudents = 5;
+        if (effectiveGpids.length > maxStudents) {
+            console.log(`Limiting students from ${effectiveGpids.length} to ${maxStudents}`);
+            effectiveGpids = effectiveGpids.slice(0, maxStudents);
+        }
 
         for (let i = 0; i < effectiveGpids.length; i++) {
             const gpid = effectiveGpids[i];
