@@ -2,8 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import { Edupage } from 'edupage-api';
 import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 
 dotenv.config();
 
@@ -27,16 +25,8 @@ app.get('/api/edupage', async (req, res) => {
         const edupage = new Edupage();
         await edupage.login(user, pass);
 
-        // Confirm student data sources
-        console.log("Edupage User Props:", Object.keys(edupage.user || {}));
-        console.log("Edupage Instance Props:", Object.keys(edupage));
-        // console.log("Edupage Students List:", edupage.students);
-
         const studentsData = [];
-
         const today = new Date();
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
 
         // Function to sanitize lessons
         const mapLessons = (raw) => {
@@ -61,18 +51,7 @@ app.get('/api/edupage', async (req, res) => {
             console.log("Initial fetch failed, maybe login issue or no rights", e);
         }
 
-        // Get student IDs (gpids)
-        // Accessing internal ASC object if available, or fallback to single user
         const gpids = edupage.ASC?.gpids || [];
-        if (gpids.length === 0 && edupage.user) {
-            // Fallback if no gpids found (unlikely if login worked)
-            studentsData.push({
-                name: edupage.user.firstName || edupage.user.name || "Schüler",
-                timetable: [],
-                homework: []
-            });
-        }
-
         console.log("Found GPIDs (ASC):", gpids);
 
         // Helper to fetch days
@@ -92,88 +71,29 @@ app.get('/api/edupage', async (req, res) => {
             return lessons;
         };
 
-        // Fallback: If no GPIDs in ASC, check if we have students in edupage.students
-        // and try to use their IDs.
+        // Student lists
         const studentObjects = edupage.students || [];
-        const safeStudentObjects = studentObjects.map(s => {
-            // Safe extraction of properties
-            return {
-                id: s.id,
-                studentId: s.studentId, // Try potential ID fields
-                name: s.name,
-                firstName: s.firstName,
-                surname: s.surname
-            };
-        });
-        console.log("Student Objects dump:", JSON.stringify(safeStudentObjects, null, 2));
 
-        let effectiveGpids = [...gpids];
-        if (effectiveGpids.length === 0 && studentObjects.length > 0) {
-            console.log("Attempting to use student IDs as GPIDs...");
-            effectiveGpids = studentObjects.map(s => s.id);
-        }
+        // --- FILTERING LOGIC ---
+        // Filter for specific children IDs provided by user: -255 and -179
+        const targetIds = ['-255', '-179'];
+        console.log(`Filtering for student IDs: ${targetIds.join(", ")}`);
 
-        // If still empty, create a dummy entry to force at least one pass (for default user)
-        if (effectiveGpids.length === 0) {
-            console.log("No IDs found, defaulting to single user pass.");
-            effectiveGpids = [null];
-        }
-
-        console.log("Effective GPIDs to process:", effectiveGpids);
-
-        console.log("Edupage User keys:", Object.keys(edupage.user || {}));
-        if (edupage.user && edupage.user.students) {
-            console.log("User.students found:", edupage.user.students.length);
-            console.log("User.students sample:", JSON.stringify(edupage.user.students[0] || {}, null, 2));
-        }
-
-        // Check for other potential properties on user
-        const userPropsToCheck = ['children', 'wards', 'childs', 'relatedStudents'];
-        userPropsToCheck.forEach(prop => {
-            if (edupage.user && edupage.user[prop]) {
-                console.log(`User property '${prop}' found:`, edupage.user[prop]);
-            }
-        });
-
-        // Dump one full student object from the main list to see structure
-        if (studentObjects.length > 0) {
-            console.log("Sample from edupage.students[0] FULL keys:", Object.keys(studentObjects[0]));
-            // Try to log safe version
-            const safeSample = {};
-            // Copy simple properties
-            for (let key in studentObjects[0]) {
-                if (typeof studentObjects[0][key] !== 'object' && typeof studentObjects[0][key] !== 'function') {
-                    safeSample[key] = studentObjects[0][key];
-                }
-            }
-            console.log("Sample from edupage.students[0] Values:", safeSample);
-        }
-
-        if (edupage.user) {
-            console.log(`Logged in as: ${edupage.user.firstName} ${edupage.user.name || edupage.user.lastname} (ID: ${edupage.user.id})`);
-        }
-
-        // Dump all found student names to help user debug
-        const allNames = studentObjects.map(s => `${s.firstName} ${s.name || s.lastname} (${s.id})`);
-        console.log("All Students available in this session:", allNames.join(", "));
-
-        // Filter for specific children names provided by user
-        const targetNames = ["Johanna", "Charlotte"];
-        console.log(`Filtering for students: ${targetNames.join(", ")}`);
-
-        // Find matching students in the objects list
-        const matchedStudents = studentObjects.filter(s => {
-            const fName = s.firstName || s.name || "";
-            return targetNames.some(target => fName.toLowerCase().includes(target.toLowerCase()));
-        });
-
+        const matchedStudents = studentObjects.filter(s => targetIds.includes(s.id));
         console.log(`Found ${matchedStudents.length} matching students.`);
 
+        let effectiveGpids = [];
         if (matchedStudents.length > 0) {
             effectiveGpids = matchedStudents.map(s => s.id);
         } else {
-            console.warn("No matching students found! Falling back to all (limited).");
-            // Only limit if we didn't find our specific targets
+            console.warn("No matching students found by ID! Falling back to raw GPIDs (limited).");
+            effectiveGpids = [...gpids];
+            // If still empty and User exists, maybe fallback to single pass? 
+            if (effectiveGpids.length === 0 && edupage.user) {
+                effectiveGpids = [null]; // Force one pass for default user
+            }
+
+            // Limit to avoids massive fetching if we missed the specific IDs
             const maxStudents = 5;
             if (effectiveGpids.length > maxStudents) {
                 effectiveGpids = effectiveGpids.slice(0, maxStudents);
@@ -184,8 +104,9 @@ app.get('/api/edupage', async (req, res) => {
 
         for (let i = 0; i < effectiveGpids.length; i++) {
             const gpid = effectiveGpids[i];
+            console.log(`Processing GPID [${i}]: ${gpid}`);
 
-            // Switch Context if we have a real gpid
+            // Switch Context if we have a real gpid and ASC object exists
             if (gpid && edupage.ASC) {
                 edupage.ASC.gpid = gpid;
             }
@@ -202,10 +123,14 @@ app.get('/api/edupage', async (req, res) => {
             }
 
             // Name resolution
-            let name = `Schüler ${i + 1}`;
-            if (studentObjects[i] && (studentObjects[i].name || studentObjects[i].firstName)) {
-                name = studentObjects[i].firstName || studentObjects[i].name;
+            // Try to find the student object that matches this GPID
+            const studentObj = studentObjects.find(s => s.id === gpid);
+            let name = `Schüler ${gpid || (i + 1)}`;
+
+            if (studentObj) {
+                name = studentObj.firstName || studentObj.name || studentObj.lastname || name;
             } else if (i === 0 && edupage.user) {
+                // Fallback to user name if only one student or default
                 name = edupage.user.firstName || edupage.user.name || name;
             }
 
@@ -215,8 +140,6 @@ app.get('/api/edupage', async (req, res) => {
                 homework: []
             });
         }
-
-        // If for some reason loop didn't run (no gpids?), fallback handled above or empty.
 
         res.json({
             students: studentsData
