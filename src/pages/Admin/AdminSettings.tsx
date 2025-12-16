@@ -106,6 +106,30 @@ const AdminSettings: React.FC = () => {
                 </section>
 
                 <section>
+                    <h3 className="text-xl font-semibold text-slate-300 mb-4">Edupage Zugangsdaten</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm text-slate-400 mb-1">Benutzername / Email</label>
+                            <input
+                                type="text"
+                                value={config.edupage?.username || ''}
+                                onChange={(e) => updateConfig({ edupage: { ...config.edupage, username: e.target.value } })}
+                                className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 w-full focus:outline-none focus:border-blue-500"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm text-slate-400 mb-1">Passwort</label>
+                            <input
+                                type="password"
+                                value={config.edupage?.password || ''}
+                                onChange={(e) => updateConfig({ edupage: { ...config.edupage, password: e.target.value } })}
+                                className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 w-full focus:outline-none focus:border-blue-500"
+                            />
+                        </div>
+                    </div>
+                </section>
+
+                <section>
                     <h3 className="text-xl font-semibold text-slate-300 mb-4">Anzeigeoptionen</h3>
                     <label className="flex items-center space-x-3">
                         <input
