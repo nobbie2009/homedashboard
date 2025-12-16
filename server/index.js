@@ -78,7 +78,17 @@ app.get('/api/edupage', async (req, res) => {
         // Fallback: If no GPIDs in ASC, check if we have students in edupage.students
         // and try to use their IDs.
         const studentObjects = edupage.students || [];
-        console.log("Student Objects dump:", JSON.stringify(studentObjects, null, 2));
+        const safeStudentObjects = studentObjects.map(s => {
+            // Safe extraction of properties
+            return {
+                id: s.id,
+                studentId: s.studentId, // Try potential ID fields
+                name: s.name,
+                firstName: s.firstName,
+                surname: s.surname
+            };
+        });
+        console.log("Student Objects dump:", JSON.stringify(safeStudentObjects, null, 2));
 
         let effectiveGpids = [...gpids];
         if (effectiveGpids.length === 0 && studentObjects.length > 0) {
