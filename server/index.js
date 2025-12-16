@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import fs from 'fs';
 import { Edupage } from 'edupage-api';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
@@ -26,6 +27,21 @@ app.get('/api/edupage', async (req, res) => {
     try {
         const edupage = new Edupage();
         await edupage.login(user, pass);
+
+        // DEBUG: Write edupage structure to file
+        try {
+            const debugInfo = {
+                edupageKeys: Object.keys(edupage),
+                edupageProtoKeys: Object.keys(Object.getPrototypeOf(edupage)),
+                students: edupage.students,
+                user: edupage.user,
+                // Check if getTimetableForDate is on prototype
+                getTimetableForDateLength: edupage.getTimetableForDate?.length
+            };
+            fs.writeFileSync('server_debug.json', JSON.stringify(debugInfo, null, 2));
+        } catch (err) {
+            console.error("Debug write failed:", err);
+        }
 
         // Confirm student data sources
         console.log("Edupage User Props:", Object.keys(edupage.user || {}));
