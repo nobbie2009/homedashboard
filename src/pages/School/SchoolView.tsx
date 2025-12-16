@@ -15,10 +15,28 @@ interface Lesson {
     date: string;
 }
 
+interface HomeworkItem {
+    id: string;
+    title: string;
+    subject: string;
+    date: string;
+    done: boolean;
+}
+
+interface InboxItem {
+    id: string;
+    title: string;
+    body: string;
+    sender: string;
+    date: string;
+    limitDate?: string;
+}
+
 interface StudentData {
     name: string;
     timetable: Lesson[];
-    homework: any[];
+    homework: HomeworkItem[];
+    inbox: InboxItem[];
 }
 
 const SchoolView: React.FC = () => {
@@ -50,15 +68,16 @@ const SchoolView: React.FC = () => {
             }
 
             const result = await response.json();
-            // Expecting { students: [...] }
+            console.log("Frontend received:", result);
+
             if (result.students) {
                 setData(result.students);
             } else {
-                // Fallback if backend returns flat structure
-                setData([{ name: result.user?.name || 'Schüler', timetable: result.timetable || [], homework: [] }]);
+                setData([{ name: result.user?.name || 'Schüler', timetable: result.timetable || [], homework: [], inbox: [] }]);
             }
 
         } catch (err: any) {
+            console.error("Fetch error:", err);
             setError(err.message);
         } finally {
             setLoading(false);
@@ -67,10 +86,9 @@ const SchoolView: React.FC = () => {
 
     useEffect(() => {
         fetchData();
-        // Auto-refresh every 30 minutes
         const interval = setInterval(fetchData, 30 * 60 * 1000);
         return () => clearInterval(interval);
-    }, [config.edupage]); // Reload if config changes
+    }, [config.edupage]);
 
     if (error) {
         return (
@@ -96,7 +114,6 @@ const SchoolView: React.FC = () => {
         );
     }
 
-    // Determine grid columns based on student count (max 2 for now as requested)
     const gridCols = data.length > 1 ? 'grid-cols-2' : 'grid-cols-1';
 
     return (
@@ -122,26 +139,23 @@ const SchoolView: React.FC = () => {
                         </div>
 
                         {/* Timetable Section */}
-                        <div className="bg-slate-800/80 rounded-xl border border-slate-700 overflow-hidden flex-1 flex flex-col">
+                        <div className="bg-slate-800/80 rounded-xl border border-slate-700 overflow-hidden flex flex-col" style={{ maxHeight: '400px' }}>
                             <div className="p-4 border-b border-slate-700 bg-slate-800 flex items-center justify-between">
                                 <h4 className="font-bold flex items-center">
                                     <Clock className="w-4 h-4 mr-2 text-blue-400" />
                                     Stundenplan
                                 </h4>
                             </div>
-                            <div className="p-2 space-y-2 overflow-y-auto max-h-[500px] flex-1">
+                            <div className="p-2 space-y-2 overflow-y-auto flex-1 custom-scrollbar">
                                 {student.timetable && student.timetable.length > 0 ? (
                                     (() => {
                                         const groupedLessons: React.ReactNode[] = [];
                                         let lastDate = '';
 
                                         student.timetable.forEach((lesson, lIdx) => {
-                                            // Format date for comparison and display header
-                                            // lesson.date is likely ISO string "2023-12-16T..."
                                             const lessonDateObj = new Date(lesson.date);
                                             const dateStr = format(lessonDateObj, 'yyyy-MM-dd');
 
-                                            // Insert Header if date changed
                                             if (dateStr !== lastDate) {
                                                 const isToday = format(new Date(), 'yyyy-MM-dd') === dateStr;
                                                 const displayDate = format(lessonDateObj, 'EEEE, dd.MM.', { locale: de });
@@ -173,23 +187,76 @@ const SchoolView: React.FC = () => {
                                         return groupedLessons;
                                     })()
                                 ) : (
-                                    <div className="text-center p-4 text-slate-500 italic">Keine Stunden gefunden</div>
+                                    <div className="text-center p-8 text-slate-500 italic">Keine Stunden gefunden</div>
                                 )}
                             </div>
                         </div>
 
                         {/* Homework Section */}
-                        <div className="bg-slate-800/80 rounded-xl border border-slate-700 overflow-hidden flex-1">
+                        <div className="bg-slate-800/80 rounded-xl border border-slate-700 overflow-hidden flex flex-col flex-1" style={{ maxHeight: '300px' }}>
                             <div className="p-4 border-b border-slate-700 bg-slate-800">
                                 <h4 className="font-bold flex items-center">
                                     <BookOpen className="w-4 h-4 mr-2 text-orange-400" />
                                     Hausaufgaben & Prüfungen
+                                    {student.homework?.length > 0 &&
+                                        <span className="ml-2 bg-orange-500/20 text-orange-300 text-xs px-2 py-0.5 rounded-full">{student.homework.length}</span>
+                                    }
                                 </h4>
                             </div>
-                            <div className="p-4 text-center text-slate-500 italic">
-                                {student.homework?.length === 0 ? "Alles erledigt!" : "Aufgaben anzeigen..."}
+                            <div className="p-0 overflow-y-auto flex-1 custom-scrollbar">
+                                {student.homework && student.homework.length > 0 ? (
+                                    <div className="divide-y divide-slate-700/50">
+                                        {student.homework.map((hw, hIdx) => (
+                                            <div key={hIdx} className="p-3 hover:bg-slate-700/30 transition">
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <span className="font-medium text-slate-200">{hw.title}</span>
+                                                    <span className="text-xs bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded">
+                                                        {hw.date ? format(new Date(hw.date), 'dd.MM.', { locale: de }) : ''}
+                                                    </span>
+                                                </div>
+                                                <div className="text-sm text-orange-300/80">{hw.subject}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center p-8 text-slate-500 italic">Alles erledigt!</div>
+                                )}
                             </div>
                         </div>
+
+                        {/* Inbox Section */}
+                        <div className="bg-slate-800/80 rounded-xl border border-slate-700 overflow-hidden flex flex-col flex-1" style={{ maxHeight: '300px' }}>
+                            <div className="p-4 border-b border-slate-700 bg-slate-800">
+                                <h4 className="font-bold flex items-center">
+                                    <BookOpen className="w-4 h-4 mr-2 text-indigo-400" />
+                                    Posteingang
+                                    {student.inbox?.length > 0 &&
+                                        <span className="ml-2 bg-indigo-500/20 text-indigo-300 text-xs px-2 py-0.5 rounded-full">{student.inbox.length}</span>
+                                    }
+                                </h4>
+                            </div>
+                            <div className="p-0 overflow-y-auto flex-1 custom-scrollbar">
+                                {student.inbox && student.inbox.length > 0 ? (
+                                    <div className="divide-y divide-slate-700/50">
+                                        {student.inbox.map((msg, mIdx) => (
+                                            <div key={mIdx} className="p-3 hover:bg-slate-700/30 transition group cursor-pointer">
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <span className="font-medium text-slate-200 group-hover:text-indigo-300 transition">{msg.title}</span>
+                                                    <span className="text-xs text-slate-500">
+                                                        {msg.date ? format(new Date(msg.date), 'dd.MM.', { locale: de }) : ''}
+                                                    </span>
+                                                </div>
+                                                <div className="text-sm text-slate-400 line-clamp-2">{msg.body.replace(/<[^>]*>?/gm, '')}</div>
+                                                <div className="mt-1 text-xs text-slate-500 text-right">Von: {msg.sender}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center p-8 text-slate-500 italic">Keine Nachrichten</div>
+                                )}
+                            </div>
+                        </div>
+
                     </div>
                 ))}
 
