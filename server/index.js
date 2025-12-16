@@ -149,6 +149,14 @@ app.get('/api/edupage', async (req, res) => {
             console.log("Sample from edupage.students[0] Values:", safeSample);
         }
 
+        if (edupage.user) {
+            console.log(`Logged in as: ${edupage.user.firstName} ${edupage.user.name || edupage.user.lastname} (ID: ${edupage.user.id})`);
+        }
+
+        // Dump all found student names to help user debug
+        const allNames = studentObjects.map(s => `${s.firstName} ${s.name || s.lastname} (${s.id})`);
+        console.log("All Students available in this session:", allNames.join(", "));
+
         // Filter for specific children names provided by user
         const targetNames = ["Johanna", "Charlotte"];
         console.log(`Filtering for students: ${targetNames.join(", ")}`);
