@@ -73,61 +73,58 @@ app.get('/api/edupage', async (req, res) => {
             });
         }
 
-        console.log("Found GPIDs:", gpids);
+        console.log("Found GPIDs (ASC):", gpids);
 
-        // Helper to fetch days
-        const fetchDays = async () => {
-            const daysToFetch = 3; // Today + 2 days
-            const lessons = [];
-            for (let i = 0; i < daysToFetch; i++) {
-                const d = new Date(today);
-                d.setDate(today.getDate() + i);
-                try {
-                    const raw = await edupage.getTimetableForDate(d);
-                    lessons.push(...mapLessons(raw));
-                } catch (err) {
-                    console.error(`Failed to fetch date ${d}:`, err);
-                }
-            }
-            return lessons;
-        };
-
-        // Iterate students
-        // Attempts to find names in edupage.students or edupage.user.students if available
-        // We really don't have a reliable Map of ID -> Name without more probing, 
-        // so we might use "Student 1", "Student 2" or try to find name in fetched data?
-        // Actually, edupage.students might be the array of Student objects matching gpids?
+        // Fallback: If no GPIDs in ASC, check if we have students in edupage.students
+        // and try to use their IDs.
         const studentObjects = edupage.students || [];
+        console.log("Student Objects dump:", JSON.stringify(studentObjects, null, 2));
 
-        for (let i = 0; i < gpids.length; i++) {
-            const gpid = gpids[i];
+        let effectiveGpids = [...gpids];
+        if (effectiveGpids.length === 0 && studentObjects.length > 0) {
+            console.log("Attempting to use student IDs as GPIDs...");
+            effectiveGpids = studentObjects.map(s => s.id);
+        }
 
-            // Switch Context
-            if (edupage.ASC) {
+        // If still empty, create a dummy entry to force at least one pass (for default user)
+        if (effectiveGpids.length === 0) {
+            console.log("No IDs found, defaulting to single user pass.");
+            effectiveGpids = [null];
+        }
+
+        console.log("Effective GPIDs to process:", effectiveGpids);
+
+        for (let i = 0; i < effectiveGpids.length; i++) {
+            const gpid = effectiveGpids[i];
+
+            // Switch Context if we have a real gpid
+            if (gpid && edupage.ASC) {
                 edupage.ASC.gpid = gpid;
             }
 
             // CRITICAL: Clear cache to force fetch for new student
             edupage.timetables = [];
 
-            const timetable = await fetchDays();
+            let timetable = [];
+            try {
+                timetable = await fetchDays();
+                console.log(`Fetched ${timetable.length} lessons for GPID ${gpid}`);
+            } catch (err) {
+                console.error(`Error fetching for GPID ${gpid}:`, err);
+            }
 
             // Name resolution
             let name = `Schüler ${i + 1}`;
-            // Try to find name in studentObjects
-            // Assuming studentObjects might have 'id' or 'gpid' matching?
-            // Or maybe just index matching?
             if (studentObjects[i] && (studentObjects[i].name || studentObjects[i].firstName)) {
                 name = studentObjects[i].firstName || studentObjects[i].name;
             } else if (i === 0 && edupage.user) {
-                // Default to user name for first one if no students array
                 name = edupage.user.firstName || edupage.user.name || name;
             }
 
             studentsData.push({
                 name: name,
                 timetable: timetable,
-                homework: [] // Homework fetching usually also needs gpid switch
+                homework: []
             });
         }
 
