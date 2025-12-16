@@ -19,8 +19,7 @@ import clsx from 'clsx';
 // Constants for layout
 const HOUR_HEIGHT = 60; // pixels per hour
 const START_HOUR = 6;   // Start scroll at 6:00
-const DAY_START_HOUR = 0;
-const DAY_END_HOUR = 24;
+
 
 const CalendarView: React.FC = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -154,7 +153,7 @@ const CalendarView: React.FC = () => {
 
                         {/* Events Grid */}
                         <div className="grid grid-cols-7 relative divide-x divide-slate-700/50 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSI2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMCA2MEwxMDAwMCA2MCIgc3Ryb2tlPSJyZ2JhKDc1LDg1LDEwMSwwLjEpIiBmaWxsPSJub25lIi8+PC9zdmc+')]" style={{ backgroundSize: `100% ${HOUR_HEIGHT}px` }}>
-                            {weekDays.map((day, dayIndex) => {
+                            {weekDays.map((day) => {
                                 const dayEvents = weekEvents.filter(e => isSameDay(e.start, day));
                                 const isCurrentDay = isToday(day);
 
