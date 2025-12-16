@@ -121,12 +121,30 @@ app.get('/api/edupage', async (req, res) => {
 
         console.log("Effective GPIDs to process:", effectiveGpids);
 
-        // Limit to 5 students to avoid massive fetching if class list is returned
-        const maxStudents = 5;
-        if (effectiveGpids.length > maxStudents) {
-            console.log(`Limiting students from ${effectiveGpids.length} to ${maxStudents}`);
-            effectiveGpids = effectiveGpids.slice(0, maxStudents);
+        // Filter for specific children names provided by user
+        const targetNames = ["Johanna", "Charlotte"];
+        console.log(`Filtering for students: ${targetNames.join(", ")}`);
+
+        // Find matching students in the objects list
+        const matchedStudents = studentObjects.filter(s => {
+            const fName = s.firstName || s.name || "";
+            return targetNames.some(target => fName.toLowerCase().includes(target.toLowerCase()));
+        });
+
+        console.log(`Found ${matchedStudents.length} matching students.`);
+
+        if (matchedStudents.length > 0) {
+            effectiveGpids = matchedStudents.map(s => s.id);
+        } else {
+            console.warn("No matching students found! Falling back to all (limited).");
+            // Only limit if we didn't find our specific targets
+            const maxStudents = 5;
+            if (effectiveGpids.length > maxStudents) {
+                effectiveGpids = effectiveGpids.slice(0, maxStudents);
+            }
         }
+
+        console.log("Final GPIDs to process:", effectiveGpids);
 
         for (let i = 0; i < effectiveGpids.length; i++) {
             const gpid = effectiveGpids[i];
