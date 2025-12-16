@@ -1,74 +1,178 @@
-import React, { useState } from 'react';
-import { mockSchool } from '../../services/mockData';
-import clsx from 'clsx';
-import { BookOpen, Clock } from 'lucide-react';
-import { format } from 'date-fns';
+import React, { useEffect, useState } from 'react';
+import { useConfig } from '../../contexts/ConfigContext';
+import { BookOpen, Clock, AlertCircle, RefreshCw } from 'lucide-react';
+import { format, isSameDay, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
 
-const SchoolView: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'timetable' | 'homework'>('timetable');
+interface Lesson {
+    id: string;
+    subject: { name: string; short: string };
+    class: { name: string };
+    teacher: { name: string };
+    classroom: { name: string };
+    startTime: string;
+    endTime: string;
+    date: string;
+}
 
-    return (
-        <div className="h-full flex flex-col">
-            <div className="flex items-center justify-between mb-6 px-2">
-                <h2 className="text-3xl font-bold bg-gradient-to-r from-indigo-400 to-purple-500 bg-clip-text text-transparent">
-                    Schule & Edupage
-                </h2>
-                <div className="flex bg-slate-800 rounded-lg p-1">
-                    <button
-                        onClick={() => setActiveTab('timetable')}
-                        className={clsx("px-4 py-2 rounded-md transition", activeTab === 'timetable' ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-white")}
-                    >
-                        Stundenplan
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('homework')}
-                        className={clsx("px-4 py-2 rounded-md transition", activeTab === 'homework' ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-white")}
-                    >
-                        Hausaufgaben
+interface StudentData {
+    name: string;
+    timetable: Lesson[];
+    homework: any[];
+}
+
+const SchoolView: React.FC = () => {
+    const { config } = useConfig();
+    const [data, setData] = useState<StudentData[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const fetchData = async () => {
+        if (!config.edupage?.username || !config.edupage?.password) {
+            setError("Keine Edupage Zugangsdaten in den Einstellungen hinterlegt.");
+            return;
+        }
+
+        setLoading(true);
+        setError(null);
+
+        try {
+            const response = await fetch('/api/edupage', {
+                headers: {
+                    'username': config.edupage.username,
+                    'password': config.edupage.password
+                }
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || 'Fehler beim Laden der Daten');
+            }
+
+            const result = await response.json();
+            // Expecting { students: [...] }
+            if (result.students) {
+                setData(result.students);
+            } else {
+                // Fallback if backend returns flat structure
+                setData([{ name: result.user?.name || 'Schüler', timetable: result.timetable || [], homework: [] }]);
+            }
+
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+        // Auto-refresh every 30 minutes
+        const interval = setInterval(fetchData, 30 * 60 * 1000);
+        return () => clearInterval(interval);
+    }, [config.edupage]); // Reload if config changes
+
+    if (error) {
+        return (
+            <div className="h-full flex items-center justify-center p-8 text-center bg-slate-900 text-white">
+                <div className="max-w-md bg-slate-800 p-6 rounded-xl border border-red-500/50">
+                    <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold mb-2">Verbindungsfehler</h3>
+                    <p className="text-slate-300 mb-4">{error}</p>
+                    <button onClick={fetchData} className="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-500">
+                        Erneut versuchen
                     </button>
                 </div>
             </div>
+        );
+    }
 
-            <div className="flex-1 overflow-y-auto px-2 pb-20">
-                {activeTab === 'timetable' && (
-                    <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-slate-400 uppercase tracking-wider mb-4">Heute</h3>
-                        {mockSchool.timetable.map(period => (
-                            <div key={period.id} className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 flex items-center justify-between">
-                                <div className="flex items-center space-x-4">
-                                    <div className="p-3 bg-indigo-500/20 text-indigo-300 rounded-xl">
-                                        <Clock className="w-6 h-6" />
-                                    </div>
-                                    <div>
-                                        <div className="text-xl font-bold text-white">{period.subject}</div>
-                                        <div className="text-slate-400">{period.time}</div>
-                                    </div>
-                                </div>
-                                <div className="text-2xl font-bold text-slate-500">{period.room}</div>
+    if (loading && data.length === 0) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center bg-slate-900 text-white space-y-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                <p className="text-slate-400">Lade Schuldaten...</p>
+            </div>
+        );
+    }
+
+    // Determine grid columns based on student count (max 2 for now as requested)
+    const gridCols = data.length > 1 ? 'grid-cols-2' : 'grid-cols-1';
+
+    return (
+        <div className="h-full bg-slate-900 p-6 text-slate-100 overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-3xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                    Schule
+                </h2>
+                <button onClick={fetchData} className="p-2 hover:bg-slate-800 rounded-full transition" disabled={loading}>
+                    <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                </button>
+            </div>
+
+            <div className={`grid ${gridCols} gap-6 h-full pb-20`}>
+                {data.map((student, idx) => (
+                    <div key={idx} className="flex flex-col space-y-6">
+                        {/* Student Header */}
+                        <div className="flex items-center space-x-3 bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+                            <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center text-xl font-bold">
+                                {student.name.charAt(0)}
                             </div>
-                        ))}
+                            <h3 className="text-xl font-bold">{student.name}</h3>
+                        </div>
+
+                        {/* Timetable Today */}
+                        <div className="bg-slate-800/80 rounded-xl border border-slate-700 overflow-hidden flex-1">
+                            <div className="p-4 border-b border-slate-700 bg-slate-800 flex items-center justify-between">
+                                <h4 className="font-bold flex items-center">
+                                    <Clock className="w-4 h-4 mr-2 text-blue-400" />
+                                    Stundenplan Heute
+                                </h4>
+                                <span className="text-xs text-slate-500">{format(new Date(), 'dd.MM.', { locale: de })}</span>
+                            </div>
+                            <div className="p-2 space-y-2 overflow-y-auto max-h-[400px]">
+                                {student.timetable && student.timetable.length > 0 ? (
+                                    student.timetable
+                                        // Filter for today if API returns multiple days (Edupage usually returns range)
+                                        // If backend returns just 'next lessons', we display them.
+                                        // For prototype, we display all returned lessons.
+                                        .map((lesson, lIdx) => (
+                                            <div key={lesson.id || lIdx} className="bg-slate-700/50 p-3 rounded-lg flex justify-between items-center hover:bg-slate-700 transition">
+                                                <div className="flex items-center space-x-3">
+                                                    <div className="text-sm font-mono text-slate-400 w-12 text-right">
+                                                        {lesson.startTime}
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-bold text-emerald-300">{lesson.subject?.name || 'Unbekannt'}</div>
+                                                        <div className="text-xs text-slate-400">Raum {lesson.classroom?.name} • {lesson.teacher?.name}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
+                                ) : (
+                                    <div className="text-center p-4 text-slate-500 italic">Keine Stunden heute</div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Homework Section */}
+                        <div className="bg-slate-800/80 rounded-xl border border-slate-700 overflow-hidden flex-1">
+                            <div className="p-4 border-b border-slate-700 bg-slate-800">
+                                <h4 className="font-bold flex items-center">
+                                    <BookOpen className="w-4 h-4 mr-2 text-orange-400" />
+                                    Hausaufgaben & Prüfungen
+                                </h4>
+                            </div>
+                            <div className="p-4 text-center text-slate-500 italic">
+                                {student.homework?.length === 0 ? "Alles erledigt!" : "Aufgaben anzeigen..."}
+                            </div>
+                        </div>
                     </div>
-                )}
+                ))}
 
-                {activeTab === 'homework' && (
-                    <div className="space-y-4">
-                        {mockSchool.homework.map(hw => (
-                            <div key={hw.id} className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-5 flex items-start space-x-4">
-                                <div className="p-3 bg-purple-500/20 text-purple-300 rounded-xl mt-1">
-                                    <BookOpen className="w-6 h-6" />
-                                </div>
-                                <div className="flex-1">
-                                    <div className="flex justify-between items-start">
-                                        <div className="text-lg font-bold text-white">{hw.subject}</div>
-                                        <span className="text-sm px-2 py-1 bg-red-500/20 text-red-300 rounded border border-red-500/30">
-                                            bis {format(hw.due, 'dd.MM.', { locale: de })}
-                                        </span>
-                                    </div>
-                                    <div className="text-slate-300 mt-2 text-lg">{hw.task}</div>
-                                </div>
-                            </div>
-                        ))}
+                {data.length === 0 && !loading && (
+                    <div className="col-span-full text-center p-10 bg-slate-800/30 rounded-xl border border-dashed border-slate-700">
+                        <p className="text-slate-400">Keine Schülerdaten gefunden.</p>
                     </div>
                 )}
             </div>
