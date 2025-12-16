@@ -16,8 +16,8 @@ const PORT = 3001;
 app.get('/api/edupage', async (req, res) => {
     const { username, password } = req.headers;
 
-    const user = process.env.EDUPAGE_USER || (username as string);
-    const pass = process.env.EDUPAGE_PASSWORD || (password as string);
+    const user = process.env.EDUPAGE_USER || username;
+    const pass = process.env.EDUPAGE_PASSWORD || password;
 
     if (!user || !pass) {
         return res.status(401).json({ error: 'Missing credentials' });
@@ -70,7 +70,7 @@ app.get('/api/edupage', async (req, res) => {
             students: studentsData
         });
 
-    } catch (error: any) {
+    } catch (error) {
         console.error("Edupage Error:", error);
         res.status(500).json({ error: error.message || "Unknown Error" });
     }

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useConfig } from '../../contexts/ConfigContext';
 import { BookOpen, Clock, AlertCircle, RefreshCw } from 'lucide-react';
-import { format, isSameDay, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 
 interface Lesson {
