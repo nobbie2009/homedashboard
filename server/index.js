@@ -27,42 +27,50 @@ app.get('/api/edupage', async (req, res) => {
         const edupage = new Edupage();
         await edupage.login(user, pass);
 
-        // Prepare response array
+        // Confirm student data sources
+        console.log("Edupage User Props:", Object.keys(edupage.user || {}));
+        console.log("Edupage Instance Props:", Object.keys(edupage));
+        // console.log("Edupage Students List:", edupage.students);
+
         const studentsData = [];
 
         const today = new Date();
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
-        // Fetch Timetable using verified method
-        const rawTimetable = await edupage.getTimetableForDate(today);
+        // Function to sanitize lessons
+        const mapLessons = (raw) => {
+            if (!raw) return [];
+            let list = Array.isArray(raw) ? raw : (raw.lessons || []);
+            return list.map(lesson => ({
+                id: lesson.id,
+                startTime: lesson.startTime,
+                endTime: lesson.endTime,
+                date: lesson.date,
+                subject: lesson.subject ? { name: lesson.subject.name, short: lesson.subject.short } : { name: '?', short: '?' },
+                classroom: lesson.classroom ? { name: lesson.classroom.name } : { name: '' },
+                teacher: lesson.teacher ? { name: lesson.teacher.name } : { name: '' },
+                class: lesson.class ? { name: lesson.class.name } : { name: '' }
+            }));
+        };
 
-        // Sanitize data to avoid Circular Structure error
-        let lessons = [];
-        if (Array.isArray(rawTimetable)) {
-            lessons = rawTimetable;
-        } else if (rawTimetable && Array.isArray(rawTimetable.lessons)) {
-            lessons = rawTimetable.lessons;
-        } else {
-            console.log("Raw Timetable Type:", typeof rawTimetable);
-            console.log("Raw Timetable Keys:", Object.keys(rawTimetable || {}));
-            // throw new Error("Timetable is not an array. Check logs.");
-        }
+        const rawToday = await edupage.getTimetableForDate(today);
+        const rawTomorrow = await edupage.getTimetableForDate(tomorrow);
 
-        const timetable = lessons.map(lesson => ({
-            id: lesson.id,
-            startTime: lesson.startTime,
-            endTime: lesson.endTime,
-            date: lesson.date,
-            subject: lesson.subject ? { name: lesson.subject.name, short: lesson.subject.short } : { name: '?', short: '?' },
-            classroom: lesson.classroom ? { name: lesson.classroom.name } : { name: '' },
-            teacher: lesson.teacher ? { name: lesson.teacher.name } : { name: '' },
-            class: lesson.class ? { name: lesson.class.name } : { name: '' }
-        }));
+        const timetableToday = mapLessons(rawToday);
+        const timetableTomorrow = mapLessons(rawTomorrow);
+
+        // Combine for now (or distinct properties?)
+        // Frontend expects 'timetable' array. We can merge or change frontend to expect { today, tomorrow }.
+        // Let's merge and let frontend sort/filter by date?
+        // Or better: update frontend to receive separated lists.
+        // For compatibility with current Frontend check:
+        // Frontend uses: student.timetable.filter(isToday) logic? No, current frontend assumes all is today.
+        // I will change the backend to return 'timetable' containing both, and let Frontend filter.
 
         studentsData.push({
             name: edupage.user.firstName || edupage.user.name || "Schüler",
-            timetable: timetable,
+            timetable: [...timetableToday, ...timetableTomorrow],
             homework: []
         });
 
