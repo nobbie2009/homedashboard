@@ -121,36 +121,59 @@ const SchoolView: React.FC = () => {
                             <h3 className="text-xl font-bold">{student.name}</h3>
                         </div>
 
-                        {/* Timetable Today */}
-                        <div className="bg-slate-800/80 rounded-xl border border-slate-700 overflow-hidden flex-1">
+                        {/* Timetable Section */}
+                        <div className="bg-slate-800/80 rounded-xl border border-slate-700 overflow-hidden flex-1 flex flex-col">
                             <div className="p-4 border-b border-slate-700 bg-slate-800 flex items-center justify-between">
                                 <h4 className="font-bold flex items-center">
                                     <Clock className="w-4 h-4 mr-2 text-blue-400" />
-                                    Stundenplan Heute
+                                    Stundenplan
                                 </h4>
-                                <span className="text-xs text-slate-500">{format(new Date(), 'dd.MM.', { locale: de })}</span>
                             </div>
-                            <div className="p-2 space-y-2 overflow-y-auto max-h-[400px]">
+                            <div className="p-2 space-y-2 overflow-y-auto max-h-[500px] flex-1">
                                 {student.timetable && student.timetable.length > 0 ? (
-                                    student.timetable
-                                        // Filter for today if API returns multiple days (Edupage usually returns range)
-                                        // If backend returns just 'next lessons', we display them.
-                                        // For prototype, we display all returned lessons.
-                                        .map((lesson, lIdx) => (
-                                            <div key={lesson.id || lIdx} className="bg-slate-700/50 p-3 rounded-lg flex justify-between items-center hover:bg-slate-700 transition">
-                                                <div className="flex items-center space-x-3">
-                                                    <div className="text-sm font-mono text-slate-400 w-12 text-right">
-                                                        {lesson.startTime}
+                                    (() => {
+                                        const groupedLessons: React.ReactNode[] = [];
+                                        let lastDate = '';
+
+                                        student.timetable.forEach((lesson, lIdx) => {
+                                            // Format date for comparison and display header
+                                            // lesson.date is likely ISO string "2023-12-16T..."
+                                            const lessonDateObj = new Date(lesson.date);
+                                            const dateStr = format(lessonDateObj, 'yyyy-MM-dd');
+
+                                            // Insert Header if date changed
+                                            if (dateStr !== lastDate) {
+                                                const isToday = format(new Date(), 'yyyy-MM-dd') === dateStr;
+                                                const displayDate = format(lessonDateObj, 'EEEE, dd.MM.', { locale: de });
+
+                                                groupedLessons.push(
+                                                    <div key={`header-${dateStr}`} className="sticky top-0 z-10 bg-slate-800/95 backdrop-blur py-2 px-1 border-b border-slate-700/50 text-xs font-bold text-slate-400 uppercase tracking-wider mt-2 first:mt-0">
+                                                        {isToday ? `Heute - ${displayDate}` : displayDate}
                                                     </div>
-                                                    <div>
-                                                        <div className="font-bold text-emerald-300">{lesson.subject?.name || 'Unbekannt'}</div>
-                                                        <div className="text-xs text-slate-400">Raum {lesson.classroom?.name} • {lesson.teacher?.name}</div>
+                                                );
+                                                lastDate = dateStr;
+                                            }
+
+                                            groupedLessons.push(
+                                                <div key={lesson.id || `${lIdx}-${lesson.startTime}`} className="bg-slate-700/50 p-3 rounded-lg flex justify-between items-center hover:bg-slate-700 transition">
+                                                    <div className="flex items-center space-x-3 w-full">
+                                                        <div className="text-sm font-mono text-slate-400 w-12 text-right flex-shrink-0">
+                                                            {lesson.startTime}
+                                                        </div>
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="font-bold text-emerald-300 truncate">{lesson.subject?.name || 'Unbekannt'}</div>
+                                                            <div className="text-xs text-slate-400 truncate">
+                                                                Raum {lesson.classroom?.name} • {lesson.teacher?.name}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))
+                                            );
+                                        });
+                                        return groupedLessons;
+                                    })()
                                 ) : (
-                                    <div className="text-center p-4 text-slate-500 italic">Keine Stunden heute</div>
+                                    <div className="text-center p-4 text-slate-500 italic">Keine Stunden gefunden</div>
                                 )}
                             </div>
                         </div>

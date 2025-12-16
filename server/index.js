@@ -1,6 +1,4 @@
-import express from 'express';
 import cors from 'cors';
-import fs from 'fs';
 import { Edupage } from 'edupage-api';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
@@ -27,21 +25,6 @@ app.get('/api/edupage', async (req, res) => {
     try {
         const edupage = new Edupage();
         await edupage.login(user, pass);
-
-        // DEBUG: Write edupage structure to file
-        try {
-            const debugInfo = {
-                edupageKeys: Object.keys(edupage),
-                edupageProtoKeys: Object.keys(Object.getPrototypeOf(edupage)),
-                students: edupage.students,
-                user: edupage.user,
-                // Check if getTimetableForDate is on prototype
-                getTimetableForDateLength: edupage.getTimetableForDate?.length
-            };
-            fs.writeFileSync('server_debug.json', JSON.stringify(debugInfo, null, 2));
-        } catch (err) {
-            console.error("Debug write failed:", err);
-        }
 
         // Confirm student data sources
         console.log("Edupage User Props:", Object.keys(edupage.user || {}));
@@ -70,25 +53,84 @@ app.get('/api/edupage', async (req, res) => {
             }));
         };
 
-        const rawToday = await edupage.getTimetableForDate(today);
-        const rawTomorrow = await edupage.getTimetableForDate(tomorrow);
+        // Initialize gpids by fetching today's timetable for default student
+        try {
+            await edupage.getTimetableForDate(today);
+        } catch (e) {
+            console.log("Initial fetch failed, maybe login issue or no rights", e);
+        }
 
-        const timetableToday = mapLessons(rawToday);
-        const timetableTomorrow = mapLessons(rawTomorrow);
+        // Get student IDs (gpids)
+        // Accessing internal ASC object if available, or fallback to single user
+        const gpids = edupage.ASC?.gpids || [];
+        if (gpids.length === 0 && edupage.user) {
+            // Fallback if no gpids found (unlikely if login worked)
+            studentsData.push({
+                name: edupage.user.firstName || edupage.user.name || "Schüler",
+                timetable: [],
+                homework: []
+            });
+        }
 
-        // Combine for now (or distinct properties?)
-        // Frontend expects 'timetable' array. We can merge or change frontend to expect { today, tomorrow }.
-        // Let's merge and let frontend sort/filter by date?
-        // Or better: update frontend to receive separated lists.
-        // For compatibility with current Frontend check:
-        // Frontend uses: student.timetable.filter(isToday) logic? No, current frontend assumes all is today.
-        // I will change the backend to return 'timetable' containing both, and let Frontend filter.
+        console.log("Found GPIDs:", gpids);
 
-        studentsData.push({
-            name: edupage.user.firstName || edupage.user.name || "Schüler",
-            timetable: [...timetableToday, ...timetableTomorrow],
-            homework: []
-        });
+        // Helper to fetch days
+        const fetchDays = async () => {
+            const daysToFetch = 3; // Today + 2 days
+            const lessons = [];
+            for (let i = 0; i < daysToFetch; i++) {
+                const d = new Date(today);
+                d.setDate(today.getDate() + i);
+                try {
+                    const raw = await edupage.getTimetableForDate(d);
+                    lessons.push(...mapLessons(raw));
+                } catch (err) {
+                    console.error(`Failed to fetch date ${d}:`, err);
+                }
+            }
+            return lessons;
+        };
+
+        // Iterate students
+        // Attempts to find names in edupage.students or edupage.user.students if available
+        // We really don't have a reliable Map of ID -> Name without more probing, 
+        // so we might use "Student 1", "Student 2" or try to find name in fetched data?
+        // Actually, edupage.students might be the array of Student objects matching gpids?
+        const studentObjects = edupage.students || [];
+
+        for (let i = 0; i < gpids.length; i++) {
+            const gpid = gpids[i];
+
+            // Switch Context
+            if (edupage.ASC) {
+                edupage.ASC.gpid = gpid;
+            }
+
+            // CRITICAL: Clear cache to force fetch for new student
+            edupage.timetables = [];
+
+            const timetable = await fetchDays();
+
+            // Name resolution
+            let name = `Schüler ${i + 1}`;
+            // Try to find name in studentObjects
+            // Assuming studentObjects might have 'id' or 'gpid' matching?
+            // Or maybe just index matching?
+            if (studentObjects[i] && (studentObjects[i].name || studentObjects[i].firstName)) {
+                name = studentObjects[i].firstName || studentObjects[i].name;
+            } else if (i === 0 && edupage.user) {
+                // Default to user name for first one if no students array
+                name = edupage.user.firstName || edupage.user.name || name;
+            }
+
+            studentsData.push({
+                name: name,
+                timetable: timetable,
+                homework: [] // Homework fetching usually also needs gpid switch
+            });
+        }
+
+        // If for some reason loop didn't run (no gpids?), fallback handled above or empty.
 
         res.json({
             students: studentsData
