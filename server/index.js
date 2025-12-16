@@ -121,6 +121,34 @@ app.get('/api/edupage', async (req, res) => {
 
         console.log("Effective GPIDs to process:", effectiveGpids);
 
+        console.log("Edupage User keys:", Object.keys(edupage.user || {}));
+        if (edupage.user && edupage.user.students) {
+            console.log("User.students found:", edupage.user.students.length);
+            console.log("User.students sample:", JSON.stringify(edupage.user.students[0] || {}, null, 2));
+        }
+
+        // Check for other potential properties on user
+        const userPropsToCheck = ['children', 'wards', 'childs', 'relatedStudents'];
+        userPropsToCheck.forEach(prop => {
+            if (edupage.user && edupage.user[prop]) {
+                console.log(`User property '${prop}' found:`, edupage.user[prop]);
+            }
+        });
+
+        // Dump one full student object from the main list to see structure
+        if (studentObjects.length > 0) {
+            console.log("Sample from edupage.students[0] FULL keys:", Object.keys(studentObjects[0]));
+            // Try to log safe version
+            const safeSample = {};
+            // Copy simple properties
+            for (let key in studentObjects[0]) {
+                if (typeof studentObjects[0][key] !== 'object' && typeof studentObjects[0][key] !== 'function') {
+                    safeSample[key] = studentObjects[0][key];
+                }
+            }
+            console.log("Sample from edupage.students[0] Values:", safeSample);
+        }
+
         // Filter for specific children names provided by user
         const targetNames = ["Johanna", "Charlotte"];
         console.log(`Filtering for students: ${targetNames.join(", ")}`);
