@@ -143,11 +143,14 @@ app.get('/api/edupage', async (req, res) => {
 
                 // Process Homework
                 if (edupage.homeworks) {
+                    if (edupage.homeworks.length > 0) {
+                        console.log("DEBUG HOMEWORK ITEM [0]:", JSON.stringify(edupage.homeworks[0], null, 2));
+                    }
                     homework = edupage.homeworks.map(hw => ({
                         id: hw.id,
                         title: hw.title || "Hausaufgabe",
                         subject: hw.subject ? hw.subject.name : "Unbekannt",
-                        date: hw.date, // Due date
+                        date: hw.date || hw.dueDate || hw.completionDate, // Try common date fields
                         done: hw.done || false
                     }));
                 }
