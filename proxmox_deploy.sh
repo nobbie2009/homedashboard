@@ -62,7 +62,7 @@ sleep 10
 
 echo "=== Step 3: Setting up Environment inside Container ==="
 # Update and install dependencies
-pct exec $CT_ID -- bash -c "apt-get update && apt-get install -y curl git"
+pct exec $CT_ID -- bash -c "apt-get update && apt-get install -y curl git && git config --global credential.helper store"
 
 # Install Docker
 echo "Installing Docker..."
