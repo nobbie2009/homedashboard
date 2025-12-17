@@ -12,12 +12,17 @@ app.use(express.json());
 
 const PORT = 3001;
 
+let oauth2Client = null;
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    oauth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        process.env.GOOGLE_REDIRECT_URI || "http://localhost:3001/auth/google/callback"
+    );
+} else {
+    console.warn("WARNING: Google Client ID/Secret not found. Google Auth will fail.");
+}
 
-const oauth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI || "http://localhost:3001/auth/google/callback"
-);
 let userTokens = null; // In-memory storage for MVP
 
 app.get('/api/edupage', async (req, res) => {
@@ -219,6 +224,9 @@ app.get('/api/edupage', async (req, res) => {
 // --- GOOGLE AUTH ROUTES ---
 
 app.get('/auth/google', (req, res) => {
+    if (!oauth2Client) {
+        return res.status(500).json({ error: "Server missing Google Credentials in .env" });
+    }
     const scopes = [
         'https://www.googleapis.com/auth/calendar.readonly',
         'https://www.googleapis.com/auth/calendar.events.readonly'
@@ -231,6 +239,9 @@ app.get('/auth/google', (req, res) => {
 });
 
 app.get('/auth/google/callback', async (req, res) => {
+    if (!oauth2Client) {
+        return res.redirect('http://localhost:5173/admin/settings?googleAuth=error_missing_creds');
+    }
     const { code } = req.query;
     try {
         const { tokens } = await oauth2Client.getToken(code);
