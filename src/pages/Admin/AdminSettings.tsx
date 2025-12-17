@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useKiosk } from '../../contexts/KioskContext';
 import { useConfig } from '../../contexts/ConfigContext';
-import { Lock, Save } from 'lucide-react';
+import { Lock, Save, Calendar as CalendarIcon, CheckCircle } from 'lucide-react';
 // import clsx from 'clsx';
 
 const AdminSettings: React.FC = () => {
@@ -9,6 +9,31 @@ const AdminSettings: React.FC = () => {
     const { config, updateConfig } = useConfig();
     const [pin, setPin] = useState('');
     const [error, setError] = useState('');
+    const [remoteCalendars, setRemoteCalendars] = useState<any[]>([]);
+    const [isGoogleAuth, setIsGoogleAuth] = useState(false);
+
+    useEffect(() => {
+        // Check URL for auth status
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('googleAuth') === 'success') {
+            setIsGoogleAuth(true);
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+
+        // Fetch remote calendars
+        fetch('http://localhost:3001/api/google/calendars')
+            .then(res => {
+                if (res.ok) {
+                    setIsGoogleAuth(true); // If we can fetch, we are auth'd
+                    return res.json();
+                }
+                throw new Error("Not authenticated");
+            })
+            .then(data => {
+                if (Array.isArray(data)) setRemoteCalendars(data);
+            })
+            .catch(() => setIsGoogleAuth(false));
+    }, []);
 
     const handleUnlock = () => {
         if (unlock(pin)) {
@@ -25,6 +50,14 @@ const AdminSettings: React.FC = () => {
             ? config.enabledCalendars.filter(c => c !== cal)
             : [...config.enabledCalendars, cal];
         updateConfig({ enabledCalendars: newCalendars });
+    };
+
+    const handleToggleGoogleCalendar = (calId: string) => {
+        const current = config.google?.selectedCalendars || [];
+        const newSelection = current.includes(calId)
+            ? current.filter(id => id !== calId)
+            : [...current, calId];
+        updateConfig({ google: { ...config.google, selectedCalendars: newSelection } });
     };
 
     if (isLocked) {
@@ -78,6 +111,50 @@ const AdminSettings: React.FC = () => {
             </div>
 
             <div className="space-y-8">
+                <section className="bg-slate-800/30 p-6 rounded-xl border border-slate-700">
+                    <div className="flex justify-between items-start mb-4">
+                        <h3 className="text-xl font-semibold text-slate-300 flex items-center gap-2">
+                            <CalendarIcon className="w-5 h-5" />
+                            Google Calendar
+                        </h3>
+                        {isGoogleAuth ? (
+                            <span className="flex items-center gap-1 text-green-400 text-sm font-medium bg-green-400/10 px-3 py-1 rounded-full">
+                                <CheckCircle className="w-4 h-4 ml-1" />
+                                Verbunden
+                            </span>
+                        ) : (
+                            <a
+                                href="http://localhost:3001/auth/google"
+                                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-500 transition"
+                            >
+                                Mit Google verbinden
+                            </a>
+                        )}
+                    </div>
+
+                    {isGoogleAuth && remoteCalendars.length > 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                            {remoteCalendars.map(cal => (
+                                <label key={cal.id} className="flex items-center space-x-3 p-3 bg-slate-800 rounded-lg cursor-pointer hover:bg-slate-750 transition border border-slate-700/50">
+                                    <input
+                                        type="checkbox"
+                                        checked={(config.google?.selectedCalendars || []).includes(cal.id)}
+                                        onChange={() => handleToggleGoogleCalendar(cal.id)}
+                                        className="w-4 h-4 rounded border-slate-600 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <div className="flex flex-col overflow-hidden">
+                                        <span className="truncate font-medium text-slate-200">{cal.summary}</span>
+                                        <span className="text-xs text-slate-500 truncate">{cal.id}</span>
+                                    </div>
+                                </label>
+                            ))}
+                        </div>
+                    )}
+                    {isGoogleAuth && remoteCalendars.length === 0 && (
+                        <p className="text-slate-500 italic">Keine Kalender gefunden.</p>
+                    )}
+                </section>
+
                 <section>
                     <h3 className="text-xl font-semibold text-slate-300 mb-4">Sichtbare Kalender</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { Edupage } from 'edupage-api';
+import { google } from 'googleapis';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -10,6 +11,14 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = 3001;
+
+
+const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI || "http://localhost:3001/auth/google/callback"
+);
+let userTokens = null; // In-memory storage for MVP
 
 app.get('/api/edupage', async (req, res) => {
     const { username, password } = req.headers;
@@ -203,6 +212,99 @@ app.get('/api/edupage', async (req, res) => {
     } catch (error) {
         console.error("Edupage Error:", error);
         res.status(500).json({ error: error.message || "Unknown Error" });
+    }
+});
+
+
+// --- GOOGLE AUTH ROUTES ---
+
+app.get('/auth/google', (req, res) => {
+    const scopes = [
+        'https://www.googleapis.com/auth/calendar.readonly',
+        'https://www.googleapis.com/auth/calendar.events.readonly'
+    ];
+    const url = oauth2Client.generateAuthUrl({
+        access_type: 'offline', // Request refresh token
+        scope: scopes
+    });
+    res.json({ url });
+});
+
+app.get('/auth/google/callback', async (req, res) => {
+    const { code } = req.query;
+    try {
+        const { tokens } = await oauth2Client.getToken(code);
+        oauth2Client.setCredentials(tokens);
+        userTokens = tokens; // Save tokens (consider saving to file/db in prod)
+        console.log("Google tokens acquired successfully.");
+        // Redirect back to Frontend Admin Settings
+        res.redirect('http://localhost:5173/admin/settings?googleAuth=success');
+    } catch (error) {
+        console.error("Error retrieving access token", error);
+        res.redirect('http://localhost:5173/admin/settings?googleAuth=error');
+    }
+});
+
+app.get('/api/google/calendars', async (req, res) => {
+    if (!userTokens) {
+        return res.status(401).json({ error: "Not authenticated with Google" });
+    }
+    try {
+        oauth2Client.setCredentials(userTokens);
+        const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+        const response = await calendar.calendarList.list();
+        res.json(response.data.items);
+    } catch (error) {
+        console.error("Error fetching calendars", error);
+        res.status(500).json({ error: "Failed to fetch calendars" });
+    }
+});
+
+app.post('/api/google/events', async (req, res) => {
+    if (!userTokens) {
+        return res.status(401).json({ error: "Not authenticated with Google" });
+    }
+    const { calendarIds } = req.body; // Array of calendar IDs
+    if (!calendarIds || !Array.isArray(calendarIds)) {
+        return res.status(400).json({ error: "Missing calendarIds array" });
+    }
+
+    try {
+        oauth2Client.setCredentials(userTokens);
+        const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+        const allEvents = [];
+        const timeMin = new Date().toISOString();
+        const timeMax = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // Next 7 days
+
+        for (const calId of calendarIds) {
+            const response = await calendar.events.list({
+                calendarId: calId,
+                timeMin: timeMin,
+                timeMax: timeMax,
+                singleEvents: true,
+                orderBy: 'startTime',
+            });
+            // Tag events with calendar ID/Name if needed
+            const events = response.data.items.map(e => ({
+                ...e,
+                calendarId: calId // Track source
+            }));
+            allEvents.push(...events);
+        }
+
+        // Sort combined events by date
+        allEvents.sort((a, b) => {
+            const dateA = new Date(a.start.dateTime || a.start.date);
+            const dateB = new Date(b.start.dateTime || b.start.date);
+            return dateA - dateB;
+        });
+
+        res.json(allEvents);
+
+    } catch (error) {
+        console.error("Error fetching events", error);
+        res.status(500).json({ error: "Failed to fetch events" });
     }
 });
 

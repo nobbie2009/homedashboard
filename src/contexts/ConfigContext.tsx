@@ -10,6 +10,9 @@ export interface AppConfig {
         username?: string;
         password?: string;
     };
+    google?: {
+        selectedCalendars: string[];
+    };
 }
 
 interface ConfigContextType {
@@ -23,6 +26,7 @@ const defaultConfig: AppConfig = {
     showSeconds: false,
     schoolNames: ['Max', 'Moritz'],
     edupage: { username: '', password: '' },
+    google: { selectedCalendars: [] },
 };
 
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
