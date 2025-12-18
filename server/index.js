@@ -286,7 +286,12 @@ app.post('/api/google/events', async (req, res) => {
         const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
         const allEvents = [];
-        const timeMin = new Date().toISOString();
+
+        // Fix: Fetch from start of TODAY (00:00) instead of NOW
+        const now = new Date();
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        const timeMin = startOfDay.toISOString();
         const timeMax = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // Next 7 days
 
         for (const calId of calendarIds) {

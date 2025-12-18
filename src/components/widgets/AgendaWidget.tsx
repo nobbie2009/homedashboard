@@ -75,18 +75,21 @@ export const AgendaWidget: React.FC = () => {
                 ) : events.length === 0 ? (
                     <div className="text-slate-500 text-center mt-10">Keine Termine heute</div>
                 ) : (
-                    events.map(event => (
-                        <div key={event.id} className="flex items-center p-3 bg-slate-700/50 rounded-lg border-l-4 border-l-blue-500 transition hover:bg-slate-700">
-                            <div className="flex flex-col w-16 text-center border-r border-slate-600 pr-3 mr-3">
-                                <span className="text-xl font-bold text-white">{format(event.start, 'HH:mm')}</span>
-                                <span className="text-xs text-slate-400">{format(event.end, 'HH:mm')}</span>
+                    events.map(event => {
+                        const isPast = event.end < new Date();
+                        return (
+                            <div key={event.id} className={`flex items-center p-3 bg-slate-700/50 rounded-lg border-l-4 border-l-blue-500 transition hover:bg-slate-700 ${isPast ? 'opacity-50 grayscale' : ''}`}>
+                                <div className="flex flex-col w-16 text-center border-r border-slate-600 pr-3 mr-3">
+                                    <span className={`text-xl font-bold ${isPast ? 'text-slate-400' : 'text-white'}`}>{format(event.start, 'HH:mm')}</span>
+                                    <span className="text-xs text-slate-400">{format(event.end, 'HH:mm')}</span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className={`font-medium text-lg leading-tight truncate ${isPast ? 'text-slate-400' : 'text-white'}`}>{event.title}</div>
+                                    <div className="text-xs text-slate-400 mt-1 uppercase truncate">{event.calendarId}</div>
+                                </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="text-white font-medium text-lg leading-tight truncate">{event.title}</div>
-                                <div className="text-xs text-slate-400 mt-1 uppercase truncate">{event.calendarId}</div>
-                            </div>
-                        </div>
-                    ))
+                        );
+                    })
                 )}
             </div>
         </div>
