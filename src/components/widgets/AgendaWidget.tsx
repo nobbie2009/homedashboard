@@ -1,11 +1,9 @@
 import React, { useMemo } from 'react';
 import { format, isSameDay } from 'date-fns';
-import { useConfig } from '../../contexts/ConfigContext';
 import { useGoogleEvents } from '../../hooks/useGoogleEvents';
 import { MapPin } from 'lucide-react';
 
 export const AgendaWidget: React.FC = () => {
-    const { config } = useConfig();
     const { events, loading } = useGoogleEvents();
 
     const todaysEvents = useMemo(() => {
