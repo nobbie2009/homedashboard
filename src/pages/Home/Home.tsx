@@ -1,6 +1,7 @@
 import React from 'react';
 import { UnifiedHeaderWidget } from '../../components/widgets/UnifiedHeaderWidget';
 import { AgendaWidget } from '../../components/widgets/AgendaWidget';
+import { CameraWidget } from '../../components/widgets/CameraWidget';
 
 import { CountdownWidget } from '../../components/widgets/CountdownWidget';
 import { WeekWidget } from '../../components/widgets/WeekWidget';
