@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { Home, ClipboardList, GraduationCap, Lock, Unlock, Settings as SettingsIcon, Calendar } from 'lucide-react';
+import { Home, ClipboardList, Lock, Unlock, Settings as SettingsIcon, Calendar, LayoutDashboard } from 'lucide-react';
 import { useKiosk } from '../../contexts/KioskContext';
 import clsx from 'clsx';
 
@@ -9,10 +9,10 @@ export const MainLayout: React.FC = () => {
     // const location = useLocation();
 
     const navItems = [
-        { path: '/', icon: Home, label: 'Home' },
-        { path: '/notes', icon: ClipboardList, label: 'Notes' },
+        { path: '/', icon: LayoutDashboard, label: 'Heute' },
         { path: '/status', icon: Calendar, label: 'Diese Woche' },
-        { path: '/school', icon: GraduationCap, label: 'School' },
+        { path: '/school', icon: Home, label: 'Home' },
+        { path: '/notes', icon: ClipboardList, label: 'Notizen' },
     ];
 
     return (
