@@ -228,7 +228,7 @@ const WeekView: React.FC = () => {
                                                 }}
                                             >
                                                 <div className="font-bold text-white drop-shadow-md whitespace-normal break-words leading-tight">
-                                                    {event.calendarName ? `${event.calendarName}: ` : ''}{event.title}
+                                                    {event.title}
                                                 </div>
                                                 <div className="text-white/90 truncate text-[10px] mt-0.5">
                                                     {format(event.start, 'HH:mm')} - {format(event.end, 'HH:mm')}
