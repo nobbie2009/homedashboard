@@ -1,7 +1,7 @@
 import React from 'react';
 import { UnifiedHeaderWidget } from '../../components/widgets/UnifiedHeaderWidget';
 import { AgendaWidget } from '../../components/widgets/AgendaWidget';
-import { TrashWidget } from '../../components/widgets/TrashWidget';
+
 import { CountdownWidget } from '../../components/widgets/CountdownWidget';
 import { WeekWidget } from '../../components/widgets/WeekWidget';
 
@@ -23,7 +23,9 @@ export const Home: React.FC = () => {
 
             {/* Bottom Row: Trash & Countdown */}
             <div className="h-48">
-                <TrashWidget />
+                <div className="h-full bg-slate-800/20 rounded-xl border border-slate-700/30 flex items-center justify-center text-slate-600 italic">
+                    Platzhalter
+                </div>
             </div>
             <div className="h-48">
                 <CountdownWidget />
