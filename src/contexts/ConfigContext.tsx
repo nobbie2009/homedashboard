@@ -44,7 +44,6 @@ const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 
 export function ConfigProvider({ children }: { children: React.ReactNode }) {
     const [config, setConfig] = useState<AppConfig>(defaultConfig);
-    const [loaded, setLoaded] = useState(false);
 
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -64,11 +63,9 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
                     edupage: { ...prev.edupage, ...(data.edupage || {}) },
                     google: { ...prev.google, ...(data.google || {}) }
                 }));
-                setLoaded(true);
             })
             .catch(err => {
                 console.error("Config load error:", err);
-                setLoaded(true); // Fallback to default
             });
     }, []);
 
