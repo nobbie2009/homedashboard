@@ -223,7 +223,7 @@ const AdminSettings: React.FC = () => {
                                                     key={s.key}
                                                     onClick={() => toggleScope(s.key as import('../../contexts/ConfigContext').CalendarScope)}
                                                     disabled={!isSelected}
-                                                    className={`w-8 h-8 rounded text-xs font-bold transition-all ${settings.scopes[s.key as any]
+                                                    className={`w-8 h-8 rounded text-xs font-bold transition-all ${settings.scopes[s.key as import('../../contexts/ConfigContext').CalendarScope]
                                                         ? 'bg-blue-600 text-white'
                                                         : 'bg-slate-800 text-slate-500'
                                                         } ${!isSelected ? 'opacity-30 cursor-not-allowed' : 'hover:scale-105'}`}
