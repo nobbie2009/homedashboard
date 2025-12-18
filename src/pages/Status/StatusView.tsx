@@ -15,131 +15,148 @@ import { de } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
 import clsx from 'clsx';
 import { useConfig } from '../../contexts/ConfigContext';
+import { useGoogleEvents, CalendarEvent } from '../../hooks/useGoogleEvents';
 
 // Constants for layout
 const HOUR_HEIGHT = 60; // pixels per hour
 
-interface CalendarEvent {
-    id: string;
-    title: string;
-    start: Date;
-    end: Date;
-    calendarId: string;
-    description?: string;
-    location?: string;
+// --- Helper for Layout (Overlapping Events) ---
+interface LayoutEvent extends CalendarEvent {
+    style: React.CSSProperties;
 }
+
+const layoutEvents = (events: CalendarEvent[]): LayoutEvent[] => {
+    // 1. Sort by start time, then duration (longest first)
+    const sorted = [...events].sort((a, b) => {
+        if (a.start.getTime() === b.start.getTime()) {
+            return (b.end.getTime() - b.start.getTime()) - (a.end.getTime() - a.start.getTime());
+        }
+        return a.start.getTime() - b.start.getTime();
+    });
+
+    const columns: CalendarEvent[][] = [];
+    const processedEvents: LayoutEvent[] = [];
+
+    sorted.forEach(ev => {
+        let placed = false;
+        // Try to place in existing column
+        for (let i = 0; i < columns.length; i++) {
+            const lastInCol = columns[i][columns[i].length - 1];
+            // If current event starts after last event in column ends -> fits here
+            if (ev.start >= lastInCol.end) {
+                columns[i].push(ev);
+                processedEvents.push({
+                    ...ev,
+                    style: {
+                        top: `${(getHours(ev.start) * 60 + getMinutes(ev.start)) / 60 * HOUR_HEIGHT}px`,
+                        height: `${Math.max(differenceInMinutes(ev.end, ev.start) / 60 * HOUR_HEIGHT, 25)}px`,
+                        left: `${(i / columns.length) * 100}%`, // Temp, re-calc later
+                        width: `${(1 / columns.length) * 100}%`, // Temp
+                        position: 'absolute'
+                    }
+                });
+                placed = true;
+                break;
+            }
+        }
+
+        // If not placed, start new column
+        if (!placed) {
+            columns.push([ev]);
+            processedEvents.push({
+                ...ev,
+                style: {
+                    top: `${(getHours(ev.start) * 60 + getMinutes(ev.start)) / 60 * HOUR_HEIGHT}px`,
+                    height: `${Math.max(differenceInMinutes(ev.end, ev.start) / 60 * HOUR_HEIGHT, 25)}px`,
+                    left: `0%`,
+                    width: `100%`,
+                    position: 'absolute'
+                }
+            });
+        }
+    });
+
+    // Re-calculate widths based on total columns overlapping at any point?
+    // A simpler approach for "columns":
+    // Just blindly assign width = 100% / max_concurrent_columns_in_group
+    // But here we might have independent groups.
+    // simpler visual approx:
+    // Just use the column index we assigned!
+
+    // We need to know for each event, how many columns TOTAL exist in its timeframe group.
+    // This is complex "Event Packing".
+    // Simplified: Just update width based on final column count? No, that assumes all cols persist.
+
+    // Better simple algo:
+    // 1. Calculate collisions for each event.
+    // 2. Assign column index.
+    // 3. Max columns = max visual overlap.
+
+    // Since we already built "columns" above where strictly no overlap within column:
+    // We can iterate processed events again and fix widths.
+    // But the above greedy "first fit" column fill is decent. 
+    // We just need to know how many columns are active *at that specific time*.
+
+    // Let's stick to the "columns" variable. It roughly represents horizontal lanes.
+    const totalLanes = columns.length;
+
+    // Re-map to apply correct width/left based on the lane index found
+    const result = [];
+    for (const ev of sorted) {
+        // find which lane this event is in
+        const laneIndex = columns.findIndex(col => col.includes(ev));
+        const style = {
+            top: `${(getHours(ev.start) * 60 + getMinutes(ev.start)) / 60 * HOUR_HEIGHT}px`,
+            height: `${Math.max(differenceInMinutes(ev.end, ev.start) / 60 * HOUR_HEIGHT, 25)}px`,
+            // Distribute lanes evenly. 
+            // Note: This makes ALL events narrow if there is ONE busy time. Ideally we cluster.
+            // But for a dashboard, distinct columns is safer than complex clustering.
+            left: `${(laneIndex / totalLanes) * 100}%`,
+            width: `${(1 / totalLanes) * 100}%`,
+            position: 'absolute' as 'absolute'
+        };
+        result.push({ ...ev, style });
+    }
+
+    return result;
+};
+
 
 const WeekView: React.FC = () => {
     const { config } = useConfig();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [now, setNow] = useState(new Date());
-    const [events, setEvents] = useState<CalendarEvent[]>([]);
-    const [loading, setLoading] = useState(false);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-    // Initial scroll to current time
+    const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }); // Monday start
+    const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+    // Uses the hook!
+    // We pass explicit range to match the view (if backend supported it optimally)
+    // Currently backend defaults to "Next 7 days" but we patched it to support body params!
+    const { events, loading } = useGoogleEvents({
+        timeMin: weekStart.toISOString(),
+        timeMax: addDays(weekStart, 7).toISOString()
+    });
+
+    // Initial scroll
     useEffect(() => {
         if (scrollContainerRef.current) {
             const now = new Date();
             const startMinutes = getHours(now) * 60 + getMinutes(now);
-            const scrollPos = (startMinutes / 60) * HOUR_HEIGHT - 300; // Center (approx half screen height)
+            const scrollPos = (startMinutes / 60) * HOUR_HEIGHT - 300;
             scrollContainerRef.current.scrollTop = Math.max(0, scrollPos);
         }
     }, [scrollContainerRef]);
 
-    // Update "now" every minute
     useEffect(() => {
         const interval = setInterval(() => setNow(new Date()), 60000);
         return () => clearInterval(interval);
     }, []);
 
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }); // Monday start
-    const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-
-    // Fetch Events when week changes
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
-    useEffect(() => {
-        const fetchWeekEvents = async () => {
-            const selected = config.google?.selectedCalendars || [];
-            if (selected.length === 0) {
-                setEvents([]);
-                return;
-            }
-
-            setLoading(true);
-            try {
-                // Calculate Query Range (Week Start to Week End)
-                // Note: We fetch a bit more to be safe? API usually accepts timeMin/Max
-                // But our endpoint currently hardcodes "Next 7 days from NOW".
-                // We need to UPDATE THE ENDPOINT OR USE IT AS IS?
-                // The endpoint uses:
-                // const timeMin = startOfDay.toISOString();
-                // const timeMax = new Date(Date.now() + 7 * 24 ...
-                // This is problematic for viewing NEXT week or PREVIOUS week.
-                //
-                // QUICK FIX: For now, I'll use the existing endpoint which fetches From Today + 7 days.
-                // IF the user navigates to future weeks, it might work if within range.
-                // IF the user navigates to PAST weeks, it won't work.
-                //
-                // REAL FIX: I should have updated the backend to accept custom ranges.
-                // But for this step I will assume "This Week" (Status Page rename) implies simply viewing the current status.
-                // If the user uses arrow keys he expects it to work.
-                // I will stick to "Next 7 days" endpoint behavior for now and mention it as limitation or fix backend if unsafe.
-                // Actually, let's fix the backend in the next step if I can't pass params.
-                //
-                // Wait, the endpoint `api/google/events` hardcodes timeMin/timeMax.
-                // I should update the backend to respect `req.body.timeMin` and `req.body.timeMax` if provided.
-
-                const res = await fetch(`${API_URL}/api/google/events`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        calendarIds: selected,
-                        // Proposed backend update support:
-                        timeMin: weekStart.toISOString(),
-                        timeMax: addDays(weekStart, 7).toISOString()
-                    })
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    const mapped: CalendarEvent[] = data.map((e: any) => ({
-                        id: e.id,
-                        title: e.summary || "Kein Titel",
-                        start: new Date(e.start.dateTime || e.start.date),
-                        end: new Date(e.end.dateTime || e.end.date),
-                        calendarId: e.calendarId || 'google',
-                        description: e.description,
-                        location: e.location
-                    }));
-                    setEvents(mapped);
-                }
-            } catch (err) {
-                console.error("Failed to fetch events", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchWeekEvents();
-    }, [config.google?.selectedCalendars, weekStart.toISOString()]); // Refetch when week changes
-
     const addWeek = () => setCurrentDate(d => addWeeks(d, 1));
     const subWeek = () => setCurrentDate(d => subWeeks(d, 1));
     const goToToday = () => setCurrentDate(new Date());
-
-    const getEventStyle = (event: CalendarEvent) => {
-        const startMinutes = getHours(event.start) * 60 + getMinutes(event.start);
-        const duration = differenceInMinutes(event.end, event.start);
-        const color = config.google?.calendarColors?.[event.calendarId] || '#3b82f6';
-
-        return {
-            top: `${(startMinutes / 60) * HOUR_HEIGHT}px`,
-            height: `${Math.max(duration / 60 * HOUR_HEIGHT, 25)}px`, // Min height for visibility
-            backgroundColor: color,
-            borderColor: color
-        };
-    };
 
     const getCurrentTimePosition = () => {
         const minutes = getHours(now) * 60 + getMinutes(now);
@@ -224,7 +241,11 @@ const WeekView: React.FC = () => {
                         {/* Events Grid */}
                         <div className="grid grid-cols-7 relative divide-x divide-slate-700/50 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSI2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMCA2MEwxMDAwMCA2MCIgc3Ryb2tlPSJyZ2JhKDc1LDg1LDEwMSwwLjEpIiBmaWxsPSJub25lIi8+PC9zdmc+')]" style={{ backgroundSize: `100% ${HOUR_HEIGHT}px` }}>
                             {weekDays.map((day) => {
-                                const dayEvents = events.filter(e => isSameDay(e.start, day));
+                                // Filter events for this day
+                                const dayEventsRaw = events.filter(e => isSameDay(e.start, day));
+                                // Calculate layout (avoid overlaps)
+                                const layoutedEvents = layoutEvents(dayEventsRaw);
+
                                 const isCurrentDay = isToday(day);
 
                                 return (
@@ -241,13 +262,17 @@ const WeekView: React.FC = () => {
                                         )}
 
                                         {/* Events */}
-                                        {dayEvents.map(event => (
+                                        {layoutedEvents.map(event => (
                                             <div
                                                 key={event.id}
                                                 className={clsx(
-                                                    "absolute left-1 right-1 rounded-md p-1 pl-2 text-xs border shadow-sm overflow-hidden hover:z-50 hover:shadow-xl transition-all cursor-pointer group",
+                                                    "rounded-md p-1 pl-2 text-xs border shadow-sm overflow-hidden hover:z-50 hover:shadow-xl transition-all cursor-pointer group",
                                                 )}
-                                                style={getEventStyle(event)}
+                                                style={{
+                                                    ...event.style,
+                                                    backgroundColor: event.color || '#3b82f6',
+                                                    borderColor: event.color || '#3b82f6'
+                                                }}
                                             >
                                                 <div className="font-bold truncate text-white drop-shadow-md">{event.title}</div>
                                                 <div className="text-white/90 truncate">
