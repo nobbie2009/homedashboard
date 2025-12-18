@@ -3,6 +3,8 @@ import cors from 'cors';
 import { Edupage } from 'edupage-api';
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
 
 dotenv.config();
 
@@ -23,7 +25,23 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     console.warn("WARNING: Google Client ID/Secret not found. Google Auth will fail.");
 }
 
-let userTokens = null; // In-memory storage for MVP
+// Token storage path
+const TOKEN_PATH = path.join(__dirname, 'tokens.json');
+let userTokens = null;
+
+// Load tokens on startup
+if (fs.existsSync(TOKEN_PATH)) {
+    try {
+        const data = fs.readFileSync(TOKEN_PATH, 'utf8');
+        userTokens = JSON.parse(data);
+        if (oauth2Client) {
+            oauth2Client.setCredentials(userTokens);
+            console.log("Loaded Google tokens from file.");
+        }
+    } catch (err) {
+        console.error("Failed to load tokens:", err);
+    }
+}
 
 app.get('/api/edupage', async (req, res) => {
     const { username, password } = req.headers;
@@ -246,8 +264,12 @@ app.get('/auth/google/callback', async (req, res) => {
     try {
         const { tokens } = await oauth2Client.getToken(code);
         oauth2Client.setCredentials(tokens);
-        userTokens = tokens; // Save tokens (consider saving to file/db in prod)
-        console.log("Google tokens acquired successfully.");
+        userTokens = tokens;
+
+        // Save tokens to file
+        fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens));
+        console.log("Google tokens acquired and saved to file.");
+
         // Redirect back to Frontend Admin Settings (Relative path works because of Nginx proxy)
         res.redirect('/admin/settings?googleAuth=success');
     } catch (error) {

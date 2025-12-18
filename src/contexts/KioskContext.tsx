@@ -15,12 +15,16 @@ const ADMIN_PIN = '1234';
 const IDLE_TIMEOUT_MS = 60000; // 1 minute for testing, can be increased
 
 export function KioskProvider({ children }: { children: React.ReactNode }) {
-    const [isLocked, setIsLocked] = useState(true); // Default to locked
+    const [isLocked, setIsLocked] = useState(() => {
+        const stored = localStorage.getItem('kiosk_is_locked');
+        return stored !== null ? JSON.parse(stored) : true;
+    }); // Default to locked, or load from storage
     const [lastInteraction, setLastInteraction] = useState(Date.now());
 
     const unlock = useCallback((pin: string) => {
         if (pin === ADMIN_PIN) {
             setIsLocked(false);
+            localStorage.setItem('kiosk_is_locked', 'false');
             resetIdleTimer();
             return true;
         }
@@ -29,6 +33,7 @@ export function KioskProvider({ children }: { children: React.ReactNode }) {
 
     const lock = useCallback(() => {
         setIsLocked(true);
+        localStorage.setItem('kiosk_is_locked', 'true');
     }, []);
 
     const resetIdleTimer = useCallback(() => {
@@ -41,7 +46,7 @@ export function KioskProvider({ children }: { children: React.ReactNode }) {
 
         const interval = setInterval(() => {
             if (Date.now() - lastInteraction > IDLE_TIMEOUT_MS) {
-                lock();
+                lock(); // lock() handles persistence now
             }
         }, 5000); // Check every 5 seconds
 
