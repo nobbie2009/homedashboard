@@ -240,7 +240,7 @@ app.get('/auth/google', (req, res) => {
 
 app.get('/auth/google/callback', async (req, res) => {
     if (!oauth2Client) {
-        return res.redirect('http://localhost:5173/admin/settings?googleAuth=error_missing_creds');
+        return res.redirect('/admin/settings?googleAuth=error_missing_creds');
     }
     const { code } = req.query;
     try {
@@ -248,11 +248,11 @@ app.get('/auth/google/callback', async (req, res) => {
         oauth2Client.setCredentials(tokens);
         userTokens = tokens; // Save tokens (consider saving to file/db in prod)
         console.log("Google tokens acquired successfully.");
-        // Redirect back to Frontend Admin Settings
-        res.redirect('http://localhost:5173/admin/settings?googleAuth=success');
+        // Redirect back to Frontend Admin Settings (Relative path works because of Nginx proxy)
+        res.redirect('/admin/settings?googleAuth=success');
     } catch (error) {
         console.error("Error retrieving access token", error);
-        res.redirect('http://localhost:5173/admin/settings?googleAuth=error');
+        res.redirect('/admin/settings?googleAuth=error');
     }
 });
 
