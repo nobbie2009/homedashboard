@@ -241,6 +241,25 @@ const AdminSettings: React.FC = () => {
 
 
                 <section>
+                    <h3 className="text-xl font-semibold text-slate-300 mb-4">Kamera Stream</h3>
+                    <div className="bg-slate-900/40 rounded-lg border border-slate-700/50 p-4">
+                        <label className="block text-sm font-medium text-slate-400 mb-2">
+                            RTSP / HTTP Stream URL
+                        </label>
+                        <input
+                            type="text"
+                            value={config.cameraUrl || ''}
+                            onChange={(e) => updateConfig({ cameraUrl: e.target.value })}
+                            placeholder="rtsp://user:pass@192.168.1.100:554/stream"
+                            className="bg-slate-800 border border-slate-700 rounded w-full px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500"
+                        />
+                        <p className="text-xs text-slate-500 mt-2">
+                            Unterstützt RTSP Streams (werden via Backend transcodiert) oder direkte HTTP MJPEG Streams.
+                        </p>
+                    </div>
+                </section>
+
+                <section>
                     <h3 className="text-xl font-semibold text-slate-300 mb-4">Wetter Standort</h3>
                     <input
                         type="text"
