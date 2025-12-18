@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useKiosk } from '../../contexts/KioskContext';
 import { useConfig } from '../../contexts/ConfigContext';
-import { Lock, Save, Calendar as CalendarIcon, CheckCircle } from 'lucide-react';
+import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download } from 'lucide-react';
 // import clsx from 'clsx';
 
 const AdminSettings: React.FC = () => {
@@ -56,6 +56,37 @@ const AdminSettings: React.FC = () => {
             ? current.filter(id => id !== calId)
             : [...current, calId];
         updateConfig({ google: { ...config.google, selectedCalendars: newSelection } });
+    };
+
+    const handleExport = () => {
+        window.open(`${API_URL}/api/config/backup`, '_blank');
+    };
+
+    const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const json = JSON.parse(e.target?.result as string);
+                const res = await fetch(`${API_URL}/api/config/restore`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(json)
+                });
+                if (res.ok) {
+                    alert('Einstellungen erfolgreich importiert. Seite wird neu geladen.');
+                    window.location.reload();
+                } else {
+                    alert('Fehler beim Importieren.');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Ungültige Datei.');
+            }
+        };
+        reader.readAsText(file);
     };
 
     if (isLocked) {
@@ -290,6 +321,25 @@ const AdminSettings: React.FC = () => {
                                 className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 w-full focus:outline-none focus:border-blue-500"
                             />
                         </div>
+                    </div>
+                </section>
+
+                <section>
+                    <h3 className="text-xl font-semibold text-slate-300 mb-4">Backup & Wiederherstellung</h3>
+                    <div className="flex space-x-4">
+                        <button
+                            onClick={handleExport}
+                            className="flex items-center space-x-2 bg-slate-800 border border-slate-700 px-4 py-2 rounded-lg hover:bg-slate-700 transition"
+                        >
+                            <Download className="w-5 h-5 text-blue-400" />
+                            <span>Einstellungen exportieren</span>
+                        </button>
+
+                        <label className="flex items-center space-x-2 bg-slate-800 border border-slate-700 px-4 py-2 rounded-lg hover:bg-slate-700 transition cursor-pointer">
+                            <Upload className="w-5 h-5 text-green-400" />
+                            <span>Einstellungen importieren</span>
+                            <input type="file" accept=".json" onChange={handleImport} className="hidden" />
+                        </label>
                     </div>
                 </section>
 

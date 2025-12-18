@@ -30,8 +30,14 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 
 // Token storage path
 // Token storage path
-const TOKEN_PATH = path.join(__dirname, 'tokens.json');
-const CONFIG_PATH = path.join(__dirname, 'config.json');
+// Token storage path
+const DATA_DIR = path.join(__dirname, 'data');
+if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+const TOKEN_PATH = path.join(DATA_DIR, 'tokens.json');
+const CONFIG_PATH = path.join(DATA_DIR, 'config.json');
 
 let userTokens = null;
 let appConfig = {};
@@ -79,6 +85,32 @@ app.post('/api/config', (req, res) => {
     } catch (err) {
         console.error("Failed to save config:", err);
         res.status(500).json({ error: "Failed to save config" });
+    }
+});
+
+// Backup & Restore
+app.get('/api/config/backup', (req, res) => {
+    if (fs.existsSync(CONFIG_PATH)) {
+        res.download(CONFIG_PATH, 'homedashboard-config.json');
+    } else {
+        res.json(appConfig); // If no file yet, send in-memory
+    }
+});
+
+app.post('/api/config/restore', (req, res) => {
+    try {
+        const newConfig = req.body;
+        // Basic validation
+        if (typeof newConfig !== 'object') {
+            return res.status(400).send("Invalid config format");
+        }
+        appConfig = newConfig;
+        fs.writeFileSync(CONFIG_PATH, JSON.stringify(appConfig, null, 2));
+        console.log("Config restored from backup.");
+        res.json({ success: true });
+    } catch (err) {
+        console.error("Restore failed:", err);
+        res.status(500).send("Restore failed");
     }
 });
 
