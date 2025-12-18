@@ -276,6 +276,7 @@ app.post('/api/google/events', async (req, res) => {
         return res.status(401).json({ error: "Not authenticated with Google" });
     }
     const { calendarIds } = req.body; // Array of calendar IDs
+    console.log("DEBUG: Fetching events for calendars:", calendarIds);
     if (!calendarIds || !Array.isArray(calendarIds)) {
         return res.status(400).json({ error: "Missing calendarIds array" });
     }
@@ -312,7 +313,7 @@ app.post('/api/google/events', async (req, res) => {
         });
 
         res.json(allEvents);
-
+        console.log(`DEBUG: Found ${allEvents.length} events total.`);
     } catch (error) {
         console.error("Error fetching events", error);
         res.status(500).json({ error: "Failed to fetch events" });
