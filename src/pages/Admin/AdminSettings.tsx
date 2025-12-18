@@ -48,12 +48,7 @@ const AdminSettings: React.FC = () => {
         }
     };
 
-    const handleToggleCalendar = (cal: string) => {
-        const newCalendars = config.enabledCalendars.includes(cal)
-            ? config.enabledCalendars.filter(c => c !== cal)
-            : [...config.enabledCalendars, cal];
-        updateConfig({ enabledCalendars: newCalendars });
-    };
+
 
     const handleToggleGoogleCalendar = (calId: string) => {
         const current = config.google?.selectedCalendars || [];
@@ -243,22 +238,7 @@ const AdminSettings: React.FC = () => {
                     )}
                 </section>
 
-                <section>
-                    <h3 className="text-xl font-semibold text-slate-300 mb-4">Sichtbare Kalender</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {['family', 'work', 'school', 'garbage'].map(cal => (
-                            <label key={cal} className="flex items-center space-x-3 p-4 bg-slate-800/50 rounded-lg border border-slate-700 cursor-pointer hover:bg-slate-800 transition">
-                                <input
-                                    type="checkbox"
-                                    checked={config.enabledCalendars.includes(cal)}
-                                    onChange={() => handleToggleCalendar(cal)}
-                                    className="w-5 h-5 rounded border-slate-600 text-blue-600 focus:ring-blue-500 focus:ring-offset-slate-900"
-                                />
-                                <span className="capitalize text-lg">{cal}</span>
-                            </label>
-                        ))}
-                    </div>
-                </section>
+
 
                 <section>
                     <h3 className="text-xl font-semibold text-slate-300 mb-4">Wetter Standort</h3>

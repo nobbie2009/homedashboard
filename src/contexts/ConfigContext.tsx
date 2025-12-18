@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 // Define configuration types
 export interface AppConfig {
@@ -44,9 +44,49 @@ const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 
 export function ConfigProvider({ children }: { children: React.ReactNode }) {
     const [config, setConfig] = useState<AppConfig>(defaultConfig);
+    const [loaded, setLoaded] = useState(false);
+
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+    // Load from Backend
+    useEffect(() => {
+        fetch(`${API_URL}/api/config`)
+            .then(res => {
+                if (res.ok) return res.json();
+                throw new Error("Failed to load config");
+            })
+            .then(data => {
+                // Determine deep merge or just shallow? Shallow for now, but ensure nested objects exist
+                setConfig(prev => ({
+                    ...prev,
+                    ...data,
+                    // Ensure nested objects are merged correctly if partial data comes back
+                    edupage: { ...prev.edupage, ...(data.edupage || {}) },
+                    google: { ...prev.google, ...(data.google || {}) }
+                }));
+                setLoaded(true);
+            })
+            .catch(err => {
+                console.error("Config load error:", err);
+                setLoaded(true); // Fallback to default
+            });
+    }, []);
 
     const updateConfig = (newConfig: Partial<AppConfig>) => {
-        setConfig((prev) => ({ ...prev, ...newConfig }));
+        setConfig((prev) => {
+            const updated = { ...prev, ...newConfig };
+
+            // Persist to backend (Debounced ideally, but simple POST for now)
+            // We only send the partial update or full? 
+            // Better send full updated config to be safe
+            fetch(`${API_URL}/api/config`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updated)
+            }).catch(e => console.error("Failed to save config:", e));
+
+            return updated;
+        });
     };
 
     return (

@@ -29,8 +29,12 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 }
 
 // Token storage path
+// Token storage path
 const TOKEN_PATH = path.join(__dirname, 'tokens.json');
+const CONFIG_PATH = path.join(__dirname, 'config.json');
+
 let userTokens = null;
+let appConfig = {};
 
 // Load tokens on startup
 if (fs.existsSync(TOKEN_PATH)) {
@@ -45,6 +49,38 @@ if (fs.existsSync(TOKEN_PATH)) {
         console.error("Failed to load tokens:", err);
     }
 }
+
+// Load config on startup
+if (fs.existsSync(CONFIG_PATH)) {
+    try {
+        appConfig = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+        console.log("Loaded AppConfig from file.");
+    } catch (err) {
+        console.error("Failed to load config:", err);
+    }
+}
+
+// Event Cache
+const eventCache = new Map();
+const CACHE_TTL = 10 * 60 * 1000; // 10 Minutes
+
+// --- Config Endpoints ---
+app.get('/api/config', (req, res) => {
+    res.json(appConfig);
+});
+
+app.post('/api/config', (req, res) => {
+    try {
+        const newConfig = { ...appConfig, ...req.body };
+        appConfig = newConfig;
+        fs.writeFileSync(CONFIG_PATH, JSON.stringify(appConfig, null, 2));
+        console.log("Config saved.");
+        res.json({ success: true, config: appConfig });
+    } catch (err) {
+        console.error("Failed to save config:", err);
+        res.status(500).json({ error: "Failed to save config" });
+    }
+});
 
 app.get('/api/edupage', async (req, res) => {
     const { username, password } = req.headers;
@@ -302,50 +338,70 @@ app.post('/api/google/events', async (req, res) => {
     }
     const { calendarIds } = req.body; // Array of calendar IDs
     console.log("DEBUG: Fetching events for calendars:", calendarIds);
-    if (!calendarIds || !Array.isArray(calendarIds)) {
-        return res.status(400).json({ error: "Missing calendarIds array" });
+    if (!oauth2Client) return res.status(500).json({ error: "Google Auth not configured" });
+
+    // Check Cache
+    const cacheKey = JSON.stringify(req.body);
+    const cached = eventCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+        console.log("Serving events from cache");
+        return res.json(cached.data);
     }
 
+    const { timeMin, timeMax } = req.body;
+
+    if (!calendarIds || !Array.isArray(calendarIds)) {
+        return res.status(400).json({ error: "Missing calendarIds" });
+    }
+
+    // Default to starts of today if not provided
+    // const startOfDay = new Date();
+    // startOfDay.setHours(0, 0, 0, 0);
+    // const timeMinParam = timeMin || startOfDay.toISOString();
+
+    // Default range logic (if not provided)
+    const now = new Date();
+    const tMin = timeMin || new Date(now.setHours(0, 0, 0, 0)).toISOString();
+    const tMax = timeMax || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
     try {
-        oauth2Client.setCredentials(userTokens);
         const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
-        const allEvents = [];
-
-        // Fix: Fetch from start of TODAY (00:00) instead of NOW
-        const now = new Date();
-        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-        const timeMin = req.body.timeMin || startOfDay.toISOString();
-        const timeMax = req.body.timeMax || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        let allEvents = [];
 
         for (const calId of calendarIds) {
-            const response = await calendar.events.list({
-                calendarId: calId,
-                timeMin: timeMin,
-                timeMax: timeMax,
-                singleEvents: true,
-                orderBy: 'startTime',
-            });
-            // Tag events with calendar ID/Name if needed
-            const events = response.data.items.map(e => ({
-                ...e,
-                calendarId: calId // Track source
-            }));
-            allEvents.push(...events);
+            try {
+                const response = await calendar.events.list({
+                    calendarId: calId,
+                    timeMin: tMin,
+                    timeMax: tMax,
+                    singleEvents: true,
+                    orderBy: 'startTime',
+                });
+
+                const events = response.data.items.map(event => ({
+                    id: event.id,
+                    summary: event.summary,
+                    start: event.start,
+                    end: event.end,
+                    calendarId: calId, // Tag with source calendar
+                    description: event.description,
+                    location: event.location
+                }));
+
+                allEvents = [...allEvents, ...events];
+            } catch (err) {
+                console.error(`Failed to fetch for ${calId}:`, err.message);
+            }
         }
 
-        // Sort combined events by date
-        allEvents.sort((a, b) => {
-            const dateA = new Date(a.start.dateTime || a.start.date);
-            const dateB = new Date(b.start.dateTime || b.start.date);
-            return dateA - dateB;
-        });
+        // Save to Cache
+        eventCache.set(cacheKey, { timestamp: Date.now(), data: allEvents });
 
         res.json(allEvents);
-        console.log(`DEBUG: Found ${allEvents.length} events total.`);
-    } catch (error) {
-        console.error("Error fetching events", error);
+
+    } catch (err) {
+        console.error("Google API Error", err);
         res.status(500).json({ error: "Failed to fetch events" });
     }
 });
