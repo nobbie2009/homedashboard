@@ -1,64 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { format, addDays, isSameDay } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { useConfig } from '../../contexts/ConfigContext';
-
-interface CalendarEvent {
-    id: string;
-    title: string;
-    start: Date;
-    end: Date;
-    calendarId: string;
-    color: string;
-}
+import { useGoogleEvents } from '../../hooks/useGoogleEvents';
 
 export const WeekWidget: React.FC = () => {
     const { config } = useConfig();
-    const [events, setEvents] = useState<CalendarEvent[]>([]);
-    const [loading, setLoading] = useState(false);
-
-    // Use env var or default to localhost
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
-    useEffect(() => {
-        const fetchEvents = async () => {
-            const selected = config.google?.selectedCalendars || [];
-            if (selected.length === 0) {
-                setEvents([]);
-                return;
-            }
-
-            setLoading(true);
-            try {
-                const res = await fetch(`${API_URL}/api/google/events`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ calendarIds: selected })
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    const mapped: CalendarEvent[] = data.map((e: any) => ({
-                        id: e.id,
-                        title: e.summary || "Kein Titel",
-                        start: new Date(e.start.dateTime || e.start.date),
-                        end: new Date(e.end.dateTime || e.end.date),
-                        calendarId: e.calendarId || 'google',
-                        color: 'bg-blue-500' // Placeholder
-                    }));
-                    setEvents(mapped);
-                }
-            } catch (err) {
-                console.error("Failed to fetch events", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchEvents();
-        // Refresh every 10 minutes
-        const interval = setInterval(fetchEvents, 600000);
-        return () => clearInterval(interval);
-    }, [config.google?.selectedCalendars]);
+    const { events, loading } = useGoogleEvents({ scope: 'weekWidget' });
 
     // Generate next 5 days
     const nextDays = Array.from({ length: 5 }, (_, i) => addDays(new Date(), i)); // Today + 4 days

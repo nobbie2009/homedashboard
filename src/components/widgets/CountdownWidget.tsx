@@ -4,7 +4,7 @@ import { useGoogleEvents } from '../../hooks/useGoogleEvents';
 
 export const CountdownWidget: React.FC = () => {
     const [now, setNow] = useState(new Date());
-    const { events, loading } = useGoogleEvents();
+    const { events, loading } = useGoogleEvents({ scope: 'nextEvent' });
 
     useEffect(() => {
         const timer = setInterval(() => setNow(new Date()), 1000);

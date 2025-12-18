@@ -4,7 +4,7 @@ import { useGoogleEvents } from '../../hooks/useGoogleEvents';
 import { MapPin } from 'lucide-react';
 
 export const AgendaWidget: React.FC = () => {
-    const { events, loading } = useGoogleEvents();
+    const { events, loading } = useGoogleEvents({ scope: 'today' });
 
     const todaysEvents = useMemo(() => {
         const today = new Date();

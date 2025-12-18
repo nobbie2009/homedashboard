@@ -136,31 +136,106 @@ const AdminSettings: React.FC = () => {
                     </div>
 
                     {isGoogleAuth && remoteCalendars.length > 0 && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-                            {remoteCalendars.map(cal => (
-                                <label key={cal.id} className="flex items-center space-x-3 p-3 bg-slate-800 rounded-lg cursor-pointer hover:bg-slate-750 transition border border-slate-700/50">
-                                    <input
-                                        type="checkbox"
-                                        checked={(config.google?.selectedCalendars || []).includes(cal.id)}
-                                        onChange={() => handleToggleGoogleCalendar(cal.id)}
-                                        className="w-4 h-4 rounded border-slate-600 text-blue-600 focus:ring-blue-500"
-                                    />
-                                    <input
-                                        type="color"
-                                        value={config.google?.calendarColors?.[cal.id] || '#3b82f6'}
-                                        onClick={(e) => e.stopPropagation()} // Prevent toggling checkbox
-                                        onChange={(e) => {
-                                            const newColors = { ...(config.google?.calendarColors || {}), [cal.id]: e.target.value };
-                                            updateConfig({ google: { selectedCalendars: config.google?.selectedCalendars || [], calendarColors: newColors } });
-                                        }}
-                                        className="w-8 h-8 rounded-full border-0 p-0 bg-transparent cursor-pointer"
-                                    />
-                                    <div className="flex flex-col overflow-hidden">
-                                        <span className="truncate font-medium text-slate-200">{cal.summary}</span>
-                                        <span className="text-xs text-slate-500 truncate">{cal.id}</span>
+                        <div className="mt-4 space-y-4">
+                            <div className="grid grid-cols-[auto_40px_1fr_auto] gap-4 items-center px-2 py-2 text-xs uppercase text-slate-500 font-bold border-b border-slate-700">
+                                <span>Aktiv</span>
+                                <span>Farbe</span>
+                                <span>Name (Alias)</span>
+                                <div className="flex space-x-2">
+                                    <span title="Heute Widget">Heute</span>
+                                    <span title="Wochen Widget">Woche</span>
+                                    <span title="Nächstes Event">Next</span>
+                                    <span title="Wochenansicht">View</span>
+                                </div>
+                            </div>
+
+                            {remoteCalendars.map(cal => {
+                                const isSelected = (config.google?.selectedCalendars || []).includes(cal.id);
+                                const settings = config.google?.calendarSettings?.[cal.id] || {
+                                    id: cal.id,
+                                    color: config.google?.calendarColors?.[cal.id] || '#3b82f6',
+                                    alias: cal.summary,
+                                    scopes: { today: true, weekWidget: true, nextEvent: true, weekView: true }
+                                };
+
+                                const updateSettings = (partial: Partial<typeof settings>) => {
+                                    const newSettings = { ...settings, ...partial };
+                                    const allSettings = { ...(config.google?.calendarSettings || {}), [cal.id]: newSettings };
+
+                                    // Also update legacy structures for compat
+                                    const newColors = { ...(config.google?.calendarColors || {}), [cal.id]: newSettings.color };
+
+                                    updateConfig({
+                                        google: {
+                                            ...config.google,
+                                            calendarColors: newColors,
+                                            calendarSettings: allSettings,
+                                            selectedCalendars: config.google?.selectedCalendars || []
+                                        }
+                                    });
+                                };
+
+                                const toggleScope = (scope: keyof typeof settings.scopes) => {
+                                    updateSettings({
+                                        scopes: { ...settings.scopes, [scope]: !settings.scopes[scope] }
+                                    });
+                                };
+
+                                return (
+                                    <div key={cal.id} className="grid grid-cols-[auto_40px_1fr_auto] gap-4 items-center p-3 bg-slate-900/40 rounded-lg border border-slate-700/50 hover:border-slate-600 transition">
+
+                                        {/* 1. Active Checkbox */}
+                                        <input
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() => handleToggleGoogleCalendar(cal.id)}
+                                            className="w-5 h-5 rounded border-slate-600 text-blue-600 focus:ring-blue-500"
+                                        />
+
+                                        {/* 2. Color Picker */}
+                                        <input
+                                            type="color"
+                                            value={settings.color}
+                                            onChange={(e) => updateSettings({ color: e.target.value })}
+                                            className="w-8 h-8 rounded-full border-0 p-0 bg-transparent cursor-pointer"
+                                            disabled={!isSelected}
+                                        />
+
+                                        {/* 3. Alias Input */}
+                                        <input
+                                            type="text"
+                                            value={settings.alias}
+                                            onChange={(e) => updateSettings({ alias: e.target.value })}
+                                            placeholder={cal.summary}
+                                            className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500 w-full disabled:opacity-50"
+                                            disabled={!isSelected}
+                                        />
+
+                                        {/* 4. Scopes */}
+                                        <div className="flex items-center space-x-3">
+                                            {[
+                                                { key: 'today', label: 'H' },
+                                                { key: 'weekWidget', label: 'W' },
+                                                { key: 'nextEvent', label: 'N' },
+                                                { key: 'weekView', label: 'V' },
+                                            ].map((s) => (
+                                                <button
+                                                    key={s.key}
+                                                    onClick={() => toggleScope(s.key as import('../../contexts/ConfigContext').CalendarScope)}
+                                                    disabled={!isSelected}
+                                                    className={`w-8 h-8 rounded text-xs font-bold transition-all ${settings.scopes[s.key as any]
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-slate-800 text-slate-500'
+                                                        } ${!isSelected ? 'opacity-30 cursor-not-allowed' : 'hover:scale-105'}`}
+                                                    title={s.key}
+                                                >
+                                                    {s.label}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
-                                </label>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                     {isGoogleAuth && remoteCalendars.length === 0 && (

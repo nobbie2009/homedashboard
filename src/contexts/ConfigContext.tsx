@@ -13,7 +13,17 @@ export interface AppConfig {
     google?: {
         selectedCalendars: string[];
         calendarColors?: Record<string, string>;
+        calendarSettings?: Record<string, CalendarSettings>;
     };
+}
+
+export type CalendarScope = 'today' | 'weekWidget' | 'nextEvent' | 'weekView';
+
+export interface CalendarSettings {
+    id: string;
+    color: string;
+    alias: string;
+    scopes: Record<CalendarScope, boolean>;
 }
 
 interface ConfigContextType {
@@ -27,7 +37,7 @@ const defaultConfig: AppConfig = {
     showSeconds: false,
     schoolNames: ['Max', 'Moritz'],
     edupage: { username: '', password: '' },
-    google: { selectedCalendars: [], calendarColors: {} },
+    google: { selectedCalendars: [], calendarColors: {}, calendarSettings: {} },
 };
 
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);

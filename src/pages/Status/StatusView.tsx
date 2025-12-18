@@ -34,7 +34,9 @@ const layoutEvents = (events: CalendarEvent[]): LayoutEvent[] => {
     });
 
     const columns: CalendarEvent[][] = [];
-    const processedEvents: LayoutEvent[] = [];
+
+    // We don't really need processedEvents array if we just build columns then map
+    // But keeping original logic structure for safety
 
     sorted.forEach(ev => {
         let placed = false;
@@ -44,16 +46,6 @@ const layoutEvents = (events: CalendarEvent[]): LayoutEvent[] => {
             // If current event starts after last event in column ends -> fits here
             if (ev.start >= lastInCol.end) {
                 columns[i].push(ev);
-                processedEvents.push({
-                    ...ev,
-                    style: {
-                        top: `${(getHours(ev.start) * 60 + getMinutes(ev.start)) / 60 * HOUR_HEIGHT}px`,
-                        height: `${Math.max(differenceInMinutes(ev.end, ev.start) / 60 * HOUR_HEIGHT, 25)}px`,
-                        left: `${(i / columns.length) * 100}%`, // Temp, re-calc later
-                        width: `${(1 / columns.length) * 100}%`, // Temp
-                        position: 'absolute'
-                    }
-                });
                 placed = true;
                 break;
             }
@@ -62,41 +54,9 @@ const layoutEvents = (events: CalendarEvent[]): LayoutEvent[] => {
         // If not placed, start new column
         if (!placed) {
             columns.push([ev]);
-            processedEvents.push({
-                ...ev,
-                style: {
-                    top: `${(getHours(ev.start) * 60 + getMinutes(ev.start)) / 60 * HOUR_HEIGHT}px`,
-                    height: `${Math.max(differenceInMinutes(ev.end, ev.start) / 60 * HOUR_HEIGHT, 25)}px`,
-                    left: `0%`,
-                    width: `100%`,
-                    position: 'absolute'
-                }
-            });
         }
     });
 
-    // Re-calculate widths based on total columns overlapping at any point?
-    // A simpler approach for "columns":
-    // Just blindly assign width = 100% / max_concurrent_columns_in_group
-    // But here we might have independent groups.
-    // simpler visual approx:
-    // Just use the column index we assigned!
-
-    // We need to know for each event, how many columns TOTAL exist in its timeframe group.
-    // This is complex "Event Packing".
-    // Simplified: Just update width based on final column count? No, that assumes all cols persist.
-
-    // Better simple algo:
-    // 1. Calculate collisions for each event.
-    // 2. Assign column index.
-    // 3. Max columns = max visual overlap.
-
-    // Since we already built "columns" above where strictly no overlap within column:
-    // We can iterate processed events again and fix widths.
-    // But the above greedy "first fit" column fill is decent. 
-    // We just need to know how many columns are active *at that specific time*.
-
-    // Let's stick to the "columns" variable. It roughly represents horizontal lanes.
     const totalLanes = columns.length;
 
     // Re-map to apply correct width/left based on the lane index found
@@ -107,9 +67,6 @@ const layoutEvents = (events: CalendarEvent[]): LayoutEvent[] => {
         const style = {
             top: `${(getHours(ev.start) * 60 + getMinutes(ev.start)) / 60 * HOUR_HEIGHT}px`,
             height: `${Math.max(differenceInMinutes(ev.end, ev.start) / 60 * HOUR_HEIGHT, 25)}px`,
-            // Distribute lanes evenly. 
-            // Note: This makes ALL events narrow if there is ONE busy time. Ideally we cluster.
-            // But for a dashboard, distinct columns is safer than complex clustering.
             left: `${(laneIndex / totalLanes) * 100}%`,
             width: `${(1 / totalLanes) * 100}%`,
             position: 'absolute' as 'absolute'
@@ -129,12 +86,10 @@ const WeekView: React.FC = () => {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }); // Monday start
     const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-    // Uses the hook!
-    // We pass explicit range to match the view (if backend supported it optimally)
-    // Currently backend defaults to "Next 7 days" but we patched it to support body params!
     const { events, loading } = useGoogleEvents({
         timeMin: weekStart.toISOString(),
-        timeMax: addDays(weekStart, 7).toISOString()
+        timeMax: addDays(weekStart, 7).toISOString(),
+        scope: 'weekView'
     });
 
     // Initial scroll
@@ -145,7 +100,7 @@ const WeekView: React.FC = () => {
             const scrollPos = (startMinutes / 60) * HOUR_HEIGHT - 300;
             scrollContainerRef.current.scrollTop = Math.max(0, scrollPos);
         }
-    }, [scrollContainerRef]);
+    }, []); // Run once on mount (or when ref is ready? Ref shouldn't trigger re-render, so empty dep is fine)
 
     useEffect(() => {
         const interval = setInterval(() => setNow(new Date()), 60000);
@@ -264,7 +219,7 @@ const WeekView: React.FC = () => {
                                             <div
                                                 key={event.id}
                                                 className={clsx(
-                                                    "rounded-md p-1 pl-2 text-xs border shadow-sm overflow-hidden hover:z-50 hover:shadow-xl transition-all cursor-pointer group",
+                                                    "rounded-md p-1 pl-2 text-xs border shadow-sm overflow-hidden hover:z-50 hover:shadow-xl transition-all cursor-pointer group flex flex-col",
                                                 )}
                                                 style={{
                                                     ...event.style,
@@ -272,8 +227,10 @@ const WeekView: React.FC = () => {
                                                     borderColor: event.color || '#3b82f6'
                                                 }}
                                             >
-                                                <div className="font-bold truncate text-white drop-shadow-md">{event.title}</div>
-                                                <div className="text-white/90 truncate">
+                                                <div className="font-bold text-white drop-shadow-md whitespace-normal break-words leading-tight">
+                                                    {event.calendarName ? `${event.calendarName}: ` : ''}{event.title}
+                                                </div>
+                                                <div className="text-white/90 truncate text-[10px] mt-0.5">
                                                     {format(event.start, 'HH:mm')} - {format(event.end, 'HH:mm')}
                                                 </div>
                                             </div>
