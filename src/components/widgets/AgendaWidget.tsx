@@ -16,6 +16,9 @@ export const AgendaWidget: React.FC = () => {
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [loading, setLoading] = useState(false);
 
+    // Use env var or default to localhost
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
     useEffect(() => {
         const fetchEvents = async () => {
             const selected = config.google?.selectedCalendars || [];
@@ -26,7 +29,7 @@ export const AgendaWidget: React.FC = () => {
 
             setLoading(true);
             try {
-                const res = await fetch('http://localhost:3001/api/google/events', {
+                const res = await fetch(`${API_URL}/api/google/events`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ calendarIds: selected })

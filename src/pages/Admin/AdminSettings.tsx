@@ -12,6 +12,9 @@ const AdminSettings: React.FC = () => {
     const [remoteCalendars, setRemoteCalendars] = useState<any[]>([]);
     const [isGoogleAuth, setIsGoogleAuth] = useState(false);
 
+    // Use env var or default to localhost
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
     useEffect(() => {
         // Check URL for auth status
         const params = new URLSearchParams(window.location.search);
@@ -21,7 +24,7 @@ const AdminSettings: React.FC = () => {
         }
 
         // Fetch remote calendars
-        fetch('http://localhost:3001/api/google/calendars')
+        fetch(`${API_URL}/api/google/calendars`)
             .then(res => {
                 if (res.ok) {
                     setIsGoogleAuth(true); // If we can fetch, we are auth'd
@@ -124,7 +127,7 @@ const AdminSettings: React.FC = () => {
                             </span>
                         ) : (
                             <a
-                                href="http://localhost:3001/auth/google"
+                                href={`${API_URL}/auth/google`}
                                 className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-500 transition"
                             >
                                 Mit Google verbinden
