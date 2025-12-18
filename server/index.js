@@ -235,7 +235,7 @@ app.get('/auth/google', (req, res) => {
         access_type: 'offline', // Request refresh token
         scope: scopes
     });
-    res.json({ url });
+    res.redirect(url);
 });
 
 app.get('/auth/google/callback', async (req, res) => {
