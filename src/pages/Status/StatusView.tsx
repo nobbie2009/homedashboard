@@ -14,7 +14,6 @@ import {
 import { de } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
 import clsx from 'clsx';
-import { useConfig } from '../../contexts/ConfigContext';
 import { useGoogleEvents, CalendarEvent } from '../../hooks/useGoogleEvents';
 
 // Constants for layout
@@ -123,7 +122,6 @@ const layoutEvents = (events: CalendarEvent[]): LayoutEvent[] => {
 
 
 const WeekView: React.FC = () => {
-    const { config } = useConfig();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [now, setNow] = useState(new Date());
     const scrollContainerRef = useRef<HTMLDivElement>(null);
