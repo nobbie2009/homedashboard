@@ -406,6 +406,48 @@ app.post('/api/google/events', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`Backend running on http://localhost:${PORT}`);
+const { spawn } = require('child_process');
+
+app.get('/api/camera/stream', (req, res) => {
+    const streamUrl = appConfig.cameraUrl;
+
+    if (!streamUrl) {
+        return res.status(404).send("Camera URL not configured");
+    }
+
+    console.log("Starting Stream for:", streamUrl);
+
+    res.writeHead(200, {
+        'Content-Type': 'multipart/x-mixed-replace; boundary=ffmpeg',
+        'Cache-Control': 'no-cache',
+        'Connection': 'close',
+        'Pragma': 'no-cache'
+    });
+
+    const ffmpeg = spawn('ffmpeg', [
+        '-rtsp_transport', 'tcp', // Force TCP (more reliable for RTSP)
+        '-i', streamUrl,
+        '-f', 'mjpeg',
+        '-q:v', '5', // Quality (1-31, lower is better config)
+        '-r', '15', // Limit framerate to 15fps for dashboard
+        '-' // Output to stdout
+    ]);
+
+    ffmpeg.stdout.pipe(res, { end: false });
+
+    // Handle errors
+    ffmpeg.stderr.on('data', (data) => {
+        // console.error(`FFMPEG Error: ${data}`); // Verbose
+    });
+
+    // Cleanup on client disconnect
+    req.on('close', () => {
+        console.log("Client disconnected, killing ffmpeg");
+        ffmpeg.kill();
+    });
 });
+
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
+```

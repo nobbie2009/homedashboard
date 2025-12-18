@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 // Define configuration types
 export interface AppConfig {
     weatherLocation: string;
+    cameraUrl?: string; // RTSP or HTTP Stream URL
     enabledCalendars: string[];
     showSeconds: boolean;
     schoolNames: string[];

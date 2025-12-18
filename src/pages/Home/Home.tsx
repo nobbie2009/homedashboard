@@ -23,9 +23,7 @@ export const Home: React.FC = () => {
 
             {/* Bottom Row: Trash & Countdown */}
             <div className="h-48">
-                <div className="h-full bg-slate-800/20 rounded-xl border border-slate-700/30 flex items-center justify-center text-slate-600 italic">
-                    Platzhalter
-                </div>
+                <CameraWidget />
             </div>
             <div className="h-48">
                 <CountdownWidget />
