@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 export interface AppConfig {
     weatherLocation: string;
     cameraUrl?: string; // RTSP or HTTP Stream URL
+    haUrl?: string; // Home Assistant Dashboard URL
     enabledCalendars: string[];
     showSeconds: boolean;
     schoolNames: string[];
