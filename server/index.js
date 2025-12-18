@@ -406,7 +406,7 @@ app.post('/api/google/events', async (req, res) => {
     }
 });
 
-const { spawn } = require('child_process');
+import { spawn } from 'child_process';
 
 app.get('/api/camera/stream', (req, res) => {
     const streamUrl = appConfig.cameraUrl;
