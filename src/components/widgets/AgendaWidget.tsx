@@ -1,83 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { format, isSameDay } from 'date-fns';
 import { useConfig } from '../../contexts/ConfigContext';
-
-interface CalendarEvent {
-    id: string;
-    title: string;
-    start: Date;
-    end: Date;
-    calendarId: string;
-    color: string;
-}
+import { useGoogleEvents } from '../../hooks/useGoogleEvents';
+import { MapPin } from 'lucide-react';
 
 export const AgendaWidget: React.FC = () => {
     const { config } = useConfig();
-    const [events, setEvents] = useState<CalendarEvent[]>([]);
-    const [loading, setLoading] = useState(false);
+    const { events, loading } = useGoogleEvents();
 
-    // Use env var or default to localhost
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
-    useEffect(() => {
-        const fetchEvents = async () => {
-            const selected = config.google?.selectedCalendars || [];
-            if (selected.length === 0) {
-                setEvents([]);
-                return;
-            }
-
-            setLoading(true);
-            try {
-                const res = await fetch(`${API_URL}/api/google/events`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ calendarIds: selected })
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    const mapped: CalendarEvent[] = data.map((e: any) => ({
-                        id: e.id,
-                        title: e.summary || "Kein Titel",
-                        start: new Date(e.start.dateTime || e.start.date),
-                        end: new Date(e.end.dateTime || e.end.date),
-                        calendarId: e.calendarId || 'google',
-                        color: 'bg-blue-500' // Placeholder, could map calendarId to colors
-                    }));
-
-                    // Filter for TODAY only (Agenda view)
-                    const today = new Date();
-                    const todaysEvents = mapped
-                        .filter(e => isSameDay(e.start, today))
-                        .sort((a, b) => a.start.getTime() - b.start.getTime());
-
-                    setEvents(todaysEvents);
-                }
-            } catch (err) {
-                console.error("Failed to fetch events", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchEvents();
-        // Refresh every 10 minutes
-        const interval = setInterval(fetchEvents, 600000);
-        return () => clearInterval(interval);
-    }, [config.google?.selectedCalendars]);
+    const todaysEvents = useMemo(() => {
+        const today = new Date();
+        return events
+            .filter(e => isSameDay(e.start, today))
+            .sort((a, b) => a.start.getTime() - b.start.getTime());
+    }, [events]);
 
     return (
         <div className="flex flex-col p-4 bg-slate-800/50 rounded-xl backdrop-blur-sm shadow-lg w-full h-full border border-slate-700 overflow-hidden">
             <h3 className="text-lg font-semibold text-slate-300 mb-3 uppercase tracking-wider">Heute</h3>
             <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar">
-                {loading && events.length === 0 ? (
+                {loading && todaysEvents.length === 0 ? (
                     <div className="text-slate-500 text-center mt-10 animate-pulse">Lade Termine...</div>
-                ) : events.length === 0 ? (
+                ) : todaysEvents.length === 0 ? (
                     <div className="text-slate-500 text-center mt-10">Keine Termine heute</div>
                 ) : (
-                    events.map(event => {
+                    todaysEvents.map(event => {
                         const isPast = event.end < new Date();
-                        const color = config.google?.calendarColors?.[event.calendarId] || '#3b82f6';
+                        const color = event.color || '#3b82f6';
 
                         return (
                             <div
@@ -91,7 +40,24 @@ export const AgendaWidget: React.FC = () => {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className={`font-medium text-lg leading-tight truncate ${isPast ? 'text-slate-400' : 'text-white'}`}>{event.title}</div>
-                                    <div className="text-xs text-slate-400 mt-1 uppercase truncate" style={{ color: color }}>{event.calendarId}</div>
+                                    <div className="flex flex-col mt-1 space-y-0.5">
+                                        {event.location && (
+                                            <div className="flex items-center text-xs text-slate-400 truncate">
+                                                <MapPin className="w-3 h-3 mr-1" />
+                                                <span className="truncate">{event.location}</span>
+                                            </div>
+                                        )}
+                                        {event.description && (
+                                            <div className="text-xs text-slate-500 truncate italic">
+                                                {event.description}
+                                            </div>
+                                        )}
+                                        {!event.location && !event.description && (
+                                            <div className="text-xs text-slate-500 truncate opacity-50">
+                                                {event.calendarId}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         );
