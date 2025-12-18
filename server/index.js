@@ -316,8 +316,8 @@ app.post('/api/google/events', async (req, res) => {
         const now = new Date();
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-        const timeMin = startOfDay.toISOString();
-        const timeMax = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // Next 7 days
+        const timeMin = req.body.timeMin || startOfDay.toISOString();
+        const timeMax = req.body.timeMax || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
         for (const calId of calendarIds) {
             const response = await calendar.events.list({

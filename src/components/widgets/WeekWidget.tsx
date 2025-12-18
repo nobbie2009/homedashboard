@@ -77,12 +77,16 @@ export const WeekWidget: React.FC = () => {
                                 {format(day, 'EEEE, d. MMM', { locale: de })}
                             </div>
                             <div className="space-y-1">
-                                {dayEvents.map(e => (
-                                    <div key={e.id} className="text-sm text-slate-300 truncate">
-                                        <span className="text-slate-500 mr-2">{format(e.start, 'HH:mm')}</span>
-                                        {e.title}
-                                    </div>
-                                ))}
+                                {dayEvents.map(e => {
+                                    const color = config.google?.calendarColors?.[e.calendarId] || '#60a5fa';
+                                    return (
+                                        <div key={e.id} className="text-sm text-slate-300 truncate flex items-center">
+                                            <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: color }}></div>
+                                            <span className="text-slate-500 mr-2">{format(e.start, 'HH:mm')}</span>
+                                            {e.title}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     );

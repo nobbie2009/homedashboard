@@ -12,6 +12,7 @@ export interface AppConfig {
     };
     google?: {
         selectedCalendars: string[];
+        calendarColors?: Record<string, string>;
     };
 }
 
@@ -26,7 +27,7 @@ const defaultConfig: AppConfig = {
     showSeconds: false,
     schoolNames: ['Max', 'Moritz'],
     edupage: { username: '', password: '' },
-    google: { selectedCalendars: [] },
+    google: { selectedCalendars: [], calendarColors: {} },
 };
 
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);

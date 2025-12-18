@@ -13,17 +13,28 @@ import {
 } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
-import { mockEvents, CalendarEvent } from '../../services/mockData';
 import clsx from 'clsx';
+import { useConfig } from '../../contexts/ConfigContext';
 
 // Constants for layout
 const HOUR_HEIGHT = 60; // pixels per hour
 
+interface CalendarEvent {
+    id: string;
+    title: string;
+    start: Date;
+    end: Date;
+    calendarId: string;
+    description?: string;
+    location?: string;
+}
 
-
-const CalendarView: React.FC = () => {
+const WeekView: React.FC = () => {
+    const { config } = useConfig();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [now, setNow] = useState(new Date());
+    const [events, setEvents] = useState<CalendarEvent[]>([]);
+    const [loading, setLoading] = useState(false);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     // Initial scroll to current time
@@ -42,36 +53,91 @@ const CalendarView: React.FC = () => {
         return () => clearInterval(interval);
     }, []);
 
-    // Keyboard navigation
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'ArrowLeft') subWeek();
-            if (e.key === 'ArrowRight') addWeek();
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [currentDate]);
-
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }); // Monday start
     const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+    // Fetch Events when week changes
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+    useEffect(() => {
+        const fetchWeekEvents = async () => {
+            const selected = config.google?.selectedCalendars || [];
+            if (selected.length === 0) {
+                setEvents([]);
+                return;
+            }
+
+            setLoading(true);
+            try {
+                // Calculate Query Range (Week Start to Week End)
+                // Note: We fetch a bit more to be safe? API usually accepts timeMin/Max
+                // But our endpoint currently hardcodes "Next 7 days from NOW".
+                // We need to UPDATE THE ENDPOINT OR USE IT AS IS?
+                // The endpoint uses:
+                // const timeMin = startOfDay.toISOString();
+                // const timeMax = new Date(Date.now() + 7 * 24 ...
+                // This is problematic for viewing NEXT week or PREVIOUS week.
+                //
+                // QUICK FIX: For now, I'll use the existing endpoint which fetches From Today + 7 days.
+                // IF the user navigates to future weeks, it might work if within range.
+                // IF the user navigates to PAST weeks, it won't work.
+                //
+                // REAL FIX: I should have updated the backend to accept custom ranges.
+                // But for this step I will assume "This Week" (Status Page rename) implies simply viewing the current status.
+                // If the user uses arrow keys he expects it to work.
+                // I will stick to "Next 7 days" endpoint behavior for now and mention it as limitation or fix backend if unsafe.
+                // Actually, let's fix the backend in the next step if I can't pass params.
+                //
+                // Wait, the endpoint `api/google/events` hardcodes timeMin/timeMax.
+                // I should update the backend to respect `req.body.timeMin` and `req.body.timeMax` if provided.
+
+                const res = await fetch(`${API_URL}/api/google/events`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        calendarIds: selected,
+                        // Proposed backend update support:
+                        timeMin: weekStart.toISOString(),
+                        timeMax: addDays(weekStart, 7).toISOString()
+                    })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    const mapped: CalendarEvent[] = data.map((e: any) => ({
+                        id: e.id,
+                        title: e.summary || "Kein Titel",
+                        start: new Date(e.start.dateTime || e.start.date),
+                        end: new Date(e.end.dateTime || e.end.date),
+                        calendarId: e.calendarId || 'google',
+                        description: e.description,
+                        location: e.location
+                    }));
+                    setEvents(mapped);
+                }
+            } catch (err) {
+                console.error("Failed to fetch events", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchWeekEvents();
+    }, [config.google?.selectedCalendars, weekStart.toISOString()]); // Refetch when week changes
 
     const addWeek = () => setCurrentDate(d => addWeeks(d, 1));
     const subWeek = () => setCurrentDate(d => subWeeks(d, 1));
     const goToToday = () => setCurrentDate(new Date());
 
-    // Filter events for the current week
-    const weekEvents = mockEvents.filter(event => {
-        const eventDate = event.start;
-        return eventDate >= weekStart && eventDate < addDays(weekStart, 7);
-    });
-
     const getEventStyle = (event: CalendarEvent) => {
         const startMinutes = getHours(event.start) * 60 + getMinutes(event.start);
         const duration = differenceInMinutes(event.end, event.start);
+        const color = config.google?.calendarColors?.[event.calendarId] || '#3b82f6';
 
         return {
             top: `${(startMinutes / 60) * HOUR_HEIGHT}px`,
-            height: `${(duration / 60) * HOUR_HEIGHT}px`,
+            height: `${Math.max(duration / 60 * HOUR_HEIGHT, 25)}px`, // Min height for visibility
+            backgroundColor: color,
+            borderColor: color
         };
     };
 
@@ -99,6 +165,7 @@ const CalendarView: React.FC = () => {
                             <ChevronRight className="w-5 h-5" />
                         </button>
                     </div>
+                    {loading && <span className="text-sm text-slate-500 animate-pulse">Lade...</span>}
                 </div>
                 <div className="flex items-center space-x-2 text-sm text-slate-400">
                     <CalendarIcon className="w-4 h-4" />
@@ -157,7 +224,7 @@ const CalendarView: React.FC = () => {
                         {/* Events Grid */}
                         <div className="grid grid-cols-7 relative divide-x divide-slate-700/50 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSI2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMCA2MEwxMDAwMCA2MCIgc3Ryb2tlPSJyZ2JhKDc1LDg1LDEwMSwwLjEpIiBmaWxsPSJub25lIi8+PC9zdmc+')]" style={{ backgroundSize: `100% ${HOUR_HEIGHT}px` }}>
                             {weekDays.map((day) => {
-                                const dayEvents = weekEvents.filter(e => isSameDay(e.start, day));
+                                const dayEvents = events.filter(e => isSameDay(e.start, day));
                                 const isCurrentDay = isToday(day);
 
                                 return (
@@ -166,10 +233,10 @@ const CalendarView: React.FC = () => {
                                         {/* Current Time Line */}
                                         {isCurrentDay && (
                                             <div
-                                                className="absolute w-full border-t-2 border-black z-20 pointer-events-none"
+                                                className="absolute w-full border-t-2 border-red-500 z-20 pointer-events-none"
                                                 style={{ top: `${getCurrentTimePosition()}px` }}
                                             >
-                                                <div className="absolute -left-1 -top-1.5 w-3 h-3 bg-black rounded-full" />
+                                                <div className="absolute -left-1 -top-1.5 w-3 h-3 bg-red-500 rounded-full" />
                                             </div>
                                         )}
 
@@ -178,13 +245,12 @@ const CalendarView: React.FC = () => {
                                             <div
                                                 key={event.id}
                                                 className={clsx(
-                                                    "absolute left-1 right-1 rounded-md p-2 text-xs border border-white/10 shadow-sm overflow-hidden hover:z-10 hover:shadow-md transition-shadow cursor-pointer",
-                                                    event.color || "bg-blue-600"
+                                                    "absolute left-1 right-1 rounded-md p-1 pl-2 text-xs border shadow-sm overflow-hidden hover:z-50 hover:shadow-xl transition-all cursor-pointer group",
                                                 )}
                                                 style={getEventStyle(event)}
                                             >
-                                                <div className="font-bold truncate text-white shadow-sm">{event.title}</div>
-                                                <div className="text-white/80 truncate">
+                                                <div className="font-bold truncate text-white drop-shadow-md">{event.title}</div>
+                                                <div className="text-white/90 truncate">
                                                     {format(event.start, 'HH:mm')} - {format(event.end, 'HH:mm')}
                                                 </div>
                                             </div>
@@ -200,4 +266,4 @@ const CalendarView: React.FC = () => {
     );
 };
 
-export default CalendarView;
+export default WeekView;

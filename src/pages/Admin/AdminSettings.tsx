@@ -145,6 +145,16 @@ const AdminSettings: React.FC = () => {
                                         onChange={() => handleToggleGoogleCalendar(cal.id)}
                                         className="w-4 h-4 rounded border-slate-600 text-blue-600 focus:ring-blue-500"
                                     />
+                                    <input
+                                        type="color"
+                                        value={config.google?.calendarColors?.[cal.id] || '#3b82f6'}
+                                        onClick={(e) => e.stopPropagation()} // Prevent toggling checkbox
+                                        onChange={(e) => {
+                                            const newColors = { ...(config.google?.calendarColors || {}), [cal.id]: e.target.value };
+                                            updateConfig({ google: { selectedCalendars: config.google?.selectedCalendars || [], calendarColors: newColors } });
+                                        }}
+                                        className="w-8 h-8 rounded-full border-0 p-0 bg-transparent cursor-pointer"
+                                    />
                                     <div className="flex flex-col overflow-hidden">
                                         <span className="truncate font-medium text-slate-200">{cal.summary}</span>
                                         <span className="text-xs text-slate-500 truncate">{cal.id}</span>

@@ -77,15 +77,21 @@ export const AgendaWidget: React.FC = () => {
                 ) : (
                     events.map(event => {
                         const isPast = event.end < new Date();
+                        const color = config.google?.calendarColors?.[event.calendarId] || '#3b82f6';
+
                         return (
-                            <div key={event.id} className={`flex items-center p-3 bg-slate-700/50 rounded-lg border-l-4 border-l-blue-500 transition hover:bg-slate-700 ${isPast ? 'opacity-50 grayscale' : ''}`}>
+                            <div
+                                key={event.id}
+                                className={`flex items-center p-3 bg-slate-700/50 rounded-lg border-l-4 transition hover:bg-slate-700 ${isPast ? 'opacity-50 grayscale' : ''}`}
+                                style={{ borderLeftColor: color }}
+                            >
                                 <div className="flex flex-col w-16 text-center border-r border-slate-600 pr-3 mr-3">
                                     <span className={`text-xl font-bold ${isPast ? 'text-slate-400' : 'text-white'}`}>{format(event.start, 'HH:mm')}</span>
                                     <span className="text-xs text-slate-400">{format(event.end, 'HH:mm')}</span>
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className={`font-medium text-lg leading-tight truncate ${isPast ? 'text-slate-400' : 'text-white'}`}>{event.title}</div>
-                                    <div className="text-xs text-slate-400 mt-1 uppercase truncate">{event.calendarId}</div>
+                                    <div className="text-xs text-slate-400 mt-1 uppercase truncate" style={{ color: color }}>{event.calendarId}</div>
                                 </div>
                             </div>
                         );
