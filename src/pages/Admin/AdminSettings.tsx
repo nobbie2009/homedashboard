@@ -291,6 +291,25 @@ const AdminSettings: React.FC = () => {
                 </section>
 
                 <section>
+                    <h3 className="text-xl font-semibold text-slate-300 mb-4">Home Assistant</h3>
+                    <div className="bg-slate-900/40 rounded-lg border border-slate-700/50 p-4">
+                        <label className="block text-sm font-medium text-slate-400 mb-2">
+                            Dashboard URL
+                        </label>
+                        <input
+                            type="text"
+                            value={config.haUrl || ''}
+                            onChange={(e) => updateConfig({ haUrl: e.target.value })}
+                            placeholder="http://homeassistant.local:8123/lovelace/dashboard"
+                            className="bg-slate-800 border border-slate-700 rounded w-full px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500"
+                        />
+                        <p className="text-xs text-slate-500 mt-2">
+                            Diese URL wird auf der "Schule" Seite als Vollbild (Iframe) angezeigt.
+                        </p>
+                    </div>
+                </section>
+
+                <section>
                     <h3 className="text-xl font-semibold text-slate-300 mb-4">Wetter Standort</h3>
                     <input
                         type="text"
