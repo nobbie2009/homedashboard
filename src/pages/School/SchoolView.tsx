@@ -1,6 +1,6 @@
 import React from 'react';
 import { useConfig } from '../../contexts/ConfigContext';
-import { Home, ExternalLink } from 'lucide-react';
+import { Home } from 'lucide-react';
 
 export const SchoolView: React.FC = () => {
     const { config } = useConfig();
@@ -27,3 +27,5 @@ export const SchoolView: React.FC = () => {
         </div>
     );
 };
+
+export default SchoolView;
