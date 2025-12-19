@@ -8,7 +8,7 @@ export const CameraWidget: React.FC = () => {
     const [error, setError] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
 
-    const API_URL = getApiUrl();
+    // const API_URL = getApiUrl();
 
     // If no URL is configured, show placeholder
     if (!config.cameraUrl) {
