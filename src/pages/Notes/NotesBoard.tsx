@@ -39,22 +39,32 @@ const NotesBoard: React.FC = () => {
 
     const API_URL = getApiUrl();
 
-    const fetchNotes = () => {
+    const fetchNotes = async () => {
         setLoading(true);
-        fetch(`${API_URL}/api/notion/notes`)
-            .then(res => {
-                if (!res.ok) throw new Error("Fehler beim Laden (Notion konfiguriert?)");
-                return res.json();
-            })
-            .then(data => {
-                setNotes(data);
-                setError('');
-            })
-            .catch(err => {
-                console.error(err);
-                setError(err.message);
-            })
-            .finally(() => setLoading(false));
+        try {
+            const response = await fetch(`${API_URL}/api/notion/notes`);
+
+            if (!response.ok) {
+                let errorMessage = `HTTP error! Status: ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorData.message || response.statusText || errorMessage;
+                } catch (jsonError) {
+                    // If response is not JSON, use statusText or default message
+                    errorMessage = response.statusText || errorMessage;
+                }
+                throw new Error(errorMessage);
+            }
+
+            const data = await response.json();
+            setNotes(data);
+            setError('');
+        } catch (err: any) {
+            console.error("Failed to load notes:", err);
+            setError(`Fehler: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
