@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { VideoOff, RefreshCw } from 'lucide-react';
+import { VideoOff } from 'lucide-react';
 import { useConfig } from '../../contexts/ConfigContext';
 import { getApiUrl } from '../../utils/api';
 
