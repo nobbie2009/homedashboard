@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useConfig, CalendarScope } from '../contexts/ConfigContext';
+import { getApiUrl } from '../utils/api';
 
 export interface CalendarEvent {
     id: string;
@@ -26,7 +27,7 @@ export const useGoogleEvents = (options: UseGoogleEventsOptions = {}) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const API_URL = getApiUrl();
 
     const fetchEvents = useCallback(async () => {
         const selected = config.google?.selectedCalendars || [];
