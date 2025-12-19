@@ -155,8 +155,8 @@ const AdminSettings: React.FC = () => {
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
                         className={`flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === tab.id
-                                ? 'bg-blue-600 text-white shadow-lg'
-                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                            ? 'bg-blue-600 text-white shadow-lg'
+                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
                             }`}
                     >
                         <tab.icon className="w-4 h-4" />
@@ -336,6 +336,11 @@ const AdminSettings: React.FC = () => {
                                 />
                                 <p className="text-xs text-slate-500 mt-2">
                                     Diese URL wird auf der "Home" Seite als Vollbild (Iframe) angezeigt.
+                                    <br className="mb-1" />
+                                    <span className="text-amber-500">
+                                        Hinweis: Falls "Verbindung abgelehnt" erscheint, muss in Home Assistant (configuration.yaml) unter "http:"
+                                        die Option <code>use_x_frame_options: false</code> gesetzt oder die Dashboard-URL erlaubt werden.
+                                    </span>
                                 </p>
                             </div>
                         </section>
