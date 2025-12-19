@@ -5,26 +5,43 @@ import { getApiUrl } from '../../utils/api';
 
 export const CameraWidget: React.FC = () => {
     const { config } = useConfig();
-    const [imageUrl, setImageUrl] = useState<string>('');
+    const [timestamp, setTimestamp] = useState<number>(Date.now());
     const API_URL = getApiUrl();
+    const [errorCount, setErrorCount] = useState(0);
 
+    // Determines the refresh URL
+    // We append a timestamp to bust browser cache
+    const imageUrl = config.cameraUrl
+        ? `${API_URL}/api/camera/snapshot?t=${timestamp}`
+        : '';
+
+    // Called when image successfully loads
+    const handleLoad = () => {
+        // Reset error count on success
+        setErrorCount(0);
+        // Schedule next fetch after a short delay (e.g. 250ms) to allow "breathing room"
+        // This ensures acceptable frame rate without flooding the server
+        setTimeout(() => {
+            setTimestamp(Date.now());
+        }, 250);
+    };
+
+    // Called when image fails to load
+    const handleError = () => {
+        console.warn("Camera snapshot failed, retrying...");
+        setErrorCount(prev => prev + 1);
+
+        // Exponential backoff or fixed slower retry
+        // If we fail, wait longer (e.g. 2s) before trying again
+        setTimeout(() => {
+            setTimestamp(Date.now());
+        }, 2000);
+    };
+
+    // Initial trigger or config change reset
     useEffect(() => {
-        if (!config.cameraUrl) return;
-
-        // Function to update the image
-        const fetchSnapshot = () => {
-            const timestamp = new Date().getTime();
-            setImageUrl(`${API_URL}/api/camera/snapshot?t=${timestamp}`);
-        };
-
-        // Initial fetch
-        fetchSnapshot();
-
-        // Poll every 1 second for near-live updates
-        const interval = setInterval(fetchSnapshot, 1000);
-
-        return () => clearInterval(interval);
-    }, [config.cameraUrl, API_URL]);
+        setTimestamp(Date.now());
+    }, [config.cameraUrl]);
 
     // If no URL is configured, show placeholder
     if (!config.cameraUrl) {
@@ -38,20 +55,23 @@ export const CameraWidget: React.FC = () => {
 
     return (
         <div className="h-full w-full bg-black rounded-xl overflow-hidden relative group border border-slate-800">
-            {imageUrl ? (
+            {imageUrl && (
                 <img
                     src={imageUrl}
                     alt="Camera Live"
                     className="w-full h-full object-cover"
-                    onError={() => console.error("Snapshot load failed")}
+                    onLoad={handleLoad}
+                    onError={handleError}
                 />
-            ) : (
-                <div className="flex items-center justify-center h-full text-slate-500 text-xs">Lade Kamera...</div>
             )}
+
+            {/* Overlay for loading state if needed, though usually we just keep showing the old image until new one loads */}
 
             {/* Overlay Title */}
             <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                <span className="text-xs text-white/80 font-medium ml-1">Live Kamera (Snapshot)</span>
+                <span className="text-xs text-white/80 font-medium ml-1">
+                    Live Kamera {errorCount > 0 && <span className="text-red-400">({errorCount} Fehleinschläge)</span>}
+                </span>
             </div>
         </div>
     );
