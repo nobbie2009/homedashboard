@@ -4,6 +4,8 @@ import { useConfig } from '../../contexts/ConfigContext';
 import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download } from 'lucide-react';
 // import clsx from 'clsx';
 
+import { getApiUrl } from '../../utils/api';
+
 const AdminSettings: React.FC = () => {
     const { isLocked, unlock, lock } = useKiosk();
     const { config, updateConfig } = useConfig();
@@ -22,7 +24,7 @@ const AdminSettings: React.FC = () => {
     ];
 
     // Use env var or default to localhost
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const API_URL = getApiUrl();
 
     useEffect(() => {
         // Check URL for auth status

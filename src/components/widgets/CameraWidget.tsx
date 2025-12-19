@@ -1,3 +1,6 @@
+import React, { useState } from 'react';
+import { VideoOff, RefreshCw } from 'lucide-react';
+import { useConfig } from '../../contexts/ConfigContext';
 import { getApiUrl } from '../../utils/api';
 
 export const CameraWidget: React.FC = () => {
