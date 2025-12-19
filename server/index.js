@@ -489,9 +489,9 @@ app.get('/api/camera/snapshot', (req, res) => {
     if (!streamUrl) return res.status(404).send("No Camera URL");
 
     const ffmpeg = spawn('ffmpeg', [
+        '-y',
         '-rtsp_transport', 'tcp',
         '-i', streamUrl,
-        '-ss', '00:00:01.500', // Seek slightly to get a valid I-frame
         '-frames:v', '1',
         '-f', 'image2',
         '-vf', 'scale=800:-1',
@@ -499,7 +499,12 @@ app.get('/api/camera/snapshot', (req, res) => {
         '-'
     ]);
 
-    res.writeHead(200, { 'Content-Type': 'image/jpeg' });
+    res.writeHead(200, {
+        'Content-Type': 'image/jpeg',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+    });
     ffmpeg.stdout.pipe(res);
 });
 
