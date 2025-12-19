@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { VideoOff, RefreshCw } from 'lucide-react';
 import { useConfig } from '../../contexts/ConfigContext';
-import { getApiUrl } from '../../utils/api';
+
 
 export const CameraWidget: React.FC = () => {
     const { config } = useConfig();
     const [error, setError] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
 
-    // const API_URL = getApiUrl();
+
 
     // If no URL is configured, show placeholder
     if (!config.cameraUrl) {
