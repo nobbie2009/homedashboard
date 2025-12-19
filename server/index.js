@@ -459,6 +459,8 @@ app.get('/api/camera/stream', (req, res) => {
     });
 
     const ffmpeg = spawn('ffmpeg', [
+        '-probesize', '64000',
+        '-analyzeduration', '0',
         '-rtsp_transport', 'tcp',
         '-i', streamUrl,
         '-vf', 'scale=800:-1', // Downscale to 800px width (maintains aspect ratio)
