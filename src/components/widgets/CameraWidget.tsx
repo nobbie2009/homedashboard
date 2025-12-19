@@ -20,7 +20,10 @@ export const CameraWidget: React.FC = () => {
         );
     }
 
-    const streamUrl = `${API_URL}/api/camera/stream?t=${refreshKey}`;
+    // Force direct connection to backend (bypass Nginx) for less latency/buffering issues
+    // Assumes backend is always on port 3001 as defined in docker-compose
+    const directApiUrl = `http://${window.location.hostname}:3001`;
+    const streamUrl = `${directApiUrl}/api/camera/stream?t=${refreshKey}`;
 
     const handleRetry = () => {
         setError(false);
