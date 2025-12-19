@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { VideoOff, RefreshCw } from 'lucide-react';
 import { useConfig } from '../../contexts/ConfigContext';
 
+import { getApiUrl } from '../../utils/api';
 
 export const CameraWidget: React.FC = () => {
     const { config } = useConfig();
     const [error, setError] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
 
-
+    const API_URL = getApiUrl();
 
     // If no URL is configured, show placeholder
     if (!config.cameraUrl) {
@@ -20,10 +21,8 @@ export const CameraWidget: React.FC = () => {
         );
     }
 
-    // Force direct connection to backend (bypass Nginx) for less latency/buffering issues
-    // Assumes backend is always on port 3001 as defined in docker-compose
-    const directApiUrl = `http://${window.location.hostname}:3001`;
-    const streamUrl = `${directApiUrl}/api/camera/stream?t=${refreshKey}`;
+    // Go through Nginx Proxy (port 80) which has buffering disabled
+    const streamUrl = `${API_URL}/api/camera/stream?t=${refreshKey}`;
 
     const handleRetry = () => {
         setError(false);
