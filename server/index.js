@@ -451,53 +451,53 @@ app.get('/api/notion/notes', async (req, res) => {
     }
 
     try {
-        const notion = new Client({ auth: notionKey });
-        console.log("Notion Client Initialized. Keys:", Object.keys(notion));
-        if (notion.databases) {
-            console.log("Notion Databases keys:", Object.keys(notion.databases));
-        } else {
-            console.error("notion.databases is UNDEFINED");
-        }
+        console.log("Fetching Notion data via direct HTTP...");
 
-        // Query database
-        // Default filter: Tag 'Private' (if property exists), or just fetch all if simple
-        // For robustness, we try to fetch all and let frontend decide, OR we follow user request "private notes"
-        // User said: "mixed database (private/work)... filter for private"
-
-        const response = await notion.databases.query({
-            database_id: notionDatabaseId,
-            filter: {
-                property: 'Tags', // Assumed property name
-                multi_select: {
-                    contains: 'Private'
-                }
+        const response = await fetch(`https://api.notion.com/v1/databases/${notionDatabaseId}/query`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${notionKey}`,
+                'Notion-Version': '2022-06-28',
+                'Content-Type': 'application/json'
             },
-            sorts: [
-                {
-                    property: 'Created', // Assumed property name, or default
-                    direction: 'descending',
+            body: JSON.stringify({
+                filter: {
+                    property: 'Gebiet',
+                    multi_select: {
+                        contains: 'Privat'
+                    }
                 },
-            ],
+                sorts: [
+                    {
+                        property: 'Ziel',
+                        direction: 'ascending',
+                    },
+                ],
+            })
         });
 
+        if (!response.ok) {
+            const errBody = await response.text();
+            console.error("Notion API Error Body:", errBody);
+            throw new Error(`Notion API Status ${response.status}: ${errBody}`);
+        }
+
+        const data = await response.json();
+
         // Map to internal Note format
-        const notes = response.results.map(page => {
+        const notes = data.results.map(page => {
             const props = page.properties;
 
             // Extract content from "Name" (Title property)
             const titleObj = props.Name?.title || [];
             const content = titleObj.map(t => t.plain_text).join("") || "Neue Notiz";
 
-            // Extract date from "Ziel" (Date property) -> simpler to just use for sorting for now
-            // or we could append it to content:
-            // const date = props.Ziel?.date?.start; 
-
-            const createdTime = page.created_time;
+            const createdTime = page.created_time || new Date().toISOString();
 
             return {
                 id: page.id,
                 content: content,
-                author: "Notion", // Could fetch created_by if needed
+                author: "Notion",
                 createdAt: createdTime,
                 color: "bg-yellow-200"
             };
@@ -506,9 +506,8 @@ app.get('/api/notion/notes', async (req, res) => {
         res.json(notes);
 
     } catch (error) {
-        console.error("Notion API Error:", error);
-        const msg = error.body ? JSON.parse(error.body).message : error.message;
-        res.status(500).json({ error: `Notion Error: ${msg}` });
+        console.error("Notion Fetch Error:", error);
+        res.status(500).json({ error: `Notion Error: ${error.message}` });
     }
 });
 
