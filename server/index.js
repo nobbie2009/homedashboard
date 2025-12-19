@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { Client } from '@notionhq/client';
 
 dotenv.config();
 
@@ -441,7 +442,6 @@ app.post('/api/google/events', async (req, res) => {
 });
 
 // --- NOTION ROUTES ---
-import { Client } from '@notionhq/client';
 
 app.get('/api/notion/notes', async (req, res) => {
     const { notionKey, notionDatabaseId } = appConfig;
@@ -452,6 +452,12 @@ app.get('/api/notion/notes', async (req, res) => {
 
     try {
         const notion = new Client({ auth: notionKey });
+        console.log("Notion Client Initialized. Keys:", Object.keys(notion));
+        if (notion.databases) {
+            console.log("Notion Databases keys:", Object.keys(notion.databases));
+        } else {
+            console.error("notion.databases is UNDEFINED");
+        }
 
         // Query database
         // Default filter: Tag 'Private' (if property exists), or just fetch all if simple
