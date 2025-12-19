@@ -484,6 +484,25 @@ app.get('/api/camera/stream', (req, res) => {
     });
 });
 
+app.get('/api/camera/snapshot', (req, res) => {
+    const streamUrl = appConfig.cameraUrl;
+    if (!streamUrl) return res.status(404).send("No Camera URL");
+
+    const ffmpeg = spawn('ffmpeg', [
+        '-rtsp_transport', 'tcp',
+        '-i', streamUrl,
+        '-ss', '00:00:01.500', // Seek slightly to get a valid I-frame
+        '-frames:v', '1',
+        '-f', 'image2',
+        '-vf', 'scale=800:-1',
+        '-q:v', '5',
+        '-'
+    ]);
+
+    res.writeHead(200, { 'Content-Type': 'image/jpeg' });
+    ffmpeg.stdout.pipe(res);
+});
+
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
