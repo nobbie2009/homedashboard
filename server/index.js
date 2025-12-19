@@ -476,31 +476,24 @@ app.get('/api/notion/notes', async (req, res) => {
 
         // Map to internal Note format
         const notes = response.results.map(page => {
-            // Helper to extract text from rich_text
-            const getText = (prop) => {
-                if (!prop) return "";
-                if (prop.title) return prop.title.map(t => t.plain_text).join("");
-                if (prop.rich_text) return prop.rich_text.map(t => t.plain_text).join("");
-                if (prop.select) return prop.select.name;
-                if (prop.multi_select) return prop.multi_select.map(s => s.name).join(", ");
-                return "";
-            };
-
             const props = page.properties;
 
-            // Heuristic to find "Name" or "Title" property
-            const titleProp = Object.values(props).find(p => p.type === 'title');
-            const content = getText(titleProp) || "Untitled Note";
+            // Extract content from "Name" (Title property)
+            const titleObj = props.Name?.title || [];
+            const content = titleObj.map(t => t.plain_text).join("") || "Neue Notiz";
 
-            // Try to find a date
+            // Extract date from "Ziel" (Date property) -> simpler to just use for sorting for now
+            // or we could append it to content:
+            // const date = props.Ziel?.date?.start; 
+
             const createdTime = page.created_time;
 
             return {
                 id: page.id,
                 content: content,
-                author: "Notion", // Could extract created_by if needed
+                author: "Notion", // Could fetch created_by if needed
                 createdAt: createdTime,
-                color: "bg-yellow-200" // Default Post-it color for now
+                color: "bg-yellow-200"
             };
         });
 
