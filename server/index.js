@@ -459,12 +459,13 @@ app.get('/api/camera/stream', (req, res) => {
     });
 
     const ffmpeg = spawn('ffmpeg', [
-        '-rtsp_transport', 'tcp', // Force TCP (more reliable for RTSP)
+        '-rtsp_transport', 'tcp',
         '-i', streamUrl,
+        '-vf', 'scale=800:-1', // Downscale to 800px width (maintains aspect ratio)
         '-f', 'mjpeg',
-        '-q:v', '5', // Quality (1-31, lower is better config)
-        '-r', '15', // Limit framerate to 15fps for dashboard
-        '-' // Output to stdout
+        '-q:v', '8', // Balanced quality (lower number = higher quality, 1-31)
+        '-r', '10', // Reduced to 10fps to save more bandwidth
+        '-'
     ]);
 
     ffmpeg.stdout.pipe(res, { end: false });
