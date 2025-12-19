@@ -500,10 +500,9 @@ app.get('/api/notion/notes', async (req, res) => {
         res.json(notes);
 
     } catch (error) {
-        console.error("Notion API Error:", error.body || error);
-        // Fallback: If filter fails (e.g. wrong property name), maybe try without filter?
-        // For now, return error so user knows config is wrong
-        res.status(500).json({ error: "Failed to fetch from Notion. Check Database ID and Property names." });
+        console.error("Notion API Error:", error);
+        const msg = error.body ? JSON.parse(error.body).message : error.message;
+        res.status(500).json({ error: `Notion Error: ${msg}` });
     }
 });
 
