@@ -296,6 +296,29 @@ const AdminSettings: React.FC = () => {
                         {isGoogleAuth && remoteCalendars.length === 0 && (
                             <p className="text-slate-500 italic">Keine Kalender gefunden.</p>
                         )}
+
+                        <div className="mt-6 border-t border-slate-700 pt-4">
+                            <label className="block text-sm font-medium text-slate-400 mb-2">
+                                Aktualisierungsrate (Cache)
+                            </label>
+                            <select
+                                value={config.google?.pollInterval || 600000}
+                                onChange={(e) => updateConfig({
+                                    google: { ...config.google, pollInterval: parseInt(e.target.value) } as any
+                                })}
+                                className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                            >
+                                <option value={60000}>1 Minute (Schnell)</option>
+                                <option value={120000}>2 Minuten</option>
+                                <option value={300000}>5 Minuten</option>
+                                <option value={600000}>10 Minuten (Standard)</option>
+                            </select>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Wie oft sollen Termine von Google abgerufen werden.
+                                <br />
+                                Achtung: Zu häufige Updates können zu einer temporären Sperre durch Google führen.
+                            </p>
+                        </div>
                     </section>
                 )}
 
@@ -336,11 +359,6 @@ const AdminSettings: React.FC = () => {
                                 />
                                 <p className="text-xs text-slate-500 mt-2">
                                     Diese URL wird auf der "Home" Seite als Vollbild (Iframe) angezeigt.
-                                    <br className="mb-1" />
-                                    <span className="text-amber-500">
-                                        Hinweis: Falls "Verbindung abgelehnt" erscheint, muss in Home Assistant (configuration.yaml) unter "http:"
-                                        die Option <code>use_x_frame_options: false</code> gesetzt oder die Dashboard-URL erlaubt werden.
-                                    </span>
                                 </p>
                             </div>
                         </section>

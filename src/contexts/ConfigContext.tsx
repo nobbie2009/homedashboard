@@ -16,6 +16,7 @@ export interface AppConfig {
         selectedCalendars: string[];
         calendarColors?: Record<string, string>;
         calendarSettings?: Record<string, CalendarSettings>;
+        pollInterval?: number; // Milliseconds
     };
 }
 
