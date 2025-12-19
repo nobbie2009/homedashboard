@@ -38,6 +38,20 @@ export const CameraWidget: React.FC = () => {
         }, 2000);
     };
 
+    // Watchdog: Force refresh if stuck for more than 5 seconds
+    // This prevents the "waterfall" from stopping if a request hangs
+    useEffect(() => {
+        const watchdog = setInterval(() => {
+            const timeSinceLastFetch = Date.now() - timestamp;
+            if (timeSinceLastFetch > 5000) {
+                console.log("Watchdog: Camera update stuck, forcing refresh...");
+                setTimestamp(Date.now());
+            }
+        }, 2000);
+
+        return () => clearInterval(watchdog);
+    }, [timestamp]);
+
     // Initial trigger or config change reset
     useEffect(() => {
         setTimestamp(Date.now());
@@ -70,7 +84,7 @@ export const CameraWidget: React.FC = () => {
             {/* Overlay Title */}
             <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                 <span className="text-xs text-white/80 font-medium ml-1">
-                    Live Kamera {errorCount > 0 && <span className="text-red-400">({errorCount} Fehleinschläge)</span>}
+                    Live Kamera {errorCount > 0 && <span className="text-red-400">({errorCount} Errors)</span>}
                 </span>
             </div>
         </div>
