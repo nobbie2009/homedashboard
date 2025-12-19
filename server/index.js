@@ -375,7 +375,9 @@ app.post('/api/google/events', async (req, res) => {
     // Check Cache
     const cacheKey = JSON.stringify(req.body);
     const cached = eventCache.get(cacheKey);
-    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+    const pollInterval = appConfig.google?.pollInterval || (10 * 60 * 1000);
+
+    if (cached && (Date.now() - cached.timestamp < pollInterval)) {
         console.log("Serving events from cache");
         return res.json(cached.data);
     }
@@ -469,7 +471,7 @@ app.get('/api/camera/stream', (req, res) => {
 
     // Handle errors
     ffmpeg.stderr.on('data', (data) => {
-        // console.error(`FFMPEG Error: ${data}`); // Verbose
+        console.error(`FFMPEG Error: ${data}`); // Verbose
     });
 
     // Cleanup on client disconnect
