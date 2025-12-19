@@ -43,12 +43,14 @@ const defaultConfig: AppConfig = {
     google: { selectedCalendars: [], calendarColors: {}, calendarSettings: {} },
 };
 
+import { getApiUrl } from '../utils/api';
+
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 
 export function ConfigProvider({ children }: { children: React.ReactNode }) {
     const [config, setConfig] = useState<AppConfig>(defaultConfig);
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const API_URL = getApiUrl();
 
     // Load from Backend
     useEffect(() => {
