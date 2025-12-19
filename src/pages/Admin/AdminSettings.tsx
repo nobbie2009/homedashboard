@@ -419,6 +419,34 @@ const AdminSettings: React.FC = () => {
                                 />
                             </div>
                         </div>
+
+                        <div className="mt-8 pt-8 border-t border-slate-700">
+                            <h3 className="text-xl font-semibold text-slate-300 mb-4">Notion Integration</h3>
+                            <div className="bg-slate-900/40 rounded-lg border border-slate-700/50 p-6 space-y-4">
+                                <div>
+                                    <label className="block text-sm text-slate-400 mb-1">Notion Integration Token</label>
+                                    <input
+                                        type="password"
+                                        value={config.notionKey || ''}
+                                        onChange={(e) => updateConfig({ notionKey: e.target.value })}
+                                        placeholder="secret_..."
+                                        className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 w-full focus:outline-none focus:border-blue-500 font-mono text-sm"
+                                    />
+                                    <p className="text-xs text-slate-500 mt-1">Erstellen Sie einen Token unter <a href="https://www.notion.so/my-integrations" target="_blank" className="text-blue-400 hover:underline">my-integrations</a>.</p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-slate-400 mb-1">Database ID</label>
+                                    <input
+                                        type="text"
+                                        value={config.notionDatabaseId || ''}
+                                        onChange={(e) => updateConfig({ notionDatabaseId: e.target.value })}
+                                        placeholder="32-stellige ID aus der URL"
+                                        className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 w-full focus:outline-none focus:border-blue-500 font-mono text-sm"
+                                    />
+                                    <p className="text-xs text-slate-500 mt-1">Die ID der Datenbank, die Ihre Notizen enthält.</p>
+                                </div>
+                            </div>
+                        </div>
                     </section>
                 )}
 

@@ -18,6 +18,8 @@ export interface AppConfig {
         calendarSettings?: Record<string, CalendarSettings>;
         pollInterval?: number; // Milliseconds
     };
+    notionKey?: string;
+    notionDatabaseId?: string;
 }
 
 export type CalendarScope = 'today' | 'weekWidget' | 'nextEvent' | 'weekView';
@@ -41,6 +43,8 @@ const defaultConfig: AppConfig = {
     schoolNames: ['Max', 'Moritz'],
     edupage: { username: '', password: '' },
     google: { selectedCalendars: [], calendarColors: {}, calendarSettings: {} },
+    notionKey: '',
+    notionDatabaseId: ''
 };
 
 import { getApiUrl } from '../utils/api';

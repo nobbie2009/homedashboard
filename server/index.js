@@ -440,6 +440,80 @@ app.post('/api/google/events', async (req, res) => {
     }
 });
 
+// --- NOTION ROUTES ---
+import { Client } from '@notionhq/client';
+
+app.get('/api/notion/notes', async (req, res) => {
+    const { notionKey, notionDatabaseId } = appConfig;
+
+    if (!notionKey || !notionDatabaseId) {
+        return res.status(400).json({ error: "Notion not configured (Key or DB ID missing)" });
+    }
+
+    try {
+        const notion = new Client({ auth: notionKey });
+
+        // Query database
+        // Default filter: Tag 'Private' (if property exists), or just fetch all if simple
+        // For robustness, we try to fetch all and let frontend decide, OR we follow user request "private notes"
+        // User said: "mixed database (private/work)... filter for private"
+
+        const response = await notion.databases.query({
+            database_id: notionDatabaseId,
+            filter: {
+                property: 'Tags', // Assumed property name
+                multi_select: {
+                    contains: 'Private'
+                }
+            },
+            sorts: [
+                {
+                    property: 'Created', // Assumed property name, or default
+                    direction: 'descending',
+                },
+            ],
+        });
+
+        // Map to internal Note format
+        const notes = response.results.map(page => {
+            // Helper to extract text from rich_text
+            const getText = (prop) => {
+                if (!prop) return "";
+                if (prop.title) return prop.title.map(t => t.plain_text).join("");
+                if (prop.rich_text) return prop.rich_text.map(t => t.plain_text).join("");
+                if (prop.select) return prop.select.name;
+                if (prop.multi_select) return prop.multi_select.map(s => s.name).join(", ");
+                return "";
+            };
+
+            const props = page.properties;
+
+            // Heuristic to find "Name" or "Title" property
+            const titleProp = Object.values(props).find(p => p.type === 'title');
+            const content = getText(titleProp) || "Untitled Note";
+
+            // Try to find a date
+            const createdTime = page.created_time;
+
+            return {
+                id: page.id,
+                content: content,
+                author: "Notion", // Could extract created_by if needed
+                createdAt: createdTime,
+                color: "bg-yellow-200" // Default Post-it color for now
+            };
+        });
+
+        res.json(notes);
+
+    } catch (error) {
+        console.error("Notion API Error:", error.body || error);
+        // Fallback: If filter fails (e.g. wrong property name), maybe try without filter?
+        // For now, return error so user knows config is wrong
+        res.status(500).json({ error: "Failed to fetch from Notion. Check Database ID and Property names." });
+    }
+});
+
 import { spawn } from 'child_process';
 
 app.get('/api/camera/stream', (req, res) => {
