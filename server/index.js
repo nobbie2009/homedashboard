@@ -462,10 +462,26 @@ app.get('/api/notion/notes', async (req, res) => {
             },
             body: JSON.stringify({
                 filter: {
-                    property: 'Gebiet',
-                    multi_select: {
-                        contains: 'Privat'
-                    }
+                    and: [
+                        {
+                            property: 'Gebiet',
+                            multi_select: {
+                                contains: 'Privat'
+                            }
+                        },
+                        {
+                            property: 'Status',
+                            status: {
+                                does_not_equal: 'erledigt'
+                            }
+                        },
+                        {
+                            property: 'Status',
+                            status: {
+                                does_not_equal: 'abgebrochen'
+                            }
+                        }
+                    ]
                 },
                 sorts: [
                     {
@@ -494,12 +510,28 @@ app.get('/api/notion/notes', async (req, res) => {
 
             const createdTime = page.created_time || new Date().toISOString();
 
+            // Map Notion colors to Tailwind classes
+            const notionColor = props.P?.select?.color;
+            const colorMap = {
+                red: 'bg-red-200',
+                green: 'bg-green-200',
+                blue: 'bg-blue-200',
+                yellow: 'bg-yellow-200',
+                orange: 'bg-orange-200',
+                purple: 'bg-purple-200',
+                pink: 'bg-pink-200',
+                brown: 'bg-amber-200',
+                gray: 'bg-slate-200',
+                default: 'bg-yellow-200'
+            };
+            const color = colorMap[notionColor] || 'bg-yellow-200';
+
             return {
                 id: page.id,
                 content: content,
                 author: "Notion",
                 createdAt: createdTime,
-                color: "bg-yellow-200"
+                color: color
             };
         });
 
