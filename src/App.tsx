@@ -35,9 +35,9 @@ function SecurityGate({ children }: { children: React.ReactNode }) {
 
 function App() {
     return (
-        <ConfigProvider>
-            <KioskProvider>
-                <SecurityProvider>
+        <SecurityProvider>
+            <ConfigProvider>
+                <KioskProvider>
                     <SecurityGate>
                         <BrowserRouter>
                             <Routes>
@@ -53,9 +53,9 @@ function App() {
                             </Routes>
                         </BrowserRouter>
                     </SecurityGate>
-                </SecurityProvider>
-            </KioskProvider>
-        </ConfigProvider>
+                </KioskProvider>
+            </ConfigProvider>
+        </SecurityProvider>
     );
 }
 
