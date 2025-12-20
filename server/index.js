@@ -34,7 +34,8 @@ app.use((req, res, next) => {
     }
 
     // 3. Check Device ID
-    const deviceId = req.headers['x-device-id'];
+    // Support both Header (for API fetch) and Query Param (for img tags/streams)
+    const deviceId = req.headers['x-device-id'] || req.query.deviceId;
 
     if (!deviceId) {
         // No ID provided -> Unauthorized

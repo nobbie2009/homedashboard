@@ -2,6 +2,7 @@ import React from 'react';
 import { UnifiedHeaderWidget } from '../../components/widgets/UnifiedHeaderWidget';
 import { AgendaWidget } from '../../components/widgets/AgendaWidget';
 import { CameraWidget } from '../../components/widgets/CameraWidget';
+import { RainRadarWidget } from '../../components/widgets/RainRadarWidget';
 
 import { CountdownWidget } from '../../components/widgets/CountdownWidget';
 import { WeekWidget } from '../../components/widgets/WeekWidget';
@@ -14,19 +15,39 @@ export const Home: React.FC = () => {
                 <UnifiedHeaderWidget />
             </div>
 
-            {/* Middle Row: Agenda & Week View */}
-            <div className="row-span-1 overflow-hidden">
-                <AgendaWidget />
-            </div>
-            <div className="row-span-1 overflow-hidden">
-                <WeekWidget />
+            {/* Middle Row: Agenda (Left) | Week (Center) | Radar (Right) */}
+            {/* We need a 3-column grid nested or change the main grid to 3 columns? 
+                The main grid is 2 cols. Let's change main grid to 3 cols or use a nested grid spanning 2 cols?
+                If we change main to 3 cols, we need to adjust bottom row.
+                Let's change main grid to 12 cols for flexibility or just 3 cols.
+            */}
+
+            <div className="col-span-2 row-span-1 grid grid-cols-3 gap-4 overflow-hidden h-full">
+                {/* Left: Agenda (Today) */}
+                <div className="overflow-hidden">
+                    <AgendaWidget />
+                </div>
+
+                {/* Center: Week Overview */}
+                <div className="overflow-hidden">
+                    <WeekWidget />
+                </div>
+
+                {/* Right: Rain Radar */}
+                <div className="overflow-hidden">
+                    <RainRadarWidget />
+                </div>
             </div>
 
-            {/* Bottom Row: Trash & Countdown */}
-            <div className="h-48">
+            {/* Bottom Row: Camera & Countdown */}
+            {/* They should share the width. Camera is usually wider? 
+                Let's just split them 50/50 for now or Keep existing relative sizes?
+                Previous was Camera (Left) | Countdown (Right) in a 2-col grid.
+            */}
+            <div className="col-span-1 h-48">
                 <CameraWidget />
             </div>
-            <div className="h-48">
+            <div className="col-span-1 h-48">
                 <CountdownWidget />
             </div>
         </div>
