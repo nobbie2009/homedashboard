@@ -119,3 +119,5 @@ export const SchoolView: React.FC = () => {
         </div>
     );
 };
+
+export default SchoolView;
