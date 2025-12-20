@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { VideoOff } from 'lucide-react';
 import { useConfig } from '../../contexts/ConfigContext';
 import { getApiUrl } from '../../utils/api';
@@ -38,22 +38,31 @@ export const CameraWidget: React.FC = () => {
     // AND it supports the query param now.
 
     const streamUrl = config.cameraUrl
-        ? `${API_URL}/api/camera/stream?deviceId=${deviceId}&t=${timestamp}`
+        ? `${API_URL}/api/camera/snapshot?deviceId=${deviceId}&t=${timestamp}`
         : '';
 
     // Watchdog / Error Handling for Stream
     // If the stream breaks (image fails to load), we increment error and try to re-mount (update timestamp)
 
+    // Image Load Handler - Schedule next frame
+    const handleLoad = () => {
+        setErrorCount(0);
+        // ~2-4 FPS (250ms delay + network time)
+        setTimeout(() => setTimestamp(Date.now()), 250);
+    };
+
+    // Error Handler
     const handleError = () => {
-        console.warn("Camera stream failed/stopped, retrying...");
+        console.warn("Camera snapshot failed, retrying...");
         setErrorCount(prev => prev + 1);
-        // Wait 2s then retry
+        // Wait longer on error (2s)
         setTimeout(() => setTimestamp(Date.now()), 2000);
     };
 
-    const handleLoad = () => {
-        setErrorCount(0);
-    };
+    // Initial load trigger or config change
+    useEffect(() => {
+        setTimestamp(Date.now());
+    }, [config.cameraUrl, deviceId]);
 
     // If no URL is configured
     if (!config.cameraUrl) {
