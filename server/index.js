@@ -450,6 +450,7 @@ app.get('/api/edupage', (req, res) => {
     }
 
     const scriptPath = path.join(__dirname, 'edupage_bridge.py');
+    console.log(`DEBUG: Executing Python script at: ${scriptPath}`);
 
     // Execute python script
     execFile('python', [scriptPath, username, password], (error, stdout, stderr) => {
