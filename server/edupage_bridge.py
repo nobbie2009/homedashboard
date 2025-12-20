@@ -8,28 +8,33 @@ import re
 
 # Monkey Patch Login.login to fix parsing issues (GitHub Issue #101)
 def fixed_login(self, username, password, subdomain="login1"):
+    print("DEBUG: Executing fixed_login monkey patch", file=sys.stderr)
     request_url = f"https://{subdomain}.edupage.org/login/?cmd=MainLogin"
     response = self.edupage.session.get(request_url)
     data = response.content.decode()
 
     # Robust extraction of csrftoken
+    csrf_token = ""
     try:
-        csrf_token = data.split('"csrftoken":"')[1].split('"')[0]
-    except IndexError:
-        # Fallback using regex
-        m = re.search(r'"csrftoken":"([^"]+)"', data)
-        if m:
-            csrf_token = m.group(1)
+        if '"csrftoken":"' in data:
+            csrf_token = data.split('"csrftoken":"')[1].split('"')[0]
         else:
-            # Last ditch: look for input field
-            m2 = re.search(r'name="csrfauth" value="([^"]+)"', data)
-            if m2:
-                csrf_token = m2.group(1)
+            # Fallback using regex
+            m = re.search(r'"csrftoken":"([^"]+)"', data)
+            if m:
+                csrf_token = m.group(1)
             else:
-                 # Log but try to continue or raise with context
-                 import sys
-                 print('Warning: Could not find csrftoken, using empty string', file=sys.stderr)
-                 csrf_token = ""
+                # Last ditch: look for input field
+                m2 = re.search(r'name="csrfauth" value="([^"]+)"', data)
+                if m2:
+                    csrf_token = m2.group(1)
+                else:
+                    print('DEBUG: HTML Content snippet:', data[:500], file=sys.stderr) 
+                    raise ValueError("Could not find csrftoken")
+    except Exception as e:
+         print(f"DEBUG: Error extracting csrftoken: {e}", file=sys.stderr)
+         # Don't crash yet, try empty, maybe it works?
+         pass
 
     parameters = {
         "csrfauth": csrf_token,
@@ -51,7 +56,8 @@ def fixed_login(self, username, password, subdomain="login1"):
     if subdomain == "login1":
         # Robust subdomain extraction
         try:
-             subdomain = data.split("-->")[0].split(" ")[-1]
+             if "-->" in data:
+                subdomain = data.split("-->")[0].split(" ")[-1]
         except IndexError:
              pass 
 
@@ -91,6 +97,7 @@ def fixed_login(self, username, password, subdomain="login1"):
     )
 
 # Apply Patch
+print("DEBUG: Applying monkey patch to Login.login", file=sys.stderr)
 Login.login = fixed_login
 
 def serialize_lesson(lesson, date_obj):
