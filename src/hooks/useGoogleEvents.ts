@@ -3,7 +3,30 @@ import { useConfig, CalendarScope } from '../contexts/ConfigContext';
 import { useSecurity } from '../contexts/SecurityContext'; // Import useSecurity
 import { getApiUrl } from '../utils/api';
 
-// ... (keep interface definitions)
+// Define types
+export interface CalendarEvent {
+    id: string;
+    title: string;
+    start: Date;
+    end: Date;
+    calendarId: string;
+    description?: string;
+    location?: string;
+    color?: string;
+    calendarName?: string; // Alias or ID
+}
+
+export interface UseGoogleEventsOptions {
+    timeMin?: string;
+    timeMax?: string;
+    enabled?: boolean;
+    scope?: CalendarScope;
+}
+
+// Simple in-memory cache
+const rawEventCache: Record<string, { timestamp: number, data: any[] }> = {};
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 
 export const useGoogleEvents = (options: UseGoogleEventsOptions = {}) => {
     const { config } = useConfig();
