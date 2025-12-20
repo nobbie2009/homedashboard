@@ -10,23 +10,40 @@ import { getApiUrl } from '../../utils/api';
 export interface Note {
     id: string;
     content: string;
+    description?: string;
     author: string;
     createdAt: Date;
+    targetDate?: Date;
     color: string;
 }
 
 const NoteCard = ({ note }: { note: Note }) => {
+    const description = note.description || '';
+    const truncatedDescription = description.length > 200
+        ? description.slice(0, 200) + '...'
+        : description;
+
+    // Use targetDate if available, otherwise fallback to createdAt (though backend logic handles fallback too)
+    const displayDate = note.targetDate || note.createdAt;
+
     return (
         <div className={clsx(
             "p-6 rounded-xl shadow-lg transform rotate-1 transition hover:rotate-0 hover:scale-105 duration-200 flex flex-col justify-between min-h-[200px]",
             note.color
         )}>
-            <div className="text-lg font-medium leading-relaxed whitespace-pre-wrap font-sans text-slate-800">
-                {note.content}
+            <div>
+                <div className="text-lg font-medium leading-relaxed whitespace-pre-wrap font-sans text-slate-800">
+                    {note.content}
+                </div>
+                {truncatedDescription && (
+                    <div className="mt-2 text-sm italic text-slate-600 font-serif leading-snug">
+                        {truncatedDescription}
+                    </div>
+                )}
             </div>
             <div className="flex justify-between items-end mt-4 text-sm opacity-75 font-semibold text-slate-700">
                 <span>{note.author}</span>
-                <span>{format(new Date(note.createdAt), 'dd.MM.')}</span>
+                <span>{displayDate ? format(new Date(displayDate), 'dd.MM.') : ''}</span>
             </div>
         </div>
     );

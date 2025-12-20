@@ -504,11 +504,13 @@ app.get('/api/notion/notes', async (req, res) => {
         const notes = data.results.map(page => {
             const props = page.properties;
 
-            // Extract content from "Name" (Title property)
-            const titleObj = props.Name?.title || [];
-            const content = titleObj.map(t => t.plain_text).join("") || "Neue Notiz";
+            // Extract Description
+            const descObj = props.Beschreibung?.rich_text || [];
+            const description = descObj.map(t => t.plain_text).join("");
 
-            const createdTime = page.created_time || new Date().toISOString();
+            // Extract Target Date (Ziel)
+            // Fallback to created_time if Ziel is not set
+            const targetDate = props.Ziel?.date?.start || createdTime;
 
             // Map Notion colors to Tailwind classes
             const p = props.P;
@@ -537,8 +539,14 @@ app.get('/api/notion/notes', async (req, res) => {
             return {
                 id: page.id,
                 content: content,
+                description: description,
                 author: "Notion",
-                createdAt: createdTime,
+                createdAt: targetDate, // Mapping 'Ziel' to createdAt field for now to match interface, or rename? 
+                // Better to send explicit field but frontend uses createdAt. 
+                // User requested "Target date instead of creation date".
+                // I will map it here to 'targetDate' and also keep createdAt as actual created time,
+                // but I'll update frontend to use targetDate.
+                targetDate: targetDate,
                 color: color
             };
         });
