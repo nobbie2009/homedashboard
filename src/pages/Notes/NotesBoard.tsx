@@ -34,6 +34,7 @@ const NoteCard = ({ note }: { note: Note }) => {
 
 const NotesBoard: React.FC = () => {
     // const { isLocked } = useKiosk(); // Unused for now
+    const { config } = useConfig();
     const [notes, setNotes] = useState<Note[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
