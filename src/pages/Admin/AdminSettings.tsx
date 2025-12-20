@@ -83,6 +83,7 @@ const DeviceList = () => {
 const AdminSettings: React.FC = () => {
     const { isLocked, unlock, lock } = useKiosk();
     const { config, updateConfig } = useConfig();
+    const { deviceId } = useSecurity();
     const [pin, setPin] = useState('');
     const [error, setError] = useState('');
     const [remoteCalendars, setRemoteCalendars] = useState<any[]>([]);
@@ -110,7 +111,9 @@ const AdminSettings: React.FC = () => {
         }
 
         // Fetch remote calendars
-        fetch(`${API_URL}/api/google/calendars`)
+        fetch(`${API_URL}/api/google/calendars`, {
+            headers: { 'x-device-id': deviceId }
+        })
             .then(res => {
                 if (res.ok) {
                     setIsGoogleAuth(true); // If we can fetch, we are auth'd
@@ -122,7 +125,7 @@ const AdminSettings: React.FC = () => {
                 if (Array.isArray(data)) setRemoteCalendars(data);
             })
             .catch(() => setIsGoogleAuth(false));
-    }, []);
+    }, [deviceId]);
 
     const handleUnlock = () => {
         if (unlock(pin)) {
@@ -144,8 +147,27 @@ const AdminSettings: React.FC = () => {
         updateConfig({ google: { ...config.google, selectedCalendars: newSelection } });
     };
 
-    const handleExport = () => {
-        window.open(`${API_URL}/api/config/backup`, '_blank');
+    const handleExport = async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/config/backup`, {
+                headers: { 'x-device-id': deviceId }
+            });
+
+            if (!res.ok) throw new Error('Backup failed');
+
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `homedashboard-backup-${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (e) {
+            console.error(e);
+            alert('Fehler beim Exportieren der Einstellungen.');
+        }
     };
 
     const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -158,7 +180,10 @@ const AdminSettings: React.FC = () => {
                 const json = JSON.parse(e.target?.result as string);
                 const res = await fetch(`${API_URL}/api/config/restore`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-device-id': deviceId
+                    },
                     body: JSON.stringify(json)
                 });
                 if (res.ok) {
