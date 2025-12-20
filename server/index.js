@@ -449,11 +449,16 @@ app.get('/api/edupage', (req, res) => {
         return res.status(400).send("Missing credentials");
     }
 
-    const scriptPath = path.join(__dirname, 'edupage_bridge.py');
+    const scriptPath = path.join(__dirname, 'edupage_bridge_v2.py');
     console.log(`DEBUG: Executing Python script at: ${scriptPath}`);
 
     // Execute python script
     execFile('python', [scriptPath, username, password], (error, stdout, stderr) => {
+        // Always log stderr for debugging
+        if (stderr) {
+            console.error('Wrapper Stderr:', stderr);
+        }
+
         // Parse output regardless of error code, as script might print JSON error then exit 1
         let data = null;
         try {
@@ -466,8 +471,6 @@ app.get('/api/edupage', (req, res) => {
 
         if (error && !data) {
             console.error('Edupage Script Error:', error);
-            console.error('Stderr:', stderr);
-            console.error('Stdout:', stdout);
             return res.status(500).send("Failed to execute Edupage script");
         }
 
