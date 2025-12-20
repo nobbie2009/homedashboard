@@ -511,7 +511,15 @@ app.get('/api/notion/notes', async (req, res) => {
             const createdTime = page.created_time || new Date().toISOString();
 
             // Map Notion colors to Tailwind classes
-            const notionColor = props.P?.select?.color;
+            const p = props.P;
+            let notionColor = 'default';
+
+            if (p) {
+                if (p.type === 'select') notionColor = p.select?.color;
+                else if (p.type === 'status') notionColor = p.status?.color;
+                else if (p.type === 'multi_select') notionColor = p.multi_select?.[0]?.color;
+            }
+
             const colorMap = {
                 red: 'bg-red-200',
                 green: 'bg-green-200',
