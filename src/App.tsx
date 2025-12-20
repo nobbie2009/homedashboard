@@ -8,8 +8,14 @@ import {
     NotesBoard,
     StatusView,
     SchoolView,
+    SmartHomeView,
     AdminSettings
 } from './pages';
+
+// Task List:
+// - [x] Create SmartHome view for Home Assistant <!-- id: 5 -->
+// - [/] Implement Edupage display in SchoolView <!-- id: 6 -->
+// - [/] Update Navigation/Routing <!-- id: 7 -->
 
 function App() {
     return (
@@ -22,6 +28,7 @@ function App() {
                             <Route path="notes" element={<NotesBoard />} />
                             <Route path="status" element={<StatusView />} />
                             <Route path="school" element={<SchoolView />} />
+                            <Route path="smarthome" element={<SmartHomeView />} />
                             <Route path="admin" element={<AdminSettings />} />
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </Route>
