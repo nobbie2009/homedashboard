@@ -1,10 +1,84 @@
 import React, { useState, useEffect } from 'react';
 import { useKiosk } from '../../contexts/KioskContext';
 import { useConfig } from '../../contexts/ConfigContext';
-import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download } from 'lucide-react';
+import { useSecurity } from '../../contexts/SecurityContext';
+import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download, Smartphone, Trash2, Shield, ShieldAlert } from 'lucide-react';
 // import clsx from 'clsx';
 
 import { getApiUrl } from '../../utils/api';
+
+const DeviceList = () => {
+    const { deviceId } = useSecurity();
+    const [devices, setDevices] = useState<any[]>([]);
+    const API_URL = getApiUrl();
+
+    const fetchDevices = () => {
+        fetch(`${API_URL}/api/auth/devices`, { headers: { 'x-device-id': deviceId } })
+            .then(res => res.json())
+            .then(setDevices)
+            .catch(console.error);
+    };
+
+    useEffect(() => {
+        fetchDevices();
+    }, []);
+
+    const toggleStatus = (id: string, currentStatus: string) => {
+        const newStatus = currentStatus === 'approved' ? 'rejected' : 'approved';
+        fetch(`${API_URL}/api/auth/approve`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-device-id': deviceId
+            },
+            body: JSON.stringify({ id, status: newStatus })
+        }).then(() => fetchDevices());
+    };
+
+    const deleteDevice = (id: string) => {
+        if (!confirm("Gerät wircklich löschen?")) return;
+        fetch(`${API_URL}/api/auth/device/${id}`, {
+            method: 'DELETE',
+            headers: { 'x-device-id': deviceId }
+        }).then(() => fetchDevices());
+    };
+
+    return (
+        <section>
+            <h3 className="text-xl font-semibold text-slate-300 mb-4">Geräte verwalten</h3>
+            <div className="space-y-3">
+                {devices.map(d => (
+                    <div key={d.id} className={`flex items-center justify-between p-4 rounded-lg border ${d.status === 'approved' ? 'bg-slate-900/40 border-green-900/30' : 'bg-slate-800 border-yellow-900/30'}`}>
+                        <div className="flex items-center space-x-3">
+                            {d.status === 'approved' ? <Shield className="text-green-500 w-6 h-6" /> : <ShieldAlert className="text-yellow-500 w-6 h-6" />}
+                            <div>
+                                <div className="font-bold text-white flex items-center gap-2">
+                                    {d.name}
+                                    {d.id === deviceId && <span className="text-xs bg-blue-600 px-2 py-0.5 rounded-full">Aktuelles Gerät</span>}
+                                </div>
+                                <div className="text-xs text-slate-500 font-mono">{d.ip} • {new Date(d.lastSeen).toLocaleString()}</div>
+                            </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <button
+                                onClick={() => toggleStatus(d.id, d.status)}
+                                className={`px-3 py-1.5 rounded text-sm font-bold transition ${d.status === 'approved' ? 'bg-slate-800 text-slate-400 hover:bg-red-900/20 hover:text-red-400' : 'bg-green-600 text-white hover:bg-green-500'}`}
+                            >
+                                {d.status === 'approved' ? 'Sperren' : 'Freigeben'}
+                            </button>
+                            <button
+                                onClick={() => deleteDevice(d.id)}
+                                className="p-2 text-slate-500 hover:text-red-500 transition"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </section>
+    );
+};
 
 const AdminSettings: React.FC = () => {
     const { isLocked, unlock, lock } = useKiosk();
@@ -21,6 +95,7 @@ const AdminSettings: React.FC = () => {
         { id: 'ansicht', label: 'Ansicht', icon: CheckCircle }, // Reusing CheckCircle as generic icon for View
         { id: 'extern', label: 'Externe Daten', icon: Upload }, // Reusing Upload/Download/Server equivalent
         { id: 'backup', label: 'Datensicherung', icon: Save },
+        { id: 'geraete', label: 'Sicherheit', icon: Smartphone },
     ];
 
     // Use env var or default to localhost
@@ -481,6 +556,7 @@ const AdminSettings: React.FC = () => {
                 {activeTab === 'backup' && (
                     <section>
                         <h3 className="text-xl font-semibold text-slate-300 mb-4">Backup & Wiederherstellung</h3>
+                        {/* ... backup content ... */}
                         <div className="bg-slate-900/40 rounded-lg border border-slate-700/50 p-6 space-y-6">
                             <div>
                                 <h4 className="font-bold text-slate-200 mb-2">Exportieren</h4>
@@ -505,6 +581,11 @@ const AdminSettings: React.FC = () => {
                             </div>
                         </div>
                     </section>
+                )}
+
+                {/* 6. GERÄTE TAB (Security) */}
+                {activeTab === 'geraete' && (
+                    <DeviceList />
                 )}
             </div>
 

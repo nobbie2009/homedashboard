@@ -17,25 +17,45 @@ import {
 // - [/] Implement Edupage display in SchoolView <!-- id: 6 -->
 // - [/] Update Navigation/Routing <!-- id: 7 -->
 
+import { SecurityProvider, useSecurity } from './contexts/SecurityContext';
+import AccessDenied from './pages/AccessDenied';
+
+function SecurityGate({ children }: { children: React.ReactNode }) {
+    const { deviceStatus } = useSecurity();
+
+    // If approved, show app
+    if (deviceStatus === 'approved') {
+        return <>{children}</>;
+    }
+
+    // Otherwise show Access Denied / Pending
+    // We pass deviceId/Status via context, but AccessDenied uses the hook too.
+    return <AccessDenied />;
+}
+
 function App() {
     return (
-        <KioskProvider>
-            <ConfigProvider>
-                <BrowserRouter>
-                    <Routes>
-                        <Route path="/" element={<MainLayout />}>
-                            <Route index element={<Dashboard />} />
-                            <Route path="notes" element={<NotesBoard />} />
-                            <Route path="status" element={<StatusView />} />
-                            <Route path="school" element={<SchoolView />} />
-                            <Route path="smarthome" element={<SmartHomeView />} />
-                            <Route path="admin" element={<AdminSettings />} />
-                            <Route path="*" element={<Navigate to="/" replace />} />
-                        </Route>
-                    </Routes>
-                </BrowserRouter>
-            </ConfigProvider>
-        </KioskProvider>
+        <ConfigProvider>
+            <KioskProvider>
+                <SecurityProvider>
+                    <SecurityGate>
+                        <BrowserRouter>
+                            <Routes>
+                                <Route path="/" element={<MainLayout />}>
+                                    <Route index element={<Dashboard />} />
+                                    <Route path="notes" element={<NotesBoard />} />
+                                    <Route path="status" element={<StatusView />} />
+                                    <Route path="school" element={<SchoolView />} />
+                                    <Route path="smarthome" element={<SmartHomeView />} />
+                                    <Route path="admin" element={<AdminSettings />} />
+                                    <Route path="*" element={<Navigate to="/" replace />} />
+                                </Route>
+                            </Routes>
+                        </BrowserRouter>
+                    </SecurityGate>
+                </SecurityProvider>
+            </KioskProvider>
+        </ConfigProvider>
     );
 }
 

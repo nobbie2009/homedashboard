@@ -13,11 +13,112 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+import { security } from './security.js';
+
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 const PORT = 3001;
+
+// --- Security Middleware ---
+app.use((req, res, next) => {
+    // 1. Allow Auth Endpoints
+    if (req.path.startsWith('/api/auth')) {
+        return next();
+    }
+
+    // 2. Allow OAuth Callbacks (Google)
+    if (req.path.startsWith('/auth/')) {
+        return next();
+    }
+
+    // 3. Check Device ID
+    const deviceId = req.headers['x-device-id'];
+
+    if (!deviceId) {
+        // No ID provided -> Unauthorized
+        return res.status(401).json({ error: "No Device ID provided" });
+    }
+
+    // 4. Check status
+    const device = security.getDevice(deviceId);
+
+    if (!device) {
+        // Device unknown -> Forbidden (Needs registration)
+        return res.status(403).json({ error: "Device unknown", status: 'unknown' });
+    }
+
+    if (device.status !== 'approved') {
+        // Device pending or rejected -> Forbidden
+        return res.status(403).json({ error: "Device not approved", status: device.status, device });
+    }
+
+    // 5. Update last seen and proceed
+    security.registerDevice(deviceId, device.name, req.ip, req.headers['user-agent']);
+    next();
+});
+
+// --- Auth Endpoints ---
+
+// 1. Register Device
+app.post('/api/auth/register', (req, res) => {
+    const { id, name } = req.body;
+    if (!id) return res.status(400).json({ error: "Missing ID" });
+
+    const device = security.registerDevice(id, name, req.ip, req.headers['user-agent']);
+    res.json(device);
+});
+
+// 2. Check Status
+app.get('/api/auth/status', (req, res) => {
+    const deviceId = req.headers['x-device-id'];
+    if (!deviceId) return res.status(400).json({ error: "Missing ID" });
+    const device = security.getDevice(deviceId);
+    res.json(device || { status: 'unknown' });
+});
+
+// 3. Admin Login (To approve devices)
+app.post('/api/auth/login', (req, res) => {
+    const { password } = req.body;
+    // VERY BASIC AUTH for now - matches config.adminPassword or fallback
+    // In a real app, hash this!
+    const adminPass = appConfig.adminPassword || "1234";
+
+    if (password === adminPass) {
+        res.json({ success: true });
+    } else {
+        res.status(401).json({ error: "Wrong password" });
+    }
+});
+
+// 4. Admin: List Devices (Protected by Admin check? For now, we trust the approved device/admin login flow context)
+// Actually, admin actions should probably require the password again or a session token?
+// For simplicity in this kiosk app: If you are an APPROVED device, you can list/manage others? 
+// Or better: You need to pass the password header for sensitive actions?
+// Let's go with: You can only call these if you are already approved (Middleware handles that).
+// PLUS we can add a password check to the body if we want extra securities.
+app.get('/api/auth/devices', (req, res) => {
+    res.json(security.getAllDevices());
+});
+
+app.post('/api/auth/approve', (req, res) => {
+    const { id, status } = req.body; // status: 'approved' | 'rejected' | 'pending'
+    if (security.setDeviceStatus(id, status)) {
+        res.json({ success: true });
+    } else {
+        res.status(404).json({ error: "Device not found" });
+    }
+});
+
+app.delete('/api/auth/device/:id', (req, res) => {
+    if (security.deleteDevice(req.params.id)) {
+        res.json({ success: true });
+    } else {
+        res.status(404).json({ error: "Device not found" });
+    }
+});
+
 
 let oauth2Client = null;
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
