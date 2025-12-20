@@ -121,6 +121,7 @@ def serialize_lesson(lesson, date_obj):
     }
 
 def main():
+    print("DEBUG: Edupage Bridge Script v1.5 (Monkey-patched)", file=sys.stderr)
     if len(sys.argv) < 3:
         print(json.dumps({"error": "Missing credentials"}))
         sys.exit(1)
