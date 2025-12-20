@@ -4,6 +4,7 @@ import clsx from 'clsx';
 // import { Plus } from 'lucide-react'; // Disable add button for now
 // import { useKiosk } from '../../contexts/KioskContext';
 import { useConfig } from '../../contexts/ConfigContext';
+import { useSecurity } from '../../contexts/SecurityContext';
 import { getApiUrl } from '../../utils/api';
 
 // Reusing Note interface, or defining it locally
@@ -52,6 +53,7 @@ const NoteCard = ({ note }: { note: Note }) => {
 const NotesBoard: React.FC = () => {
     // const { isLocked } = useKiosk(); // Unused for now
     const { config } = useConfig();
+    const { deviceId } = useSecurity();
     const [notes, setNotes] = useState<Note[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -61,7 +63,9 @@ const NotesBoard: React.FC = () => {
     const fetchNotes = async () => {
         setLoading(true);
         try {
-            const response = await fetch(`${API_URL}/api/notion/notes`);
+            const response = await fetch(`${API_URL}/api/notion/notes`, {
+                headers: { 'x-device-id': deviceId }
+            });
 
             if (!response.ok) {
                 let errorMessage = `HTTP error! Status: ${response.status}`;
@@ -92,7 +96,7 @@ const NotesBoard: React.FC = () => {
         const intervalTime = (config.notionRefreshInterval || 5) * 60 * 1000;
         const interval = setInterval(fetchNotes, intervalTime);
         return () => clearInterval(interval);
-    }, [config.notionRefreshInterval]);
+    }, [config.notionRefreshInterval, deviceId]);
 
     return (
         <div className="h-full flex flex-col">

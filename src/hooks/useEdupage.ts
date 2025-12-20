@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useConfig } from '../contexts/ConfigContext';
+import { useSecurity } from '../contexts/SecurityContext';
 import { getApiUrl } from '../utils/api';
 
 export interface Lesson {
@@ -30,6 +31,7 @@ export interface StudentData {
 
 export const useEdupage = () => {
     const { config } = useConfig();
+    const { deviceId } = useSecurity();
     const [data, setData] = useState<StudentData[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -49,7 +51,8 @@ export const useEdupage = () => {
                 headers: {
                     'username': config.edupage?.username || '',
                     'password': config.edupage?.password || '',
-                    'subdomain': config.edupage?.subdomain || 'login1'
+                    'subdomain': config.edupage?.subdomain || 'login1',
+                    'x-device-id': deviceId
                 }
             });
 
@@ -66,7 +69,7 @@ export const useEdupage = () => {
         } finally {
             setLoading(false);
         }
-    }, [config.edupage?.username, config.edupage?.password]);
+    }, [config.edupage?.username, config.edupage?.password, deviceId]);
 
     useEffect(() => {
         fetchEdupage();
