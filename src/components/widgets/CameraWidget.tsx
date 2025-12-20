@@ -3,43 +3,88 @@ import { VideoOff } from 'lucide-react';
 import { useConfig } from '../../contexts/ConfigContext';
 import { getApiUrl } from '../../utils/api';
 
+import { useSecurity } from '../../contexts/SecurityContext';
+
 export const CameraWidget: React.FC = () => {
     const { config } = useConfig();
+    const { deviceId } = useSecurity();
     const [timestamp, setTimestamp] = useState<number>(Date.now());
     const API_URL = getApiUrl();
     const [errorCount, setErrorCount] = useState(0);
+    const [imageSrc, setImageSrc] = useState<string>('');
 
-    // Determines the refresh URL
-    // We append a timestamp to bust browser cache
-    const imageUrl = config.cameraUrl
-        ? `${API_URL}/api/camera/snapshot?t=${timestamp}`
-        : '';
+    // Cleanup old object URLs when imageSrc changes (optional optimization, but useEffect cleanup handles most)
+    // Actually, the useEffect cleanup above revokes the URL when the effect re-runs (i.e. timestamp changes).
+    // So we are safe.
 
-    // Called when image successfully loads
-    const handleLoad = () => {
-        // Reset error count on success
-        setErrorCount(0);
-        // Schedule next fetch after a short delay (e.g. 250ms) to allow "breathing room"
-        // This ensures acceptable frame rate without flooding the server
-        setTimeout(() => {
-            setTimestamp(Date.now());
-        }, 250);
-    };
+    // Trigger next fetch when image is "loaded" (which for blob is immediate after set state?)
+    // No, we want to control the frame rate.
+    // Since we fetch manually, we know when it's done. 
+    // BUT we should wait for the *previous* fetch to finish before scheduling the next one?
+    // The useEffect replaces reliance on `onLoad` of the img tag for *network* timing, 
+    // but we can just schedule the next timestamp update after the fetch is done.
 
-    // Called when image fails to load
-    const handleError = () => {
-        console.warn("Camera snapshot failed, retrying...");
-        setErrorCount(prev => prev + 1);
+    // Changing the logic:
+    // instead of useEffect [timestamp], we can have a loop that runs.
+    // OR we keep useEffect [timestamp] but trigger the next timestamp change *inside* the fetch success.
 
-        // Exponential backoff or fixed slower retry
-        // If we fail, wait longer (e.g. 2s) before trying again
-        setTimeout(() => {
-            setTimestamp(Date.now());
-        }, 2000);
-    };
+    // Let's refine the useEffect above. 
+    // Calling setTimestamp inside useEffect[timestamp] creates an infinite loop if we aren't careful, 
+    // but with setTimeout it's fine.
 
-    // Watchdog: Force refresh if stuck for more than 5 seconds
-    // This prevents the "waterfall" from stopping if a request hangs
+    // Fetch the image blob manually to include the header
+    // Use a loop driven by timestamp updates to control framerate
+    useEffect(() => {
+        if (!config.cameraUrl || !deviceId) return;
+
+        let active = true;
+
+        const fetchImage = async () => {
+            try {
+                const res = await fetch(`${API_URL}/api/camera/snapshot?t=${Date.now()}`, {
+                    headers: { 'x-device-id': deviceId }
+                });
+
+                if (!res.ok) throw new Error("Status " + res.status);
+
+                const blob = await res.blob();
+                if (!active) return;
+
+                const newUrl = URL.createObjectURL(blob);
+
+                setImageSrc(prev => {
+                    if (prev) URL.revokeObjectURL(prev);
+                    return newUrl;
+                });
+
+                setErrorCount(0);
+
+                // Schedule next
+                setTimeout(() => {
+                    if (active) setTimestamp(Date.now());
+                }, 250);
+
+            } catch (err) {
+                console.warn("Camera snapshot failed", err);
+                if (active) {
+                    setErrorCount(prev => prev + 1);
+                    // Longer wait on error
+                    setTimeout(() => {
+                        if (active) setTimestamp(Date.now());
+                    }, 2000);
+                }
+            }
+        };
+
+        fetchImage();
+
+        return () => {
+            active = false;
+        };
+    }, [timestamp, config.cameraUrl, deviceId]);
+    // Note: 'timestamp' dependency triggers the effect. The effect schedules the change of 'timestamp'. This replaces the interval/onLoad loop.
+
+    // Watchdog
     useEffect(() => {
         const watchdog = setInterval(() => {
             const timeSinceLastFetch = Date.now() - timestamp;
@@ -48,14 +93,8 @@ export const CameraWidget: React.FC = () => {
                 setTimestamp(Date.now());
             }
         }, 2000);
-
         return () => clearInterval(watchdog);
     }, [timestamp]);
-
-    // Initial trigger or config change reset
-    useEffect(() => {
-        setTimestamp(Date.now());
-    }, [config.cameraUrl]);
 
     // If no URL is configured, show placeholder
     if (!config.cameraUrl) {
@@ -69,19 +108,14 @@ export const CameraWidget: React.FC = () => {
 
     return (
         <div className="h-full w-full bg-black rounded-xl overflow-hidden relative group border border-slate-800">
-            {imageUrl && (
+            {imageSrc && (
                 <img
-                    src={imageUrl}
+                    src={imageSrc}
                     alt="Camera Live"
                     className="w-full h-full object-cover"
-                    onLoad={handleLoad}
-                    onError={handleError}
                 />
             )}
 
-            {/* Overlay for loading state if needed, though usually we just keep showing the old image until new one loads */}
-
-            {/* Overlay Title */}
             <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                 <span className="text-xs text-white/80 font-medium ml-1">
                     Live Kamera {errorCount > 0 && <span className="text-red-400">({errorCount} Errors)</span>}
