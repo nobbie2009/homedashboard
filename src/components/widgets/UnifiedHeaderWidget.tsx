@@ -100,11 +100,11 @@ export const UnifiedHeaderWidget: React.FC = () => {
     }, [config.weatherLocation]);
 
     return (
-        <div className="flex items-center justify-between p-6 bg-slate-800/60 rounded-xl backdrop-blur-md shadow-lg w-full h-full border border-slate-700 text-white relative overflow-hidden">
+        <div className="grid grid-cols-3 items-center bg-slate-800/60 rounded-xl backdrop-blur-md shadow-lg w-full h-full border border-slate-700 text-white relative overflow-hidden">
             {/* Background Decoration/Gradient could go here */}
 
             {/* LEFT: Clock */}
-            <div className="flex flex-col justify-center min-w-[200px]">
+            <div className="flex flex-col justify-center items-start pl-8 h-full">
                 <div className="text-8xl font-black tracking-tighter tabular-nums leading-none bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">
                     {format(time, 'HH:mm')}
                 </div>
@@ -116,7 +116,7 @@ export const UnifiedHeaderWidget: React.FC = () => {
             </div>
 
             {/* CENTER: Weather */}
-            <div className="flex flex-col items-center flex-1 px-8 border-l border-r border-slate-700/50 mx-8">
+            <div className="flex flex-col items-center justify-center border-l border-r border-slate-700/50 h-full w-full">
                 {weather ? (
                     <>
                         <div className="flex items-center space-x-4 mb-2">
@@ -146,7 +146,7 @@ export const UnifiedHeaderWidget: React.FC = () => {
             </div>
 
             {/* RIGHT: Date */}
-            <div className="flex flex-col items-end justify-center min-w-[200px]">
+            <div className="flex flex-col items-end justify-center pr-8 h-full">
                 <div className="text-4xl font-bold text-blue-400 uppercase tracking-wide">
                     {format(time, 'EEEE', { locale: de })}
                 </div>
