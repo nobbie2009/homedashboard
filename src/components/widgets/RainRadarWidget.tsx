@@ -28,7 +28,7 @@ export const RainRadarWidget: React.FC = () => {
     return (
         <div className="h-full w-full bg-slate-800/60 rounded-xl backdrop-blur-md shadow-lg border border-slate-700 overflow-hidden relative">
             <iframe
-                src={`https://www.rainviewer.com/map.html?loc=${loc},${zoom}&oFa=0&oC=0&oU=0&oCS=1&oF=0&oAP=1&c=3&o=83&lm=1&layer=radar&sm=1&sn=1`}
+                src={`https://www.rainviewer.com/map.html?loc=${loc},${zoom}&oFa=0&oC=0&oU=0&oCS=1&oF=0&oAP=0&c=3&o=83&lm=1&layer=radar&sm=1&sn=1`}
                 className="w-full h-full border-0"
                 allowFullScreen
             />
