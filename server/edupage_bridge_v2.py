@@ -128,7 +128,7 @@ def main():
 
     username = sys.argv[1]
     password = sys.argv[2]
-    subdomain = sys.argv[3] if len(sys.argv) > 3 else None
+    subdomain = sys.argv[3] if len(sys.argv) > 3 else "login1"
 
     edupage = Edupage()
 
