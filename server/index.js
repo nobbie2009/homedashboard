@@ -504,6 +504,10 @@ app.get('/api/notion/notes', async (req, res) => {
         const notes = data.results.map(page => {
             const props = page.properties;
 
+            // Extract content from "Name" (Title property)
+            const titleObj = props.Name?.title || [];
+            const content = titleObj.map(t => t.plain_text).join("") || "Neue Notiz";
+
             // Extract Description
             const descObj = props.Beschreibung?.rich_text || [];
             const description = descObj.map(t => t.plain_text).join("");
