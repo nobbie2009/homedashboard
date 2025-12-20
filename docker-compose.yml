@@ -26,3 +26,4 @@ services:
       # - EDUPAGE_PASSWORD=your_pass
     volumes:
       - ./data:/app/server/data
+      - ./server:/app/server
