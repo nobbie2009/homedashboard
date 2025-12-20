@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useSecurity } from '../contexts/SecurityContext'; // Adjust path if needed
 import { ShieldAlert, Lock, RefreshCw } from 'lucide-react';
-import { getApiUrl } from '../utils/api';
+
 
 const AccessDenied: React.FC = () => {
     const { deviceId, deviceStatus, register, checkStatus } = useSecurity();
     const [deviceName, setDeviceName] = useState('');
-    const [adminPassword, setAdminPassword] = useState('');
-    const [adminError, setAdminError] = useState('');
-    const [showAdminLogin, setShowAdminLogin] = useState(false);
 
     useEffect(() => {
         // Auto-fill a name (e.g. Browser/OS)
@@ -17,33 +14,6 @@ const AccessDenied: React.FC = () => {
 
     const handleRegister = async () => {
         await register(deviceName);
-    };
-
-    const handleAdminLogin = async () => {
-        const API_URL = getApiUrl();
-        try {
-            const res = await fetch(`${API_URL}/api/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password: adminPassword })
-            });
-
-            if (res.ok) {
-                // Login successful -> Approve THIS device
-                await fetch(`${API_URL}/api/auth/approve`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: deviceId, status: 'approved' })
-                });
-                alert("Erfolgreich als Admin angemeldet. Dieses Gerät wurde genehmigt.");
-                await checkStatus();
-            } else {
-                setAdminError("Falsches Passwort");
-            }
-        } catch (e) {
-            console.error(e);
-            setAdminError("Fehler beim Verbinden");
-        }
     };
 
     return (
@@ -102,33 +72,6 @@ const AccessDenied: React.FC = () => {
                             <span>Status prüfen</span>
                         </button>
 
-                        <div className="border-t border-slate-700 pt-6">
-                            {!showAdminLogin ? (
-                                <button
-                                    onClick={() => setShowAdminLogin(true)}
-                                    className="text-slate-500 text-sm hover:text-slate-300 w-full text-center"
-                                >
-                                    Ich bin Admin (Sofort freischalten)
-                                </button>
-                            ) : (
-                                <div className="space-y-3 animate-in fade-in slide-in-from-top-4">
-                                    <input
-                                        type="password"
-                                        value={adminPassword}
-                                        onChange={(e) => setAdminPassword(e.target.value)}
-                                        placeholder="Admin Passwort (1234)"
-                                        className="w-full bg-slate-900 border border-slate-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500"
-                                    />
-                                    {adminError && <div className="text-red-400 text-xs text-center">{adminError}</div>}
-                                    <button
-                                        onClick={handleAdminLogin}
-                                        className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded-lg transition"
-                                    >
-                                        Freischalten
-                                    </button>
-                                </div>
-                            )}
-                        </div>
                     </div>
                 )}
                 {deviceStatus === 'rejected' && (
