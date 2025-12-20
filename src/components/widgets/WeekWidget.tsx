@@ -13,7 +13,7 @@ export const WeekWidget: React.FC = () => {
 
     return (
         <div className="flex flex-col p-4 bg-slate-800/50 rounded-xl backdrop-blur-sm shadow-lg w-full h-full border border-slate-700 overflow-hidden">
-            <h3 className="text-lg font-semibold text-slate-300 mb-3 uppercase tracking-wider">Wochenübersicht</h3>
+            <h3 className="text-xl font-semibold text-slate-300 mb-3 uppercase tracking-wider">Wochenübersicht</h3>
             <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4">
                 {nextDays.map(day => {
                     const dayEvents = events.filter(e => isSameDay(e.start, day));
@@ -21,17 +21,17 @@ export const WeekWidget: React.FC = () => {
 
                     return (
                         <div key={day.toISOString()} className="border-l-2 border-slate-600 pl-3">
-                            <div className="text-sm font-bold text-blue-400 mb-1 capitalize">
+                            <div className="text-lg font-bold text-blue-400 mb-1 capitalize">
                                 {format(day, 'EEEE, d. MMM', { locale: de })}
                             </div>
                             <div className="space-y-1">
                                 {dayEvents.map(e => {
                                     const color = config.google?.calendarColors?.[e.calendarId] || '#60a5fa';
                                     return (
-                                        <div key={e.id} className="text-sm text-slate-300 truncate flex items-center">
-                                            <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: color }}></div>
-                                            <span className="text-slate-500 mr-2">{format(e.start, 'HH:mm')}</span>
-                                            {e.title}
+                                        <div key={e.id} className="text-base text-slate-300 truncate flex items-center">
+                                            <div className="w-2.5 h-2.5 rounded-full mr-2" style={{ backgroundColor: color }}></div>
+                                            <span className="text-slate-500 mr-2 w-12">{format(e.start, 'HH:mm')}</span>
+                                            <span className="truncate">{e.title}</span>
                                         </div>
                                     );
                                 })}
