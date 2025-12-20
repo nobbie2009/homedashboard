@@ -3,6 +3,95 @@ import json
 import datetime
 from edupage_api import Edupage
 from edupage_api.exceptions import BadCredentialsException, CaptchaException
+from edupage_api.login import Login, TwoFactorLogin
+import re
+
+# Monkey Patch Login.login to fix parsing issues (GitHub Issue #101)
+def fixed_login(self, username, password, subdomain="login1"):
+    request_url = f"https://{subdomain}.edupage.org/login/?cmd=MainLogin"
+    response = self.edupage.session.get(request_url)
+    data = response.content.decode()
+
+    # Robust extraction of csrftoken
+    try:
+        csrf_token = data.split('"csrftoken":"')[1].split('"')[0]
+    except IndexError:
+        # Fallback using regex
+        m = re.search(r'"csrftoken":"([^"]+)"', data)
+        if m:
+            csrf_token = m.group(1)
+        else:
+            # Last ditch: look for input field
+            m2 = re.search(r'name="csrfauth" value="([^"]+)"', data)
+            if m2:
+                csrf_token = m2.group(1)
+            else:
+                 # Log but try to continue or raise with context
+                 import sys
+                 print('Warning: Could not find csrftoken, using empty string', file=sys.stderr)
+                 csrf_token = ""
+
+    parameters = {
+        "csrfauth": csrf_token,
+        "username": username,
+        "password": password,
+    }
+
+    request_url = f"https://{subdomain}.edupage.org/login/edubarLogin.php"
+    response = self.edupage.session.post(request_url, parameters)
+
+    if "cap=1" in response.url or "lerr=b43b43" in response.url:
+        raise CaptchaException()
+
+    if "bad=1" in response.url:
+        raise BadCredentialsException()
+
+    data = response.content.decode()
+
+    if subdomain == "login1":
+        # Robust subdomain extraction
+        try:
+             subdomain = data.split("-->")[0].split(" ")[-1]
+        except IndexError:
+             pass 
+
+    self.edupage.subdomain = subdomain
+    self.edupage.username = username
+
+    if "twofactor" not in response.url:
+        self._Login__parse_login_data(data) # Access private method
+        return
+
+    # 2FA Handling
+    request_url = f"https://{self.edupage.subdomain}.edupage.org/login/twofactor?sn=1"
+    two_factor_response = self.edupage.session.get(request_url)
+    data = two_factor_response.content.decode()
+
+    # Robust extraction for 2FA tokens
+    try:
+        csrf_token = data.split('csrfauth" value="')[1].split('"')[0]
+    except IndexError:
+        m = re.search(r'name="csrfauth" value="([^"]+)"', data)
+        csrf_token = m.group(1) if m else ""
+
+    try:
+        authentication_token = data.split('au" value="')[1].split('"')[0]
+    except IndexError:
+         m = re.search(r'name="au" value="([^"]+)"', data)
+         authentication_token = m.group(1) if m else ""
+
+    try:
+        authentication_endpoint = data.split('gu" value="')[1].split('"')[0]
+    except IndexError:
+         m = re.search(r'name="gu" value="([^"]+)"', data)
+         authentication_endpoint = m.group(1) if m else ""
+
+    return TwoFactorLogin(
+        authentication_endpoint, authentication_token, csrf_token, self.edupage
+    )
+
+# Apply Patch
+Login.login = fixed_login
 
 def serialize_lesson(lesson, date_obj):
     if not lesson:
