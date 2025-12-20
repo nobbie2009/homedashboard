@@ -88,7 +88,9 @@ def main():
         })
 
     except Exception as e:
-        print(json.dumps({"error": f"Fetch error: {str(e)}"}))
+        import traceback
+        error_details = traceback.format_exc()
+        print(json.dumps({"error": f"Internal Error: {str(e)}", "traceback": error_details}))
         sys.exit(1)
 
     print(json.dumps(result))
