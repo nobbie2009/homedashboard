@@ -453,23 +453,32 @@ app.get('/api/edupage', (req, res) => {
 
     // Execute python script
     execFile('python', [scriptPath, username, password], (error, stdout, stderr) => {
-        if (error) {
+        // Parse output regardless of error code, as script might print JSON error then exit 1
+        let data = null;
+        try {
+            if (stdout) {
+                data = JSON.parse(stdout);
+            }
+        } catch (e) {
+            console.error('Failed to parse script output', e);
+        }
+
+        if (error && !data) {
             console.error('Edupage Script Error:', error);
             console.error('Stderr:', stderr);
+            console.error('Stdout:', stdout);
             return res.status(500).send("Failed to execute Edupage script");
         }
 
-        try {
-            const data = JSON.parse(stdout);
-            if (data.error) {
-                console.error("Edupage Logic Error:", data.error);
-                return res.status(401).send(data.error);
-            }
+        if (data && data.error) {
+            console.error("Edupage Logic Error:", data.error);
+            return res.status(401).send(data.error);
+        }
+
+        if (data) {
             res.json(data);
-        } catch (e) {
-            console.error('Failed to parse script output', e);
-            console.error('Stdout:', stdout);
-            res.status(500).send("Invalid response from Edupage script");
+        } else {
+            res.status(500).send("No data returned from Edupage script");
         }
     });
 });
