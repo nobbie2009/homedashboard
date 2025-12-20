@@ -1,6 +1,11 @@
 FROM node:20-alpine
 
-RUN apk add --no-cache ffmpeg
+RUN apk add --no-cache ffmpeg python3 py3-pip
+
+# Setup Python Virtual Environment and Install Edupage API
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install edupage-api requests
 
 WORKDIR /app
 
