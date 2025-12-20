@@ -104,12 +104,12 @@ export const UnifiedHeaderWidget: React.FC = () => {
             {/* Background Decoration/Gradient could go here */}
 
             {/* LEFT: Clock */}
-            <div className="flex flex-col justify-center items-start pl-8 h-full">
-                <div className="text-[7rem] xl:text-[9rem] font-black tracking-tighter tabular-nums leading-none bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">
+            <div className="flex flex-row items-baseline justify-start pl-8 h-full pt-4">
+                <div className="text-8xl font-black tracking-tighter tabular-nums leading-none bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent transform translate-y-[-0.05em]">
                     {format(time, 'HH:mm')}
                 </div>
                 {config.showSeconds && (
-                    <div className="text-2xl text-slate-500 font-mono mt-[-5px] pl-2">
+                    <div className="text-4xl text-slate-500 font-mono ml-3 font-medium">
                         {format(time, ':ss')}
                     </div>
                 )}
@@ -119,27 +119,27 @@ export const UnifiedHeaderWidget: React.FC = () => {
             <div className="flex flex-col items-center justify-center border-l border-r border-slate-700/50 h-full w-full">
                 {weather ? (
                     <>
-                        <div className="flex items-center space-x-6 mb-3">
-                            {getWeatherIcon(weather.current.code, "w-24 h-24 text-yellow-400 drop-shadow-lg")}
+                        <div className="flex items-center space-x-5 mb-2">
+                            {getWeatherIcon(weather.current.code, "w-20 h-20 text-yellow-400 drop-shadow-lg")}
                             <div className="flex flex-col">
-                                <span className="text-7xl font-bold">{weather.current.temp}°</span>
-                                <span className="text-slate-400 text-lg font-medium uppercase tracking-wide">
+                                <span className="text-6xl font-bold leading-none">{weather.current.temp}°</span>
+                                <span className="text-slate-400 text-base font-medium uppercase tracking-wide mt-1">
                                     {getWeatherDescription(weather.current.code)}
                                 </span>
                             </div>
                         </div>
-                        <div className="flex space-x-8 mt-2">
+                        <div className="flex space-x-8 mt-1">
                             {weather.forecast.map((day, idx) => (
                                 <div key={idx} className="flex flex-col items-center">
-                                    <span className="text-slate-500 text-sm mb-1 uppercase font-bold">{day.day}</span>
-                                    {getWeatherIcon(day.code, "w-8 h-8 text-slate-300 mb-1")}
-                                    <span className="text-lg font-semibold">{day.tempMax}° <span className="text-slate-600 text-base">{day.tempMin}°</span></span>
+                                    <span className="text-slate-500 text-xs mb-0.5 uppercase font-bold">{day.day}</span>
+                                    {getWeatherIcon(day.code, "w-6 h-6 text-slate-300 mb-0.5")}
+                                    <span className="text-base font-semibold">{day.tempMax}° <span className="text-slate-600 text-sm">{day.tempMin}°</span></span>
                                 </div>
                             ))}
                         </div>
                     </>
                 ) : (
-                    <div className="text-slate-500 animate-pulse text-xl">
+                    <div className="text-slate-500 animate-pulse text-lg">
                         {loadingWeather ? 'Lade Wetter...' : 'Wetter nicht verfügbar'}
                     </div>
                 )}
