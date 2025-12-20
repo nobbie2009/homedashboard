@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execFile } from 'child_process';
 import { Client } from '@notionhq/client';
 
 dotenv.config();
@@ -631,6 +632,43 @@ app.get('/api/camera/snapshot', (req, res) => {
     ffmpeg.stdout.pipe(res);
 });
 
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+// --- Edupage Proxy ---
+app.get('/api/edupage', (req, res) => {
+    const username = req.headers['username'];
+    const password = req.headers['password'];
+
+    // Validate credentials presence
+    if (!username || !password) {
+        return res.status(400).send("Missing credentials");
+    }
+
+    const scriptPath = path.join(__dirname, 'edupage_bridge.py');
+
+    // Execute python script
+    execFile('python', [scriptPath, username, password], (error, stdout, stderr) => {
+        if (error) {
+            console.error('Edupage Script Error:', error);
+            console.error('Stderr:', stderr);
+            return res.status(500).send("Failed to execute Edupage script");
+        }
+
+        try {
+            const data = JSON.parse(stdout);
+            if (data.error) {
+                console.error("Edupage Logic Error:", data.error);
+                return res.status(401).send(data.error);
+            }
+            res.json(data);
+        } catch (e) {
+            console.error('Failed to parse script output', e);
+            console.error('Stdout:', stdout);
+            res.status(500).send("Invalid response from Edupage script");
+        }
+    });
 });
+
+// --- Start Server ---
+app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+});
+```
