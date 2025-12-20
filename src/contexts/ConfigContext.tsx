@@ -52,16 +52,23 @@ const defaultConfig: AppConfig = {
 
 import { getApiUrl } from '../utils/api';
 
+import { useSecurity } from './SecurityContext';
+
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 
 export function ConfigProvider({ children }: { children: React.ReactNode }) {
     const [config, setConfig] = useState<AppConfig>(defaultConfig);
+    const { deviceId } = useSecurity();
 
     const API_URL = getApiUrl();
 
     // Load from Backend
     useEffect(() => {
-        fetch(`${API_URL}/api/config`)
+        if (!deviceId) return;
+
+        fetch(`${API_URL}/api/config`, {
+            headers: { 'x-device-id': deviceId }
+        })
             .then(res => {
                 if (res.ok) return res.json();
                 throw new Error("Failed to load config");
@@ -79,7 +86,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
             .catch(err => {
                 console.error("Config load error:", err);
             });
-    }, []);
+    }, [deviceId]);
 
     const updateConfig = (newConfig: Partial<AppConfig>) => {
         setConfig((prev) => {
@@ -90,7 +97,10 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
             // Better send full updated config to be safe
             fetch(`${API_URL}/api/config`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-device-id': deviceId
+                },
                 body: JSON.stringify(updated)
             }).catch(e => console.error("Failed to save config:", e));
 

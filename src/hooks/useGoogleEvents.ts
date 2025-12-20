@@ -1,32 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useConfig, CalendarScope } from '../contexts/ConfigContext';
+import { useSecurity } from '../contexts/SecurityContext'; // Import useSecurity
 import { getApiUrl } from '../utils/api';
 
-export interface CalendarEvent {
-    id: string;
-    title: string;
-    start: Date;
-    end: Date;
-    calendarId: string;
-    description?: string;
-    location?: string;
-    color?: string;
-    calendarName?: string; // Alias or ID
-}
-
-interface UseGoogleEventsOptions {
-    timeMin?: string;
-    timeMax?: string;
-    enabled?: boolean;
-    scope?: CalendarScope;
-}
-
-// Simple in-memory cache
-const rawEventCache: Record<string, { timestamp: number, data: any[] }> = {};
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+// ... (keep interface definitions)
 
 export const useGoogleEvents = (options: UseGoogleEventsOptions = {}) => {
     const { config } = useConfig();
+    const { deviceId } = useSecurity(); // Get deviceId
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -73,9 +54,13 @@ export const useGoogleEvents = (options: UseGoogleEventsOptions = {}) => {
 
                 const res = await fetch(`${API_URL}/api/google/events`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-device-id': deviceId // Add header
+                    },
                     body: JSON.stringify(body)
                 });
+
 
                 if (res.ok) {
                     rawData = await res.json();
@@ -139,7 +124,7 @@ export const useGoogleEvents = (options: UseGoogleEventsOptions = {}) => {
             setEvents(mapped);
         }
 
-    }, [config.google?.selectedCalendars, config.google?.calendarColors, config.google?.calendarSettings, options.enabled, options.timeMin, options.timeMax, options.scope]);
+    }, [config.google?.selectedCalendars, config.google?.calendarColors, config.google?.calendarSettings, options.enabled, options.timeMin, options.timeMax, options.scope, deviceId]);
 
     // Initial fetch
     useEffect(() => {
