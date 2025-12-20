@@ -116,23 +116,29 @@ export const UnifiedHeaderWidget: React.FC = () => {
             </div>
 
             {/* CENTER: Weather */}
-            <div className="flex flex-col items-center justify-center border-l border-r border-slate-700/50 h-full w-full">
+            <div className="flex flex-row items-center justify-center border-l border-r border-slate-700/50 h-full w-full gap-8">
                 {weather ? (
                     <>
-                        <div className="flex items-center space-x-5 mb-2">
-                            {getWeatherIcon(weather.current.code, "w-20 h-20 text-yellow-400 drop-shadow-lg")}
+                        {/* Current Weather */}
+                        <div className="flex items-center space-x-4">
+                            {getWeatherIcon(weather.current.code, "w-16 h-16 text-yellow-400 drop-shadow-lg")}
                             <div className="flex flex-col">
                                 <span className="text-6xl font-bold leading-none">{weather.current.temp}°</span>
-                                <span className="text-slate-400 text-base font-medium uppercase tracking-wide mt-1">
+                                <span className="text-slate-400 text-sm font-medium uppercase tracking-wide mt-1">
                                     {getWeatherDescription(weather.current.code)}
                                 </span>
                             </div>
                         </div>
-                        <div className="flex space-x-8 mt-1">
+
+                        {/* Divider */}
+                        <div className="h-12 w-px bg-slate-700/50"></div>
+
+                        {/* Forecast */}
+                        <div className="flex space-x-6">
                             {weather.forecast.map((day, idx) => (
                                 <div key={idx} className="flex flex-col items-center">
-                                    <span className="text-slate-500 text-xs mb-0.5 uppercase font-bold">{day.day}</span>
-                                    {getWeatherIcon(day.code, "w-6 h-6 text-slate-300 mb-0.5")}
+                                    <span className="text-slate-500 text-xs mb-1 uppercase font-bold">{day.day}</span>
+                                    {getWeatherIcon(day.code, "w-6 h-6 text-slate-300 mb-1")}
                                     <span className="text-base font-semibold">{day.tempMax}° <span className="text-slate-600 text-sm">{day.tempMin}°</span></span>
                                 </div>
                             ))}
