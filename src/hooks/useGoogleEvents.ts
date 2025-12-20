@@ -22,7 +22,7 @@ interface UseGoogleEventsOptions {
 }
 
 // Simple in-memory cache
-const globalEventCache: Record<string, { timestamp: number, data: any[] }> = {};
+const rawEventCache: Record<string, { timestamp: number, data: any[] }> = {};
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 export const useGoogleEvents = (options: UseGoogleEventsOptions = {}) => {
@@ -52,8 +52,8 @@ export const useGoogleEvents = (options: UseGoogleEventsOptions = {}) => {
         let usedCache = false;
 
         // check cache
-        if (!force && globalEventCache[cacheKey]) {
-            const entry = globalEventCache[cacheKey];
+        if (!force && rawEventCache[cacheKey]) {
+            const entry = rawEventCache[cacheKey];
             if (Date.now() - entry.timestamp < CACHE_TTL) {
                 rawData = entry.data;
                 usedCache = true;
@@ -80,7 +80,7 @@ export const useGoogleEvents = (options: UseGoogleEventsOptions = {}) => {
                 if (res.ok) {
                     rawData = await res.json();
                     // Update Cache with RAW data
-                    globalEventCache[cacheKey] = { timestamp: Date.now(), data: rawData };
+                    rawEventCache[cacheKey] = { timestamp: Date.now(), data: rawData };
                 } else {
                     setError("Failed to fetch events");
                     return;
