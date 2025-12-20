@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSecurity } from '../contexts/SecurityContext'; // Adjust path if needed
-import { ShieldAlert, ShieldCheck, Lock, RefreshCw } from 'lucide-react';
+import { ShieldAlert, Lock, RefreshCw } from 'lucide-react';
 import { getApiUrl } from '../utils/api';
 
 const AccessDenied: React.FC = () => {
