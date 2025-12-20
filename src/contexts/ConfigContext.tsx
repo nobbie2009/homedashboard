@@ -11,6 +11,7 @@ export interface AppConfig {
     edupage?: {
         username?: string;
         password?: string;
+        subdomain?: string;
     };
     google?: {
         selectedCalendars: string[];
@@ -42,7 +43,7 @@ const defaultConfig: AppConfig = {
     enabledCalendars: ['family', 'school', 'garbage'],
     showSeconds: false,
     schoolNames: ['Max', 'Moritz'],
-    edupage: { username: '', password: '' },
+    edupage: { username: '', password: '', subdomain: 'login1' },
     google: { selectedCalendars: [], calendarColors: {}, calendarSettings: {} },
     notionKey: '',
     notionDatabaseId: '',

@@ -418,6 +418,21 @@ const AdminSettings: React.FC = () => {
                                     className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 w-full focus:outline-none focus:border-blue-500"
                                 />
                             </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-sm text-slate-400 mb-1">Subdomain (Instanz)</label>
+                                <div className="flex items-center">
+                                    <span className="text-slate-500 mr-2">https://</span>
+                                    <input
+                                        type="text"
+                                        value={config.edupage?.subdomain || 'login1'}
+                                        onChange={(e) => updateConfig({ edupage: { ...config.edupage, subdomain: e.target.value } })}
+                                        placeholder="login1"
+                                        className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 flex-grow focus:outline-none focus:border-blue-500"
+                                    />
+                                    <span className="text-slate-500 ml-2">.edupage.org</span>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1">z.B. "myschool" oder leer lassen für Standard ("login1").</p>
+                            </div>
                         </div>
 
                         <div className="mt-8 pt-8 border-t border-slate-700">

@@ -443,6 +443,8 @@ app.get('/api/camera/snapshot', (req, res) => {
 app.get('/api/edupage', (req, res) => {
     const username = req.headers['username'];
     const password = req.headers['password'];
+    // Default to "login1" if not provided header (though bridge script also defaults)
+    const subdomain = req.headers['subdomain'] || 'login1';
 
     // Validate credentials presence
     if (!username || !password) {
@@ -450,10 +452,10 @@ app.get('/api/edupage', (req, res) => {
     }
 
     const scriptPath = path.join(__dirname, 'edupage_bridge_v2.py');
-    console.log(`DEBUG: Executing Python script at: ${scriptPath}`);
+    console.log(`DEBUG: Executing Python script at: ${scriptPath} with subdomain: ${subdomain}`);
 
     // Execute python script
-    execFile('python', [scriptPath, username, password], (error, stdout, stderr) => {
+    execFile('python', [scriptPath, username, password, subdomain], (error, stdout, stderr) => {
         // Always log stderr for debugging
         if (stderr) {
             console.error('Wrapper Stderr:', stderr);

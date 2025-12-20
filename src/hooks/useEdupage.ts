@@ -47,8 +47,9 @@ export const useEdupage = () => {
         try {
             const res = await fetch(`${API_URL}/api/edupage`, {
                 headers: {
-                    'username': config.edupage.username,
-                    'password': config.edupage.password
+                    'username': config.edupage?.username || '',
+                    'password': config.edupage?.password || '',
+                    'subdomain': config.edupage?.subdomain || 'login1'
                 }
             });
 
