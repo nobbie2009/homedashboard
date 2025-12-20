@@ -46,6 +46,12 @@ export const useGoogleEvents = (options: UseGoogleEventsOptions = {}) => {
             return;
         }
 
+        // Wait for deviceId
+        if (!deviceId) {
+            // console.debug("Fetch skipped: No deviceId yet");
+            return;
+        }
+
         const cacheKey = JSON.stringify({
             selected,
             timeMin: options.timeMin,
@@ -149,10 +155,12 @@ export const useGoogleEvents = (options: UseGoogleEventsOptions = {}) => {
 
     }, [config.google?.selectedCalendars, config.google?.calendarColors, config.google?.calendarSettings, options.enabled, options.timeMin, options.timeMax, options.scope, deviceId]);
 
-    // Initial fetch
+    // Initial fetch when deviceId becomes available
     useEffect(() => {
-        fetchEvents();
-    }, [fetchEvents]);
+        if (deviceId && config.google?.selectedCalendars?.length) {
+            fetchEvents();
+        }
+    }, [deviceId, config.google?.selectedCalendars, fetchEvents]);
 
     const refresh = useCallback(() => fetchEvents(true), [fetchEvents]);
 
