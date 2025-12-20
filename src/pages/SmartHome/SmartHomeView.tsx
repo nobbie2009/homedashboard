@@ -1,6 +1,6 @@
 import React from 'react';
 import { useConfig } from '../../contexts/ConfigContext';
-import { Home, WifiOff } from 'lucide-react';
+import { Home } from 'lucide-react';
 
 export const SmartHomeView: React.FC = () => {
     const { config } = useConfig();
