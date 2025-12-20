@@ -20,6 +20,7 @@ export interface AppConfig {
     };
     notionKey?: string;
     notionDatabaseId?: string;
+    notionRefreshInterval?: number; // Minutes
 }
 
 export type CalendarScope = 'today' | 'weekWidget' | 'nextEvent' | 'weekView';
@@ -44,7 +45,8 @@ const defaultConfig: AppConfig = {
     edupage: { username: '', password: '' },
     google: { selectedCalendars: [], calendarColors: {}, calendarSettings: {} },
     notionKey: '',
-    notionDatabaseId: ''
+    notionDatabaseId: '',
+    notionRefreshInterval: 5 // Default 5 minutes
 };
 
 import { getApiUrl } from '../utils/api';

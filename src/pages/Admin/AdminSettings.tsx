@@ -445,6 +445,18 @@ const AdminSettings: React.FC = () => {
                                     />
                                     <p className="text-xs text-slate-500 mt-1">Die ID der Datenbank, die Ihre Notizen enthält.</p>
                                 </div>
+                                <div>
+                                    <label className="block text-sm text-slate-400 mb-1">Aktualisierungsintervall (Minuten)</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="60"
+                                        value={config.notionRefreshInterval || 5}
+                                        onChange={(e) => updateConfig({ notionRefreshInterval: parseInt(e.target.value) || 5 })}
+                                        className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 w-full focus:outline-none focus:border-blue-500 w-24"
+                                    />
+                                    <p className="text-xs text-slate-500 mt-1">Wie oft sollen neue Notizen geladen werden?</p>
+                                </div>
                             </div>
                         </div>
                     </section>

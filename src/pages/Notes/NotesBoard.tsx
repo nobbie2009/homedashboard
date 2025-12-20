@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import clsx from 'clsx';
 // import { Plus } from 'lucide-react'; // Disable add button for now
 // import { useKiosk } from '../../contexts/KioskContext';
+import { useConfig } from '../../contexts/ConfigContext';
 import { getApiUrl } from '../../utils/api';
 
 // Reusing Note interface, or defining it locally
@@ -69,10 +70,11 @@ const NotesBoard: React.FC = () => {
 
     useEffect(() => {
         fetchNotes();
-        // Poll every 5 minutes?
-        const interval = setInterval(fetchNotes, 5 * 60 * 1000);
+        // Poll based on config or default to 5 minutes
+        const intervalTime = (config.notionRefreshInterval || 5) * 60 * 1000;
+        const interval = setInterval(fetchNotes, intervalTime);
         return () => clearInterval(interval);
-    }, []);
+    }, [config.notionRefreshInterval]);
 
     return (
         <div className="h-full flex flex-col">
