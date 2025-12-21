@@ -6,6 +6,7 @@ import { getApiUrl } from '../../utils/api';
 import { useSecurity } from '../../contexts/SecurityContext';
 import clsx from 'clsx';
 import { useIdleRedirect } from '../../hooks/useIdleRedirect';
+import pkg from '../../../package.json';
 
 export const MainLayout: React.FC = () => {
     const { isLocked, lock } = useKiosk();
@@ -53,6 +54,11 @@ export const MainLayout: React.FC = () => {
                             IP: {serverIp}
                         </div>
                     )}
+
+                    {/* Version */}
+                    <div className="text-[10px] text-slate-600 font-mono">
+                        v{pkg.version}
+                    </div>
 
                     <button
                         onClick={isLocked ? undefined : lock}
