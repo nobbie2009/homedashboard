@@ -3,6 +3,7 @@ import { useKiosk } from '../../contexts/KioskContext';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useSecurity } from '../../contexts/SecurityContext';
 import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download, Smartphone, Trash2, Shield, ShieldAlert, ClipboardCheck, Plus } from 'lucide-react';
+import { IconMap, ChoreIcon } from '../../components/ChoreIcon';
 // import clsx from 'clsx';
 
 import { getApiUrl } from '../../utils/api';
@@ -89,6 +90,7 @@ const AdminSettings: React.FC = () => {
     const [remoteCalendars, setRemoteCalendars] = useState<any[]>([]);
     const [isGoogleAuth, setIsGoogleAuth] = useState(false);
     const [activeTab, setActiveTab] = useState('kalender');
+    const [newTaskIcon, setNewTaskIcon] = useState('clean');
 
     const tabs = [
         { id: 'kalender', label: 'Kalender', icon: CalendarIcon },
@@ -693,8 +695,7 @@ const AdminSettings: React.FC = () => {
                                         <div key={task.id} className="flex items-center justify-between bg-slate-800 p-3 rounded-lg border border-slate-700">
                                             <div className="flex items-center space-x-3">
                                                 <div className="bg-slate-700 p-2 rounded text-slate-300">
-                                                    {/* We could render the actual icon here if we had a map, for now just generic */}
-                                                    <ClipboardCheck className="w-4 h-4" />
+                                                    <ChoreIcon icon={task.icon} className="w-5 h-5" />
                                                 </div>
                                                 <div>
                                                     <div className="font-bold text-white">{task.label}</div>
@@ -735,7 +736,7 @@ const AdminSettings: React.FC = () => {
                                 <div className="border-t border-slate-700 pt-4 mt-4">
                                     <h4 className="text-sm font-bold text-slate-400 mb-2">Aufgabe hinzufügen</h4>
                                     <form
-                                        className="grid grid-cols-[1fr_auto_auto] gap-2"
+                                        className="space-y-4"
                                         onSubmit={(e) => {
                                             e.preventDefault();
                                             const form = e.target as HTMLFormElement;
@@ -746,35 +747,59 @@ const AdminSettings: React.FC = () => {
                                             const newTask = {
                                                 id: Date.now().toString(),
                                                 label,
-                                                icon: 'ClipboardCheck', // Default for now
+                                                icon: newTaskIcon,
                                                 rotation: rotation as any,
                                                 assignedTo: undefined
                                             };
                                             const newTasks = [...(config.chores?.tasks || []), newTask];
                                             updateConfig({ chores: { ...(config.chores || { kids: [], settings: { interval: 'weekly' } }), tasks: newTasks } as any });
                                             form.reset();
+                                            setNewTaskIcon('clean'); // Reset icon
                                         }}
                                     >
-                                        <input
-                                            type="text"
-                                            name="label"
-                                            placeholder="Bezeichnung (z.B. Müll rausbringen)"
-                                            className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500 w-full"
-                                            required
-                                        />
-                                        <select
-                                            name="rotation"
-                                            className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                                        >
-                                            <option value="weekly">Wöchentlich</option>
-                                            <option value="daily">Täglich</option>
-                                            <option value="none">Manuell</option>
-                                        </select>
+                                        <div className="grid grid-cols-[1fr_auto] gap-2">
+                                            <input
+                                                type="text"
+                                                name="label"
+                                                placeholder="Bezeichnung (z.B. Müll rausbringen)"
+                                                className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500 w-full"
+                                                required
+                                            />
+                                            <select
+                                                name="rotation"
+                                                className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                                            >
+                                                <option value="weekly">Wöchentlich</option>
+                                                <option value="daily">Täglich</option>
+                                                <option value="none">Manuell</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm text-slate-400 mb-2">Symbol wählen:</label>
+                                            <div className="flex flex-wrap gap-2">
+                                                {Object.keys(IconMap).map((iconKey) => (
+                                                    <button
+                                                        key={iconKey}
+                                                        type="button"
+                                                        onClick={() => setNewTaskIcon(iconKey)}
+                                                        className={`p-2 rounded-lg transition ${newTaskIcon === iconKey
+                                                            ? 'bg-blue-600 text-white shadow-lg scale-110'
+                                                            : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                                            }`}
+                                                    >
+                                                        <ChoreIcon icon={iconKey} className="w-5 h-5" />
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
                                         <button
                                             type="submit"
-                                            className="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-500 flex items-center"
+                                            className="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-500 flex items-center w-full justify-center"
                                         >
-                                            <Plus className="w-5 h-5" />
+                                            <Plus className="w-5 h-5 mr-2" />
+                                            Aufgabe hinzufügen
                                         </button>
                                     </form>
                                 </div>

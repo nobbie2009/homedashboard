@@ -30,18 +30,13 @@ export const ChoresWidget: React.FC = () => {
                                 <span className="text-xs text-slate-300 font-medium truncate w-full text-center">{kid.name}</span>
                             </div>
 
-                            {/* Tasks Icons */}
+                            {/* Tasks Icons & Labels */}
                             <div className="flex-1 flex flex-wrap gap-2 items-center">
                                 {kidTasks.length > 0 ? (
                                     kidTasks.map(task => (
-                                        <div key={task.id} className="relative group">
-                                            <div className="p-2 bg-slate-600/50 rounded-lg text-slate-200">
-                                                <ChoreIcon icon={task.icon} className="w-6 h-6" />
-                                            </div>
-                                            {/* Tooltip */}
-                                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-black text-xs text-white rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap pointer-events-none z-20">
-                                                {task.label}
-                                            </div>
+                                        <div key={task.id} className="flex items-center gap-2 p-2 bg-slate-600/50 rounded-lg text-slate-200">
+                                            <ChoreIcon icon={task.icon} className="w-5 h-5 flex-shrink-0" />
+                                            <span className="text-sm font-medium leading-none">{task.label}</span>
                                         </div>
                                     ))
                                 ) : (
