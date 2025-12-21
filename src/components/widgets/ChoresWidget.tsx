@@ -19,7 +19,7 @@ export const ChoresWidget: React.FC = () => {
                     return (
                         <div key={kid.id} className="flex items-center bg-slate-700/40 rounded-lg p-1.5">
                             {/* Avatar/Name */}
-                            <div className="flex flex-col items-center justify-center w-14 mr-2 border-r border-slate-600/50 pr-2">
+                            <div className="flex flex-col items-center justify-center w-20 mr-3 border-r border-slate-600/50 pr-2">
                                 {kid.photo ? (
                                     <img src={kid.photo} alt={kid.name} className="w-8 h-8 rounded-full object-cover mb-1 border-2" style={{ borderColor: kid.color }} />
                                 ) : (
@@ -27,7 +27,7 @@ export const ChoresWidget: React.FC = () => {
                                         {kid.name.substring(0, 2).toUpperCase()}
                                     </div>
                                 )}
-                                <span className="text-[10px] text-slate-300 font-medium truncate w-full text-center uppercase tracking-wide">{kid.name}</span>
+                                <span className="text-xs text-slate-300 font-medium text-center uppercase tracking-wide break-words w-full leading-tight">{kid.name}</span>
                             </div>
 
                             {/* Tasks Icons & Labels */}

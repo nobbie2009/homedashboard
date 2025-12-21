@@ -109,7 +109,7 @@ export const UnifiedHeaderWidget: React.FC = () => {
                     {format(time, 'HH:mm')}
                 </div>
                 {config.showSeconds && (
-                    <div className="text-4xl text-slate-500 font-mono ml-3 font-medium">
+                    <div className="text-6xl text-slate-500 font-mono ml-4 font-medium mb-8">
                         {format(time, ':ss')}
                     </div>
                 )}
