@@ -58,8 +58,8 @@ export const MainLayout: React.FC = () => {
             setDoorbellActive(true);
         });
 
-        eventSource.onerror = (e) => {
-            // console.error("SSE Error", e);
+        eventSource.onerror = () => {
+            // console.error("SSE Error");
             // Browser auto-retries, but we logs silent to avoid spam
             eventSource.close();
         };
