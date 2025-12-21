@@ -2,11 +2,30 @@ import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { ClipboardList, Lock, Unlock, Settings as SettingsIcon, Calendar, LayoutDashboard, GraduationCap, ClipboardCheck, Home } from 'lucide-react';
 import { useKiosk } from '../../contexts/KioskContext';
+import { getApiUrl } from '../../utils/api';
+import { useSecurity } from '../../contexts/SecurityContext';
 import clsx from 'clsx';
 import { useIdleRedirect } from '../../hooks/useIdleRedirect';
 
 export const MainLayout: React.FC = () => {
     const { isLocked, lock } = useKiosk();
+    const { deviceId } = useSecurity();
+    const [serverIp, setServerIp] = React.useState<string>('');
+
+    React.useEffect(() => {
+        const fetchIp = async () => {
+            try {
+                const res = await fetch(`${getApiUrl()}/api/system/ip`, {
+                    headers: { 'x-device-id': deviceId }
+                });
+                const data = await res.json();
+                setServerIp(data.ip);
+            } catch (e) {
+                console.error("Failed to fetch server IP", e);
+            }
+        };
+        fetchIp();
+    }, [deviceId]);
 
     // Auto-redirect to home after 3 minutes (180000ms) of inactivity
     useIdleRedirect(180000, '/');
@@ -28,10 +47,13 @@ export const MainLayout: React.FC = () => {
                     FamilyHub
                 </div>
                 <div className="flex items-center space-x-4">
-                    {/* Status Indicators will go here */}
-                    <div className="text-sm text-slate-400">
-                        {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </div>
+                    {/* Server IP (Only visible if unlocked) */}
+                    {!isLocked && (
+                        <div className="text-xs text-slate-500 font-mono">
+                            IP: {serverIp}
+                        </div>
+                    )}
+
                     <button
                         onClick={isLocked ? undefined : lock}
                         className="p-2 rounded-full hover:bg-slate-800 transition-colors"

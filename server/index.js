@@ -4,6 +4,7 @@ import { google } from 'googleapis';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import { execFile } from 'child_process';
 import { Client } from '@notionhq/client';
@@ -58,6 +59,23 @@ app.use((req, res, next) => {
     // 5. Update last seen and proceed
     security.registerDevice(deviceId, device.name, req.ip, req.headers['user-agent']);
     next();
+});
+
+// --- System Endpoints ---
+app.get('/api/system/ip', (req, res) => {
+    const nets = os.networkInterfaces();
+    const results = []; // Dictionary of networks
+
+    for (const name of Object.keys(nets)) {
+        for (const net of nets[name]) {
+            // Skip over non-IPv4 and internal (i.e. 127.0.0.1) addresses
+            if (net.family === 'IPv4' && !net.internal) {
+                results.push(net.address);
+            }
+        }
+    }
+    // Return the first one found, or a fallback
+    res.json({ ip: results[0] || 'localhost' });
 });
 
 // --- Auth Endpoints ---

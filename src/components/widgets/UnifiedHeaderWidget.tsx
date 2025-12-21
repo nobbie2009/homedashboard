@@ -105,7 +105,7 @@ export const UnifiedHeaderWidget: React.FC = () => {
 
             {/* LEFT: Clock */}
             <div className="flex flex-row items-baseline justify-start pl-8 h-full pt-4">
-                <div className="text-8xl font-black tracking-tighter tabular-nums leading-none bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent transform translate-y-[-0.05em]">
+                <div className="text-[10rem] font-black tracking-tighter tabular-nums leading-none bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent transform translate-y-[-0.05em]">
                     {format(time, 'HH:mm')}
                 </div>
                 {config.showSeconds && (
