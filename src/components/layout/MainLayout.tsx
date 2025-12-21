@@ -1,18 +1,21 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { Home, ClipboardList, Lock, Unlock, Settings as SettingsIcon, Calendar, LayoutDashboard, GraduationCap } from 'lucide-react';
+import { Home, ClipboardList, Lock, Unlock, Settings as SettingsIcon, Calendar, LayoutDashboard, GraduationCap, ClipboardCheck } from 'lucide-react';
 import { useKiosk } from '../../contexts/KioskContext';
 import clsx from 'clsx';
+import { useIdleRedirect } from '../../hooks/useIdleRedirect';
 
 export const MainLayout: React.FC = () => {
     const { isLocked, lock } = useKiosk();
-    // const location = useLocation();
+
+    // Auto-redirect to home after 3 minutes (180000ms) of inactivity
+    useIdleRedirect(180000, '/');
 
     const navItems = [
         { path: '/', icon: LayoutDashboard, label: 'Heute' },
-        { path: '/status', icon: Calendar, label: 'Diese Woche' },
+        { path: '/status', icon: Calendar, label: 'Woche' }, // Renamed from "Diese Woche" for space
+        { path: '/chores', icon: ClipboardCheck, label: 'Aufgaben' },
         { path: '/school', icon: GraduationCap, label: 'Schule' },
-        { path: '/smarthome', icon: Home, label: 'Smart Home' },
         { path: '/notes', icon: ClipboardList, label: 'Notizen' },
     ];
 

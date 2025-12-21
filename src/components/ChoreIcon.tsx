@@ -2,7 +2,7 @@ import React from 'react';
 import {
     Trash2, Utensils, Dog, Cat, Bed, Shirt,
     Sparkles, Brush, Recycle, Flower2,
-    ShoppingCart, Dishplate, Monitor, Gamepad2, Book
+    ShoppingCart, Monitor, Gamepad2, Book
 } from 'lucide-react';
 
 export const IconMap: Record<string, React.FC<any>> = {
