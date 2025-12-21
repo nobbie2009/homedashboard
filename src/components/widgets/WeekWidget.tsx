@@ -6,7 +6,7 @@ import { useGoogleEvents } from '../../hooks/useGoogleEvents';
 
 export const WeekWidget: React.FC = () => {
     const { config } = useConfig();
-    const { events, loading } = useGoogleEvents({ scope: 'weekWidget' });
+    const { events, loading, error } = useGoogleEvents({ scope: 'weekWidget' });
 
     // Generate next 5 days
     const nextDays = Array.from({ length: 5 }, (_, i) => addDays(new Date(), i)); // Today + 4 days
@@ -40,7 +40,11 @@ export const WeekWidget: React.FC = () => {
                     );
                 })}
 
-                {loading && events.length === 0 && (
+                {error ? (
+                    <div className="text-red-400 text-center text-sm pt-4">
+                        Fehler: {error}
+                    </div>
+                ) : loading && events.length === 0 && (
                     <div className="text-slate-500 text-center text-sm animate-pulse">Lade...</div>
                 )}
 

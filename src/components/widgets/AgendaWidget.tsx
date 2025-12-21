@@ -4,7 +4,7 @@ import { useGoogleEvents } from '../../hooks/useGoogleEvents';
 import { MapPin } from 'lucide-react';
 
 export const AgendaWidget: React.FC = () => {
-    const { events, loading } = useGoogleEvents({ scope: 'today' });
+    const { events, loading, error } = useGoogleEvents({ scope: 'today' });
 
     const todaysEvents = useMemo(() => {
         const today = new Date();
@@ -17,7 +17,12 @@ export const AgendaWidget: React.FC = () => {
         <div className="flex flex-col p-4 bg-slate-800/50 rounded-xl backdrop-blur-sm shadow-lg w-full h-full border border-slate-700 overflow-hidden">
             <h3 className="text-xl font-semibold text-slate-300 mb-3 uppercase tracking-wider">Heute</h3>
             <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar">
-                {loading && todaysEvents.length === 0 ? (
+                {error ? (
+                    <div className="flex flex-col items-center justify-center h-full text-red-400 space-y-2">
+                        <span className="font-bold">Fehler</span>
+                        <span className="text-xs text-center px-4">{error}</span>
+                    </div>
+                ) : loading && todaysEvents.length === 0 ? (
                     <div className="text-slate-500 text-center mt-10 animate-pulse text-lg">Lade Termine...</div>
                 ) : todaysEvents.length === 0 ? (
                     <div className="text-slate-500 text-center mt-10 text-lg">Keine Termine heute</div>
