@@ -484,6 +484,36 @@ const AdminSettings: React.FC = () => {
                         </section>
 
                         <section>
+                            <h3 className="text-xl font-semibold text-slate-300 mb-4">Weihnachtsmannroute</h3>
+                            <div className="space-y-4">
+                                <label className="flex items-center space-x-3">
+                                    <input
+                                        type="checkbox"
+                                        checked={config.santaRouteEnabled}
+                                        onChange={(e) => updateConfig({ santaRouteEnabled: e.target.checked })}
+                                        className="w-5 h-5 rounded border-slate-600 text-blue-600 focus:ring-blue-500 focus:ring-offset-slate-900"
+                                    />
+                                    <span>Aktiviere Weihnachtsmannroute</span>
+                                </label>
+
+                                {config.santaRouteEnabled && (
+                                    <div className="pl-8">
+                                        <label className="block text-sm text-slate-400 mb-1">
+                                            Tracker Adresse (Fallback: noradsanta.org)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={config.santaRouteAddress || ''}
+                                            onChange={(e) => updateConfig({ santaRouteAddress: e.target.value })}
+                                            placeholder="https://www.noradsanta.org/en/map"
+                                            className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 w-full max-w-md focus:outline-none focus:border-blue-500"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+
+                        <section>
                             <h3 className="text-xl font-semibold text-slate-300 mb-4">Anzeigeoptionen</h3>
                             <label className="flex items-center space-x-3">
                                 <input
@@ -829,7 +859,7 @@ const AdminSettings: React.FC = () => {
                     <span>Einstellungen automatisch gespeichert</span>
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 

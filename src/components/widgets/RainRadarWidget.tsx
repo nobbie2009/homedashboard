@@ -8,7 +8,6 @@ export const RainRadarWidget: React.FC = () => {
     const { config } = useConfig();
     const [radarUrl, setRadarUrl] = useState(`${dwdUrl}?t=${Date.now()}`);
     const [zoomStyle, setZoomStyle] = useState<React.CSSProperties>({});
-
     const [markerPos, setMarkerPos] = useState<{ x: number, y: number } | null>(null);
 
     // 1. Refresh Timer for Image
@@ -64,6 +63,27 @@ export const RainRadarWidget: React.FC = () => {
 
         calculateZoom();
     }, [config.weatherLocation]);
+
+    // Check if Santa Route is enabled
+    if (config.santaRouteEnabled) {
+        const santaUrl = config.santaRouteAddress || "https://www.noradsanta.org/en/map";
+        return (
+            <div className="h-full w-full bg-slate-900 rounded-xl shadow-lg border border-slate-700 overflow-hidden relative flex flex-col">
+                <iframe
+                    src={santaUrl}
+                    title="Santa Tracker"
+                    className="w-full h-full border-0"
+                    allowFullScreen
+                />
+                {/* Title Overlay */}
+                <div className="absolute top-0 left-0 bg-slate-900/60 px-2 py-1 rounded-br-lg pointer-events-none z-10 backdrop-blur-sm border-r border-b border-slate-700">
+                    <span className="text-white text-xs font-semibold">
+                        Weihnachtsmann Route
+                    </span>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="h-full w-full bg-slate-900 rounded-xl shadow-lg border border-slate-700 overflow-hidden relative flex flex-col">

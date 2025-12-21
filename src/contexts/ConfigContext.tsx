@@ -49,6 +49,8 @@ export interface AppConfig {
         tasks: Chore[];
         settings: RotationSettings;
     };
+    santaRouteEnabled?: boolean;
+    santaRouteAddress?: string;
 }
 
 export type CalendarScope = 'today' | 'weekWidget' | 'nextEvent' | 'weekView';
@@ -82,7 +84,9 @@ const defaultConfig: AppConfig = {
         ],
         tasks: [],
         settings: { interval: 'weekly' }
-    }
+    },
+    santaRouteEnabled: false,
+    santaRouteAddress: ''
 };
 
 import { getApiUrl } from '../utils/api';
