@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useKiosk } from '../../contexts/KioskContext';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useSecurity } from '../../contexts/SecurityContext';
-import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download, Smartphone, Trash2, Shield, ShieldAlert } from 'lucide-react';
+import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download, Smartphone, Trash2, Shield, ShieldAlert, ClipboardCheck, Plus } from 'lucide-react';
 // import clsx from 'clsx';
 
 import { getApiUrl } from '../../utils/api';
@@ -92,6 +92,7 @@ const AdminSettings: React.FC = () => {
 
     const tabs = [
         { id: 'kalender', label: 'Kalender', icon: CalendarIcon },
+        { id: 'aufgaben', label: 'Aufgaben', icon: ClipboardCheck },
         { id: 'zugangsdaten', label: 'Zugangsdaten', icon: Lock },
         { id: 'ansicht', label: 'Ansicht', icon: CheckCircle }, // Reusing CheckCircle as generic icon for View
         { id: 'extern', label: 'Externe Daten', icon: Upload }, // Reusing Upload/Download/Server equivalent
@@ -606,6 +607,165 @@ const AdminSettings: React.FC = () => {
                             </div>
                         </div>
                     </section>
+                )}
+
+                {/* 7. AUFGABEN TAB */}
+                {activeTab === 'aufgaben' && (
+                    <div className="space-y-8">
+                        {/* KIDS MANAGEMENT */}
+                        <section>
+                            <h3 className="text-xl font-semibold text-slate-300 mb-4">Kinder verwalten</h3>
+                            <div className="bg-slate-900/40 rounded-xl border border-slate-700/50 p-4 space-y-4">
+                                <div className="space-y-2">
+                                    {(config.chores?.kids || []).map((kid) => (
+                                        <div key={kid.id} className="flex items-center justify-between bg-slate-800 p-3 rounded-lg border border-slate-700">
+                                            <div className="flex items-center space-x-3">
+                                                <div className="w-8 h-8 rounded-full border-2 border-slate-600" style={{ backgroundColor: kid.color }}></div>
+                                                <span className="font-bold text-white">{kid.name}</span>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    const newKids = config.chores?.kids.filter(k => k.id !== kid.id) || [];
+                                                    updateConfig({ chores: { ...config.chores!, kids: newKids } });
+                                                }}
+                                                className="p-2 text-slate-500 hover:text-red-400 transition"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {(!config.chores?.kids || config.chores.kids.length === 0) && (
+                                        <p className="text-slate-500 italic text-sm">Keine Kinder angelegt.</p>
+                                    )}
+                                </div>
+
+                                <div className="border-t border-slate-700 pt-4 mt-4">
+                                    <h4 className="text-sm font-bold text-slate-400 mb-2">Kind hinzufügen</h4>
+                                    <form
+                                        className="flex gap-2"
+                                        onSubmit={(e) => {
+                                            e.preventDefault();
+                                            const form = e.target as HTMLFormElement;
+                                            const name = (form.elements.namedItem('name') as HTMLInputElement).value;
+                                            const color = (form.elements.namedItem('color') as HTMLInputElement).value;
+                                            if (!name) return;
+
+                                            const newKid = {
+                                                id: Date.now().toString(),
+                                                name,
+                                                color
+                                            };
+                                            const newKids = [...(config.chores?.kids || []), newKid];
+                                            updateConfig({ chores: { ...(config.chores || { tasks: [], settings: { interval: 'weekly' } }), kids: newKids } as any });
+                                            form.reset();
+                                        }}
+                                    >
+                                        <input
+                                            type="text"
+                                            name="name"
+                                            placeholder="Name"
+                                            className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500 flex-1"
+                                            required
+                                        />
+                                        <input
+                                            type="color"
+                                            name="color"
+                                            defaultValue="#3b82f6"
+                                            className="h-10 w-10 bg-transparent border-0 cursor-pointer rounded"
+                                        />
+                                        <button
+                                            type="submit"
+                                            className="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-500 flex items-center"
+                                        >
+                                            <Plus className="w-5 h-5" />
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </section>
+
+                        {/* TASKS MANAGEMENT */}
+                        <section>
+                            <h3 className="text-xl font-semibold text-slate-300 mb-4">Aufgaben (Chore Loop)</h3>
+                            <div className="bg-slate-900/40 rounded-xl border border-slate-700/50 p-4 space-y-4">
+                                <div className="space-y-2">
+                                    {(config.chores?.tasks || []).map((task) => (
+                                        <div key={task.id} className="flex items-center justify-between bg-slate-800 p-3 rounded-lg border border-slate-700">
+                                            <div className="flex items-center space-x-3">
+                                                <div className="bg-slate-700 p-2 rounded text-slate-300">
+                                                    {/* We could render the actual icon here if we had a map, for now just generic */}
+                                                    <ClipboardCheck className="w-4 h-4" />
+                                                </div>
+                                                <div>
+                                                    <div className="font-bold text-white">{task.label}</div>
+                                                    <div className="text-xs text-slate-500">Intervall: {task.rotation}</div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    const newTasks = config.chores?.tasks.filter(t => t.id !== task.id) || [];
+                                                    updateConfig({ chores: { ...config.chores!, tasks: newTasks } });
+                                                }}
+                                                className="p-2 text-slate-500 hover:text-red-400 transition"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {(!config.chores?.tasks || config.chores.tasks.length === 0) && (
+                                        <p className="text-slate-500 italic text-sm">Keine Aufgaben angelegt.</p>
+                                    )}
+                                </div>
+
+                                <div className="border-t border-slate-700 pt-4 mt-4">
+                                    <h4 className="text-sm font-bold text-slate-400 mb-2">Aufgabe hinzufügen</h4>
+                                    <form
+                                        className="grid grid-cols-[1fr_auto_auto] gap-2"
+                                        onSubmit={(e) => {
+                                            e.preventDefault();
+                                            const form = e.target as HTMLFormElement;
+                                            const label = (form.elements.namedItem('label') as HTMLInputElement).value;
+                                            const rotation = (form.elements.namedItem('rotation') as HTMLSelectElement).value;
+                                            if (!label) return;
+
+                                            const newTask = {
+                                                id: Date.now().toString(),
+                                                label,
+                                                icon: 'ClipboardCheck', // Default for now
+                                                rotation: rotation as any,
+                                                assignedTo: undefined
+                                            };
+                                            const newTasks = [...(config.chores?.tasks || []), newTask];
+                                            updateConfig({ chores: { ...(config.chores || { kids: [], settings: { interval: 'weekly' } }), tasks: newTasks } as any });
+                                            form.reset();
+                                        }}
+                                    >
+                                        <input
+                                            type="text"
+                                            name="label"
+                                            placeholder="Bezeichnung (z.B. Müll rausbringen)"
+                                            className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500 w-full"
+                                            required
+                                        />
+                                        <select
+                                            name="rotation"
+                                            className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                                        >
+                                            <option value="weekly">Wöchentlich</option>
+                                            <option value="daily">Täglich</option>
+                                            <option value="none">Manuell</option>
+                                        </select>
+                                        <button
+                                            type="submit"
+                                            className="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-500 flex items-center"
+                                        >
+                                            <Plus className="w-5 h-5" />
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
                 )}
 
                 {/* 6. GERÄTE TAB (Security) */}
