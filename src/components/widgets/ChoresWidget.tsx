@@ -17,30 +17,30 @@ export const ChoresWidget: React.FC = () => {
 
                     // Skip if no tasks? Or show empty state? Show empty row to keep balance
                     return (
-                        <div key={kid.id} className="flex items-center bg-slate-700/40 rounded-lg p-2">
+                        <div key={kid.id} className="flex items-center bg-slate-700/40 rounded-lg p-1.5">
                             {/* Avatar/Name */}
-                            <div className="flex flex-col items-center justify-center w-16 mr-3 border-r border-slate-600/50 pr-2">
+                            <div className="flex flex-col items-center justify-center w-14 mr-2 border-r border-slate-600/50 pr-2">
                                 {kid.photo ? (
-                                    <img src={kid.photo} alt={kid.name} className="w-10 h-10 rounded-full object-cover mb-1 border-2" style={{ borderColor: kid.color }} />
+                                    <img src={kid.photo} alt={kid.name} className="w-8 h-8 rounded-full object-cover mb-1 border-2" style={{ borderColor: kid.color }} />
                                 ) : (
-                                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm border-2" style={{ backgroundColor: kid.color, borderColor: 'rgba(255,255,255,0.2)' }}>
+                                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs border-2" style={{ backgroundColor: kid.color, borderColor: 'rgba(255,255,255,0.2)' }}>
                                         {kid.name.substring(0, 2).toUpperCase()}
                                     </div>
                                 )}
-                                <span className="text-xs text-slate-300 font-medium truncate w-full text-center">{kid.name}</span>
+                                <span className="text-[10px] text-slate-300 font-medium truncate w-full text-center uppercase tracking-wide">{kid.name}</span>
                             </div>
 
                             {/* Tasks Icons & Labels */}
                             <div className="flex-1 flex flex-wrap gap-2 items-center">
                                 {kidTasks.length > 0 ? (
                                     kidTasks.map(task => (
-                                        <div key={task.id} className="flex items-center gap-2 p-2 bg-slate-600/50 rounded-lg text-slate-200">
-                                            <ChoreIcon icon={task.icon} className="w-5 h-5 flex-shrink-0" />
-                                            <span className="text-sm font-medium leading-none">{task.label}</span>
+                                        <div key={task.id} className="flex items-center gap-1.5 px-2 py-1 bg-slate-600/50 rounded text-slate-200">
+                                            <ChoreIcon icon={task.icon} className="w-3.5 h-3.5 flex-shrink-0 opacity-80" />
+                                            <span className="text-xs font-medium leading-none">{task.label}</span>
                                         </div>
                                     ))
                                 ) : (
-                                    <span className="text-slate-500 text-xs italic ml-2">Frei!</span>
+                                    <span className="text-slate-500 text-[10px] italic ml-2">Frei!</span>
                                 )}
                             </div>
                         </div>

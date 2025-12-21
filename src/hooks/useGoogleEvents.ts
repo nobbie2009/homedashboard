@@ -162,6 +162,20 @@ export const useGoogleEvents = (options: UseGoogleEventsOptions = {}) => {
         }
     }, [deviceId, config.google?.selectedCalendars, fetchEvents]);
 
+    // Polling Effect
+    useEffect(() => {
+        if (options.enabled === false) return; // Don't poll if disabled
+
+        const intervalMs = config.google?.pollInterval || 600000; // Default 10 mins if not set
+
+        const intervalId = setInterval(() => {
+            // console.debug("Polling Google Events...");
+            fetchEvents(true); // Force fetch to ensure fresh data from API
+        }, intervalMs);
+
+        return () => clearInterval(intervalId);
+    }, [config.google?.pollInterval, fetchEvents, options.enabled]);
+
     const refresh = useCallback(() => fetchEvents(true), [fetchEvents]);
 
     return { events, loading, error, refresh };
