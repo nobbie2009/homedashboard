@@ -1,6 +1,26 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 // Define configuration types
+export interface Kid {
+    id: string;
+    name: string;
+    photo?: string; // base64 or URL
+    color: string;
+}
+
+export interface Chore {
+    id: string;
+    label: string;
+    icon: string; // lucide icon name
+    assignedTo?: string; // kidId
+    rotation: 'daily' | 'weekly' | 'none';
+}
+
+export interface RotationSettings {
+    interval: 'weekly' | 'daily';
+    lastRotation?: number; // timestamp
+}
+
 export interface AppConfig {
     weatherLocation: string;
     cameraUrl?: string; // RTSP or HTTP Stream URL
@@ -22,6 +42,11 @@ export interface AppConfig {
     notionKey?: string;
     notionDatabaseId?: string;
     notionRefreshInterval?: number; // Minutes
+    chores?: {
+        kids: Kid[];
+        tasks: Chore[];
+        settings: RotationSettings;
+    };
 }
 
 export type CalendarScope = 'today' | 'weekWidget' | 'nextEvent' | 'weekView';
@@ -47,7 +72,15 @@ const defaultConfig: AppConfig = {
     google: { selectedCalendars: [], calendarColors: {}, calendarSettings: {} },
     notionKey: '',
     notionDatabaseId: '',
-    notionRefreshInterval: 5 // Default 5 minutes
+    notionRefreshInterval: 5, // Default 5 minutes
+    chores: {
+        kids: [
+            { id: '1', name: 'Kind 1', color: 'blue' },
+            { id: '2', name: 'Kind 2', color: 'pink' }
+        ],
+        tasks: [],
+        settings: { interval: 'weekly' }
+    }
 };
 
 import { getApiUrl } from '../utils/api';
@@ -80,7 +113,12 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
                     ...data,
                     // Ensure nested objects are merged correctly if partial data comes back
                     edupage: { ...prev.edupage, ...(data.edupage || {}) },
-                    google: { ...prev.google, ...(data.google || {}) }
+                    google: { ...prev.google, ...(data.google || {}) },
+                    chores: {
+                        kids: data.chores?.kids || prev.chores?.kids || [],
+                        tasks: data.chores?.tasks || prev.chores?.tasks || [],
+                        settings: { ...prev.chores?.settings, ...(data.chores?.settings || {}) }
+                    }
                 }));
             })
             .catch(err => {

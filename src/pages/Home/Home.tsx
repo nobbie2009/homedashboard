@@ -3,6 +3,7 @@ import { UnifiedHeaderWidget } from '../../components/widgets/UnifiedHeaderWidge
 import { AgendaWidget } from '../../components/widgets/AgendaWidget';
 import { CameraWidget } from '../../components/widgets/CameraWidget';
 import { RainRadarWidget } from '../../components/widgets/RainRadarWidget';
+import { ChoresWidget } from '../../components/widgets/ChoresWidget';
 
 import { CountdownWidget } from '../../components/widgets/CountdownWidget';
 import { WeekWidget } from '../../components/widgets/WeekWidget';
@@ -44,11 +45,17 @@ export const Home: React.FC = () => {
                 Let's just split them 50/50 for now or Keep existing relative sizes?
                 Previous was Camera (Left) | Countdown (Right) in a 2-col grid.
             */}
-            <div className="col-span-1 h-48">
-                <CameraWidget />
-            </div>
-            <div className="col-span-1 h-48">
-                <CountdownWidget />
+            {/* Bottom Row: Camera | Countdown | Chores */}
+            <div className="col-span-2 h-48 grid grid-cols-3 gap-4">
+                <div className="overflow-hidden h-full">
+                    <CameraWidget />
+                </div>
+                <div className="overflow-hidden h-full">
+                    <CountdownWidget />
+                </div>
+                <div className="overflow-hidden h-full">
+                    <ChoresWidget />
+                </div>
             </div>
         </div>
     );
