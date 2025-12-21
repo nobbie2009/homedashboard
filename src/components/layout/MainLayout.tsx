@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { ClipboardList, Lock, Unlock, Settings as SettingsIcon, Calendar, LayoutDashboard, GraduationCap, ClipboardCheck } from 'lucide-react';
+import { ClipboardList, Lock, Unlock, Settings as SettingsIcon, Calendar, LayoutDashboard, GraduationCap, ClipboardCheck, Home } from 'lucide-react';
 import { useKiosk } from '../../contexts/KioskContext';
 import clsx from 'clsx';
 import { useIdleRedirect } from '../../hooks/useIdleRedirect';
@@ -17,6 +17,7 @@ export const MainLayout: React.FC = () => {
         { path: '/chores', icon: ClipboardCheck, label: 'Aufgaben' },
         { path: '/school', icon: GraduationCap, label: 'Schule' },
         { path: '/notes', icon: ClipboardList, label: 'Notizen' },
+        { path: '/smarthome', icon: Home, label: 'SmartHome' },
     ];
 
     return (
