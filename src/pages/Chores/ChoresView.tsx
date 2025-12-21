@@ -1,7 +1,7 @@
 import React from 'react';
 import { useConfig } from '../../contexts/ConfigContext';
 import { ChoreIcon } from '../../components/ChoreIcon';
-import { PartyPopper } from 'lucide-react';
+import { PartyPopper, Star } from 'lucide-react';
 
 const ChoresView: React.FC = () => {
     const { config } = useConfig();
@@ -9,8 +9,10 @@ const ChoresView: React.FC = () => {
 
     return (
         <div className="h-full w-full p-6 bg-slate-900 text-white overflow-y-auto">
-            <header className="mb-8 text-center">
-                <h1 className="text-4xl font-bold text-yellow-500 drop-shadow-md tracking-wider">🌟 Eure Aufgaben 🌟</h1>
+            <header className="mb-8 text-center flex items-center justify-center gap-3">
+                <Star className="w-8 h-8 text-yellow-400 fill-yellow-400" />
+                <h1 className="text-4xl font-bold text-yellow-500 drop-shadow-md tracking-wider">Eure Aufgaben</h1>
+                <Star className="w-8 h-8 text-yellow-400 fill-yellow-400" />
             </header>
 
             {(!kids || kids.length === 0) ? (

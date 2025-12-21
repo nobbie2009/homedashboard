@@ -173,7 +173,10 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
                     'x-device-id': deviceId
                 },
                 body: JSON.stringify(updated)
-            }).catch(e => console.error("Failed to save config:", e));
+            }).catch(e => {
+                console.error("Failed to save config:", e);
+                alert("Fehler beim Speichern der Konfiguration! (Größe/Netzwerk)");
+            });
 
             return updated;
         });
