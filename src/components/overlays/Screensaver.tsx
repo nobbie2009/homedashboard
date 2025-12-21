@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { Cloud, CloudRain, Sun, CloudSnow, Moon, CloudLightning } from 'lucide-react';
+import { Cloud, CloudRain, CloudSnow, Moon, CloudLightning } from 'lucide-react';
 import { useConfig } from '../../contexts/ConfigContext';
 
 interface WeatherData {
