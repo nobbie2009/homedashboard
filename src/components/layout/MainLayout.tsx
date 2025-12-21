@@ -7,6 +7,7 @@ import { useSecurity } from '../../contexts/SecurityContext';
 import clsx from 'clsx';
 import { useIdleRedirect } from '../../hooks/useIdleRedirect';
 import pkg from '../../../package.json';
+import { DoorbellOverlay } from '../overlays/DoorbellOverlay';
 
 export const MainLayout: React.FC = () => {
     const { isLocked, lock } = useKiosk();
@@ -40,8 +41,38 @@ export const MainLayout: React.FC = () => {
         { path: '/smarthome', icon: Home, label: 'SmartHome' },
     ];
 
+    // Doorbell Logic
+    const [doorbellActive, setDoorbellActive] = React.useState(false);
+
+    React.useEffect(() => {
+        const url = `${getApiUrl()}/api/stream/events`;
+        console.log("Connecting to SSE:", url);
+        const eventSource = new EventSource(url);
+
+        eventSource.onopen = () => {
+            // console.log("SSE Connected");
+        };
+
+        eventSource.addEventListener('doorbell', () => {
+            console.log("DOORBELL RINGING!");
+            setDoorbellActive(true);
+        });
+
+        eventSource.onerror = (e) => {
+            // console.error("SSE Error", e);
+            // Browser auto-retries, but we logs silent to avoid spam
+            eventSource.close();
+        };
+
+        return () => {
+            eventSource.close();
+        };
+    }, []);
+
     return (
-        <div className="flex flex-col h-screen w-full bg-slate-950 text-slate-100 overflow-hidden">
+        <div className="flex flex-col h-screen w-full bg-slate-950 text-slate-100 overflow-hidden relative">
+            <DoorbellOverlay active={doorbellActive} onClose={() => setDoorbellActive(false)} />
+
             {/* Header / Status Bar */}
             <header className="flex-none h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6">
                 <div className="text-xl font-bold bg-gradient-to-r from-blue-400 to-teal-400 bg-clip-text text-transparent">

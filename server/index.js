@@ -627,8 +627,44 @@ app.get('/api/edupage', (req, res) => {
     });
 });
 
-// --- Start Server ---
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+// --- SSE (Server-Sent Events) for Real-time Triggers (Doorbell) ---
+const sseClients = new Set();
+
+app.get('/api/stream/events', (req, res) => {
+    // SSE Setup
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+    });
+    res.write('\n');
+
+    // Add client
+    sseClients.add(res);
+
+    // Remove on close
+    req.on('close', () => {
+        sseClients.delete(res);
+    });
+});
+
+// Broadcast helper
+const broadcastEvent = (type, data) => {
+    sseClients.forEach(client => {
+        client.write(`event: ${type}\n`);
+        client.write(`data: ${JSON.stringify(data)}\n\n`);
+    });
+};
+
+// Doorbell Webhook
+app.post('/api/webhook/doorbell', (req, res) => {
+    console.log("Doorbell Triggered! Broadcasting to", sseClients.size, "clients.");
+    broadcastEvent('doorbell', { timestamp: Date.now() });
+    res.json({ success: true, clients: sseClients.size });
+});
+
+// --- EXECUTE ---
+app.listen(PORT, '0.0.0.0', () => { // Bind to 0.0.0.0 for external access
+    console.log(`Server running on http://0.0.0.0:${PORT}`);
 });
 
