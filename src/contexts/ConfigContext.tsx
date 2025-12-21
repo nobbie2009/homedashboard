@@ -12,6 +12,7 @@ export interface Kid {
 export interface Chore {
     id: string;
     label: string;
+    description?: string;
     icon: string; // lucide icon name
     assignedTo?: string; // kidId
     rotation: 'daily' | 'weekly' | 'none';

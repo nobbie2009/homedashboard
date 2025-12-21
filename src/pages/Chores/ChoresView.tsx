@@ -76,7 +76,10 @@ const ChoresView: React.FC = () => {
                                                 <div className="p-3 bg-slate-700 rounded-full">
                                                     <ChoreIcon icon={task.icon} className="w-8 h-8 text-white" />
                                                 </div>
-                                                <span className="text-2xl font-bold text-slate-100">{task.label}</span>
+                                                <div className="flex flex-col">
+                                                    <span className="text-2xl font-bold text-slate-100">{task.label}</span>
+                                                    {task.description && <span className="text-sm text-slate-400 italic">{task.description}</span>}
+                                                </div>
                                             </div>
                                         ))
                                     ) : (

@@ -699,6 +699,7 @@ const AdminSettings: React.FC = () => {
                                                 </div>
                                                 <div>
                                                     <div className="font-bold text-white">{task.label}</div>
+                                                    {task.description && <div className="text-xs text-slate-400 italic">{task.description}</div>}
                                                     <div className="text-xs text-slate-500">Intervall: {task.rotation}</div>
                                                 </div>
                                             </div>
@@ -741,12 +742,14 @@ const AdminSettings: React.FC = () => {
                                             e.preventDefault();
                                             const form = e.target as HTMLFormElement;
                                             const label = (form.elements.namedItem('label') as HTMLInputElement).value;
+                                            const description = (form.elements.namedItem('description') as HTMLInputElement).value;
                                             const rotation = (form.elements.namedItem('rotation') as HTMLSelectElement).value;
                                             if (!label) return;
 
                                             const newTask = {
                                                 id: Date.now().toString(),
                                                 label,
+                                                description,
                                                 icon: newTaskIcon,
                                                 rotation: rotation as any,
                                                 assignedTo: undefined
@@ -764,6 +767,12 @@ const AdminSettings: React.FC = () => {
                                                 placeholder="Bezeichnung (z.B. Müll rausbringen)"
                                                 className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500 w-full"
                                                 required
+                                            />
+                                            <input
+                                                type="text"
+                                                name="description"
+                                                placeholder="Beschreibung (optional)"
+                                                className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500 w-full col-span-2"
                                             />
                                             <select
                                                 name="rotation"
