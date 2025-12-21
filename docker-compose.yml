@@ -6,6 +6,7 @@ services:
       context: .
       args:
         - VITE_API_URL=${VITE_API_URL:-http://localhost:3001}
+      network: host
     network_mode: "host"
     restart: always
     depends_on:

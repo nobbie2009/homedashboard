@@ -56,7 +56,7 @@ export const MainLayout: React.FC = () => {
                     )}
 
                     {/* Version */}
-                    <div className="text-[10px] text-slate-600 font-mono">
+                    <div className="text-[10px] text-slate-500 font-mono opacity-60">
                         v{pkg.version}
                     </div>
 
