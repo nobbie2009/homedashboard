@@ -17,7 +17,12 @@ export const AgendaWidget: React.FC = () => {
         <div className="flex flex-col p-4 bg-slate-800/50 rounded-xl backdrop-blur-sm shadow-lg w-full h-full border border-slate-700 overflow-hidden">
             <h3 className="text-xl font-semibold text-slate-300 mb-3 uppercase tracking-wider">Heute</h3>
             <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar">
-                {error ? (
+                {error === 'AUTH_REQUIRED' ? (
+                    <div className="flex flex-col items-center justify-center h-full text-amber-400 space-y-3 p-4">
+                        <span className="font-bold text-lg text-center">Google Login Abgelaufen</span>
+                        <span className="text-sm text-center text-slate-300">Bitte im Admin-Menü neu verbinden.</span>
+                    </div>
+                ) : error ? (
                     <div className="flex flex-col items-center justify-center h-full text-red-400 space-y-2">
                         <span className="font-bold">Fehler</span>
                         <span className="text-xs text-center px-4">{error}</span>

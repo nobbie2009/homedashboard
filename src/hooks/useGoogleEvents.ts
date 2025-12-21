@@ -95,6 +95,10 @@ export const useGoogleEvents = (options: UseGoogleEventsOptions = {}) => {
                     rawData = await res.json();
                     // Update Cache with RAW data
                     rawEventCache[cacheKey] = { timestamp: Date.now(), data: rawData };
+                } else if (res.status === 401) {
+                    // Clean default error
+                    setError("AUTH_REQUIRED");
+                    return;
                 } else {
                     setError("Failed to fetch events");
                     return;

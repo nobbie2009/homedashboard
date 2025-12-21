@@ -269,7 +269,8 @@ app.get('/auth/google', (req, res) => {
     ];
     const url = oauth2Client.generateAuthUrl({
         access_type: 'offline', // Request refresh token
-        scope: scopes
+        scope: scopes,
+        prompt: 'consent' // Force new refresh token
     });
     res.redirect(url);
 });
@@ -282,10 +283,12 @@ app.get('/auth/google/callback', async (req, res) => {
     try {
         const { tokens } = await oauth2Client.getToken(code);
         oauth2Client.setCredentials(tokens);
-        userTokens = tokens;
+        // Merge with existing to keep any other props, though 'tokens' usually has what we need.
+        // Importantly, 'prompt: consent' ensures we get a refresh_token this time.
+        userTokens = { ...userTokens, ...tokens };
 
         // Save tokens to file
-        fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens));
+        fs.writeFileSync(TOKEN_PATH, JSON.stringify(userTokens));
         console.log("Google tokens acquired and saved to file.");
 
         // Redirect back to Frontend Admin Settings (Relative path works because of Nginx proxy)
@@ -350,6 +353,8 @@ app.post('/api/google/events', async (req, res) => {
 
         let allEvents = [];
 
+        let authError = null;
+
         for (const calId of calendarIds) {
             try {
                 const response = await calendar.events.list({
@@ -373,7 +378,17 @@ app.post('/api/google/events', async (req, res) => {
                 allEvents = [...allEvents, ...events];
             } catch (err) {
                 console.error(`Failed to fetch for ${calId}:`, err.message);
+                if (err.message && (err.message.includes('No refresh token') || err.message.includes('invalid_grant'))) {
+                    authError = err;
+                }
             }
+        }
+
+        // If we faced an auth error and got no events (or even if we did?), report it.
+        // Prioritize reporting the auth error if the result implies total failure.
+        if (authError && allEvents.length === 0) {
+            console.error("Google Auth seems broken, returning 401");
+            return res.status(401).json({ error: "Google Auth Expired or Invalid", details: authError.message });
         }
 
         // Save to Cache
