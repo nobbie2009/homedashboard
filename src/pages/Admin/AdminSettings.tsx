@@ -239,7 +239,7 @@ const AdminSettings: React.FC = () => {
     }
 
     return (
-        <div className="h-full flex flex-col p-6 max-w-4xl mx-auto">
+        <div className="h-full flex flex-col p-6 w-full">
             <div className="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
                 <h2 className="text-3xl font-bold text-white">Einstellungen</h2>
                 <button
@@ -252,12 +252,12 @@ const AdminSettings: React.FC = () => {
             </div>
 
             {/* Tabs Navigation */}
-            <div className="flex space-x-1 bg-slate-800/50 p-1 rounded-xl mb-6 overflow-x-auto">
+            <div className="flex flex-wrap gap-2 bg-slate-800/50 p-1 rounded-xl mb-6">
                 {tabs.map(tab => (
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === tab.id
+                        className={`flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === tab.id
                             ? 'bg-blue-600 text-white shadow-lg'
                             : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
                             }`}
@@ -701,6 +701,21 @@ const AdminSettings: React.FC = () => {
                                                     <div className="text-xs text-slate-500">Intervall: {task.rotation}</div>
                                                 </div>
                                             </div>
+
+                                            <select
+                                                value={task.assignedTo || ''}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    const newTasks = config.chores?.tasks.map(t => t.id === task.id ? { ...t, assignedTo: val || undefined } : t) || [];
+                                                    updateConfig({ chores: { ...config.chores!, tasks: newTasks } });
+                                                }}
+                                                className="bg-slate-900 border border-slate-600 text-slate-200 text-sm rounded px-2 py-1 mx-4 focus:outline-none focus:border-blue-500"
+                                            >
+                                                <option value="">-- Nicht zugewiesen --</option>
+                                                {(config.chores?.kids || []).map(k => (
+                                                    <option key={k.id} value={k.id}>{k.name}</option>
+                                                ))}
+                                            </select>
                                             <button
                                                 onClick={() => {
                                                     const newTasks = config.chores?.tasks.filter(t => t.id !== task.id) || [];

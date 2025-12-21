@@ -46,7 +46,7 @@ export const Home: React.FC = () => {
                 Previous was Camera (Left) | Countdown (Right) in a 2-col grid.
             */}
             {/* Bottom Row: Camera | Countdown | Chores */}
-            <div className="col-span-2 h-48 grid grid-cols-3 gap-4">
+            <div className="col-span-2 h-48 grid grid-cols-[2fr_1fr_2fr] gap-4">
                 <div className="overflow-hidden h-full">
                     <CameraWidget />
                 </div>
