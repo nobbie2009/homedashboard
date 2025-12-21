@@ -9,6 +9,8 @@ export const RainRadarWidget: React.FC = () => {
     const [radarUrl, setRadarUrl] = useState(`${dwdUrl}?t=${Date.now()}`);
     const [zoomStyle, setZoomStyle] = useState<React.CSSProperties>({});
 
+    const [markerPos, setMarkerPos] = useState<{ x: number, y: number } | null>(null);
+
     // 1. Refresh Timer for Image
     useEffect(() => {
         const timer = setInterval(() => {
@@ -47,6 +49,8 @@ export const RainRadarWidget: React.FC = () => {
                     xPercent = Math.max(10, Math.min(90, xPercent));
                     yPercent = Math.max(10, Math.min(90, yPercent));
 
+                    setMarkerPos({ x: xPercent, y: yPercent });
+
                     setZoomStyle({
                         transform: 'scale(3.5)', // ~100km zoom
                         transformOrigin: `${xPercent}% ${yPercent}%`,
@@ -64,13 +68,28 @@ export const RainRadarWidget: React.FC = () => {
     return (
         <div className="h-full w-full bg-slate-900 rounded-xl shadow-lg border border-slate-700 overflow-hidden relative flex flex-col">
             <div className="flex-1 relative overflow-hidden bg-slate-800">
-                {/* Display DWD Gif - Scaled via CSS */}
-                <img
-                    src={radarUrl}
-                    alt="Regenradar Deutschland"
-                    className="w-full h-full object-contain opacity-90 transition-transform duration-700"
+                {/* DWD Gif & Marker - Wrapped for Zoom */}
+                <div
+                    className="w-full h-full relative transition-transform duration-700"
                     style={zoomStyle}
-                />
+                >
+                    <img
+                        src={radarUrl}
+                        alt="Regenradar Deutschland"
+                        className="w-full h-full object-contain opacity-90"
+                    />
+
+                    {/* Location Marker */}
+                    {markerPos && (
+                        <div
+                            className="absolute w-3 h-3 bg-red-600 rounded-full border-2 border-white shadow-md transform -translate-x-1/2 -translate-y-1/2 animate-pulse"
+                            style={{
+                                left: `${markerPos.x}%`,
+                                top: `${markerPos.y}%`
+                            }}
+                        />
+                    )}
+                </div>
             </div>
 
             {/* Title Overlay */}

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { checkAndRotateChores } from '../utils/choreLogic';
 
 // Define configuration types
 export interface Kid {
@@ -108,18 +109,50 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
             })
             .then(data => {
                 // Determine deep merge or just shallow? Shallow for now, but ensure nested objects exist
-                setConfig(prev => ({
-                    ...prev,
-                    ...data,
-                    // Ensure nested objects are merged correctly if partial data comes back
-                    edupage: { ...prev.edupage, ...(data.edupage || {}) },
-                    google: { ...prev.google, ...(data.google || {}) },
-                    chores: {
-                        kids: data.chores?.kids || prev.chores?.kids || [],
-                        tasks: data.chores?.tasks || prev.chores?.tasks || [],
-                        settings: { ...prev.chores?.settings, ...(data.chores?.settings || {}) }
+                setConfig(prev => {
+                    const merged = {
+                        ...prev,
+                        ...data,
+                        edupage: { ...prev.edupage, ...(data.edupage || {}) },
+                        google: { ...prev.google, ...(data.google || {}) },
+                        chores: {
+                            kids: data.chores?.kids || prev.chores?.kids || [],
+                            tasks: data.chores?.tasks || prev.chores?.tasks || [],
+                            settings: { ...prev.chores?.settings, ...(data.chores?.settings || {}) }
+                        }
+                    };
+
+                    // Check for Chore Rotation
+                    const rotationResult = checkAndRotateChores(merged);
+                    if (rotationResult) {
+                        console.log("Rotating Chores...", rotationResult);
+                        const rotatedConfig = {
+                            ...merged,
+                            chores: {
+                                ...merged.chores!,
+                                tasks: rotationResult.tasks,
+                                settings: {
+                                    ...merged.chores!.settings,
+                                    ...rotationResult.settings
+                                }
+                            }
+                        };
+
+                        // Persist rotated config to backend
+                        fetch(`${API_URL}/api/config`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'x-device-id': deviceId
+                            },
+                            body: JSON.stringify(rotatedConfig)
+                        }).catch(e => console.error("Auto-rotation save failed", e));
+
+                        return rotatedConfig;
                     }
-                }));
+
+                    return merged;
+                });
             })
             .catch(err => {
                 console.error("Config load error:", err);
