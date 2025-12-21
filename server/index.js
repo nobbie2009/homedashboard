@@ -178,6 +178,24 @@ if (fs.existsSync(TOKEN_PATH)) {
     }
 }
 
+// Auto-Save Tokens on Refresh
+if (oauth2Client) {
+    oauth2Client.on('tokens', (tokens) => {
+        if (tokens.refresh_token) {
+            console.log("New Refresh Token received via auto-refresh!");
+        }
+        console.log("Google Access Token refreshed automatically. Saving to disk...");
+        // Merge with existing to ensure we don't lose the refresh_token if the update only has access_token
+        userTokens = { ...userTokens, ...tokens };
+        try {
+            fs.writeFileSync(TOKEN_PATH, JSON.stringify(userTokens));
+            console.log("Tokens saved to tokens.json");
+        } catch (e) {
+            console.error("Failed to save refreshed tokens:", e);
+        }
+    });
+}
+
 // Load config on startup
 if (fs.existsSync(CONFIG_PATH)) {
     try {
