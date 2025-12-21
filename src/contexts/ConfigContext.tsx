@@ -51,6 +51,11 @@ export interface AppConfig {
     };
     santaRouteEnabled?: boolean;
     santaRouteAddress?: string;
+    screensaver?: {
+        enabled: boolean;
+        start: string; // HH:mm
+        end: string; // HH:mm
+    };
 }
 
 export type CalendarScope = 'today' | 'weekWidget' | 'nextEvent' | 'weekView';
@@ -86,7 +91,12 @@ const defaultConfig: AppConfig = {
         settings: { interval: 'weekly' }
     },
     santaRouteEnabled: false,
-    santaRouteAddress: ''
+    santaRouteAddress: '',
+    screensaver: {
+        enabled: false,
+        start: '22:00',
+        end: '06:00'
+    }
 };
 
 import { getApiUrl } from '../utils/api';
@@ -124,6 +134,11 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
                             kids: data.chores?.kids || prev.chores?.kids || [],
                             tasks: data.chores?.tasks || prev.chores?.tasks || [],
                             settings: { ...prev.chores?.settings, ...(data.chores?.settings || {}) }
+                        },
+                        screensaver: {
+                            enabled: data.screensaver?.enabled ?? prev.screensaver?.enabled ?? false,
+                            start: data.screensaver?.start || prev.screensaver?.start || '22:00',
+                            end: data.screensaver?.end || prev.screensaver?.end || '06:00'
                         }
                     };
 

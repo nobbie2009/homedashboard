@@ -8,11 +8,16 @@ import clsx from 'clsx';
 import { useIdleRedirect } from '../../hooks/useIdleRedirect';
 import pkg from '../../../package.json';
 import { DoorbellOverlay } from '../overlays/DoorbellOverlay';
+import { Screensaver } from '../overlays/Screensaver';
+import { useConfig } from '../../contexts/ConfigContext';
 
 export const MainLayout: React.FC = () => {
     const { isLocked, lock } = useKiosk();
     const { deviceId } = useSecurity();
+    const { config } = useConfig();
     const [serverIp, setServerIp] = React.useState<string>('');
+    const [showScreensaver, setShowScreensaver] = React.useState(false);
+    const lastActivity = React.useRef(Date.now());
 
     React.useEffect(() => {
         const fetchIp = async () => {
@@ -28,6 +33,67 @@ export const MainLayout: React.FC = () => {
         };
         fetchIp();
     }, [deviceId]);
+
+    // Activity Listener for Screensaver & Kiosk
+    React.useEffect(() => {
+        const resetActivity = () => {
+            lastActivity.current = Date.now();
+            // If screensaver is active, dismiss it
+            setShowScreensaver(false);
+        };
+
+        window.addEventListener('mousemove', resetActivity);
+        window.addEventListener('mousedown', resetActivity);
+        window.addEventListener('touchstart', resetActivity);
+        window.addEventListener('keydown', resetActivity);
+
+        return () => {
+            window.removeEventListener('mousemove', resetActivity);
+            window.removeEventListener('mousedown', resetActivity);
+            window.removeEventListener('touchstart', resetActivity);
+            window.removeEventListener('keydown', resetActivity);
+        };
+    }, []);
+
+    // Screensaver Logic Check
+    React.useEffect(() => {
+        const checkScreensaver = () => {
+            if (!config.screensaver?.enabled) return;
+
+            const now = new Date();
+            const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+            const [startH, startM] = (config.screensaver.start || "22:00").split(':').map(Number);
+            const [endH, endM] = (config.screensaver.end || "06:00").split(':').map(Number);
+
+            const startTotal = startH * 60 + startM;
+            const endTotal = endH * 60 + endM;
+
+            let inWindow = false;
+            if (startTotal > endTotal) {
+                // cross midnight (e.g. 22:00 - 06:00)
+                inWindow = nowMinutes >= startTotal || nowMinutes < endTotal;
+            } else {
+                // same day (e.g. 08:00 - 18:00)
+                inWindow = nowMinutes >= startTotal && nowMinutes < endTotal;
+            }
+
+            if (inWindow) {
+                // If in window, check idle time (3 mins = 180000 ms)
+                if (Date.now() - lastActivity.current > 180000) {
+                    setShowScreensaver(true);
+                }
+            } else {
+                setShowScreensaver(false);
+            }
+        };
+
+        const interval = setInterval(checkScreensaver, 10000); // Check every 10s
+        checkScreensaver(); // Check immediately on mount/update
+
+        return () => clearInterval(interval);
+    }, [config.screensaver]);
+
 
     // Auto-redirect to home after 3 minutes (180000ms) of inactivity
     useIdleRedirect(180000, '/');
@@ -72,6 +138,7 @@ export const MainLayout: React.FC = () => {
     return (
         <div className="flex flex-col h-screen w-full bg-slate-950 text-slate-100 overflow-hidden relative">
             <DoorbellOverlay active={doorbellActive} onClose={() => setDoorbellActive(false)} />
+            <Screensaver active={showScreensaver} onDismiss={() => setShowScreensaver(false)} />
 
             {/* Header / Status Bar */}
             <header className="flex-none h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6">
