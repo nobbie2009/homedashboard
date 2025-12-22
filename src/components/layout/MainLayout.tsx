@@ -155,7 +155,7 @@ export const MainLayout: React.FC = () => {
 
                     {/* Version */}
                     <div className="text-[10px] text-slate-500 font-mono opacity-60">
-                        v{pkg.version}
+                        v{pkg.version}-{import.meta.env.VITE_GIT_COMMIT_HASH}
                     </div>
 
                     <button

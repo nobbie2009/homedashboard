@@ -60,11 +60,7 @@ export const AgendaWidget: React.FC = () => {
                                                 {event.description}
                                             </div>
                                         )}
-                                        {!event.location && !event.description && (
-                                            <div className="text-sm text-slate-500 truncate opacity-50">
-                                                {event.calendarId}
-                                            </div>
-                                        )}
+                                        {/* Fallback removed as per request */}
                                     </div>
                                 </div>
                             </div>
