@@ -68,19 +68,13 @@ export const RainRadarWidget: React.FC = () => {
     if (config.santaRouteEnabled) {
         const santaUrl = config.santaRouteAddress || "https://www.noradsanta.org/en/map";
         return (
-            <div className="h-full w-full bg-slate-900 rounded-xl shadow-lg border border-slate-700 overflow-hidden relative flex flex-col">
+            <div className="h-full w-full overflow-hidden relative">
                 <iframe
                     src={santaUrl}
                     title="Santa Tracker"
                     className="w-full h-full border-0"
                     allowFullScreen
                 />
-                {/* Title Overlay */}
-                <div className="absolute top-0 left-0 bg-slate-900/60 px-2 py-1 rounded-br-lg pointer-events-none z-10 backdrop-blur-sm border-r border-b border-slate-700">
-                    <span className="text-white text-xs font-semibold">
-                        Weihnachtsmann Route
-                    </span>
-                </div>
             </div>
         );
     }
