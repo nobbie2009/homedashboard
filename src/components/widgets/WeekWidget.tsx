@@ -3,6 +3,7 @@ import { format, addDays, isSameDay } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useGoogleEvents } from '../../hooks/useGoogleEvents';
+import { Cake } from 'lucide-react';
 
 export const WeekWidget: React.FC = () => {
     const { config } = useConfig();
@@ -29,7 +30,11 @@ export const WeekWidget: React.FC = () => {
                                     const color = config.google?.calendarColors?.[e.calendarId] || '#60a5fa';
                                     return (
                                         <div key={e.id} className="text-base text-slate-300 truncate flex items-center">
-                                            <div className="w-2.5 h-2.5 rounded-full mr-2" style={{ backgroundColor: color }}></div>
+                                            {e.isBirthday ? (
+                                                <Cake className="w-3.5 h-3.5 mr-2 text-pink-400" />
+                                            ) : (
+                                                <div className="w-2.5 h-2.5 rounded-full mr-2" style={{ backgroundColor: color }}></div>
+                                            )}
                                             <span className="text-slate-500 mr-2 w-12">{format(e.start, 'HH:mm')}</span>
                                             <span className="truncate">{e.title}</span>
                                         </div>

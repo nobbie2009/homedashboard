@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useKiosk } from '../../contexts/KioskContext';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useSecurity } from '../../contexts/SecurityContext';
-import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download, Smartphone, Trash2, Shield, ShieldAlert, ClipboardCheck, Plus } from 'lucide-react';
+import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download, Smartphone, Trash2, Shield, ShieldAlert, ClipboardCheck, Plus, Cake } from 'lucide-react';
 import { IconMap, ChoreIcon } from '../../components/ChoreIcon';
 // import clsx from 'clsx';
 
@@ -297,10 +297,11 @@ const AdminSettings: React.FC = () => {
 
                         {isGoogleAuth && remoteCalendars.length > 0 && (
                             <div className="mt-4 space-y-4">
-                                <div className="grid grid-cols-[auto_40px_1fr_auto] gap-4 items-center px-2 py-2 text-xs uppercase text-slate-500 font-bold border-b border-slate-700">
+                                <div className="grid grid-cols-[auto_40px_1fr_40px_auto] gap-4 items-center px-2 py-2 text-xs uppercase text-slate-500 font-bold border-b border-slate-700">
                                     <span>Aktiv</span>
                                     <span>Farbe</span>
                                     <span>Name (Alias)</span>
+                                    <span title="Geburtstag"><Cake className="w-4 h-4" /></span>
                                     <div className="flex space-x-2">
                                         <span title="Heute Widget">Heute</span>
                                         <span title="Wochen Widget">Woche</span>
@@ -315,6 +316,7 @@ const AdminSettings: React.FC = () => {
                                         id: cal.id,
                                         color: config.google?.calendarColors?.[cal.id] || '#3b82f6',
                                         alias: cal.summary,
+                                        isBirthday: false,
                                         scopes: { today: true, weekWidget: true, nextEvent: true, weekView: true }
                                     };
 
@@ -342,7 +344,7 @@ const AdminSettings: React.FC = () => {
                                     };
 
                                     return (
-                                        <div key={cal.id} className="grid grid-cols-[auto_40px_1fr_auto] gap-4 items-center p-3 bg-slate-900/40 rounded-lg border border-slate-700/50 hover:border-slate-600 transition">
+                                        <div key={cal.id} className="grid grid-cols-[auto_40px_1fr_40px_auto] gap-4 items-center p-3 bg-slate-900/40 rounded-lg border border-slate-700/50 hover:border-slate-600 transition">
 
                                             {/* 1. Active Checkbox */}
                                             <input
@@ -370,6 +372,17 @@ const AdminSettings: React.FC = () => {
                                                 className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500 w-full disabled:opacity-50"
                                                 disabled={!isSelected}
                                             />
+
+                                            {/* 3b. Is Birthday Toggle */}
+                                            <div className="flex items-center justify-center" title="Ist Geburtstagskalender?">
+                                                <button
+                                                    onClick={() => updateSettings({ isBirthday: !settings.isBirthday })}
+                                                    disabled={!isSelected}
+                                                    className={`p-1.5 rounded transition ${settings.isBirthday ? 'text-pink-400 bg-pink-400/10' : 'text-slate-600 hover:text-slate-400'}`}
+                                                >
+                                                    <Cake className="w-5 h-5" />
+                                                </button>
+                                            </div>
 
                                             {/* 4. Scopes */}
                                             <div className="flex items-center space-x-3">

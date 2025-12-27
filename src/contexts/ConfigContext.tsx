@@ -64,6 +64,7 @@ export interface CalendarSettings {
     id: string;
     color: string;
     alias: string;
+    isBirthday?: boolean;
     scopes: Record<CalendarScope, boolean>;
 }
 

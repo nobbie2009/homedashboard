@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { format, isSameDay } from 'date-fns';
 import { useGoogleEvents } from '../../hooks/useGoogleEvents';
-import { MapPin } from 'lucide-react';
+import { MapPin, Cake } from 'lucide-react';
 
 export const AgendaWidget: React.FC = () => {
     const { events, loading, error } = useGoogleEvents({ scope: 'today' });
@@ -49,10 +49,14 @@ export const AgendaWidget: React.FC = () => {
                                 <div className="flex-1 min-w-0">
                                     <div className={`font-medium text-xl leading-tight truncate ${isPast ? 'text-slate-400' : 'text-white'}`}>{event.title}</div>
                                     <div className="flex flex-col mt-1 space-y-0.5">
-                                        {event.location && (
+                                        {(event.location || event.isBirthday) && (
                                             <div className="flex items-center text-sm text-slate-400 truncate">
-                                                <MapPin className="w-3.5 h-3.5 mr-1" />
-                                                <span className="truncate">{event.location}</span>
+                                                {event.isBirthday ? (
+                                                    <Cake className="w-3.5 h-3.5 mr-1 text-pink-400" />
+                                                ) : (
+                                                    <MapPin className="w-3.5 h-3.5 mr-1" />
+                                                )}
+                                                <span className="truncate">{event.location || (event.isBirthday ? 'Geburtstag' : '')}</span>
                                             </div>
                                         )}
                                         {event.description && (

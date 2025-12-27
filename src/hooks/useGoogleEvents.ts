@@ -14,6 +14,7 @@ export interface CalendarEvent {
     location?: string;
     color?: string;
     calendarName?: string; // Alias or ID
+    isBirthday?: boolean;
 }
 
 export interface UseGoogleEventsOptions {
@@ -123,6 +124,7 @@ export const useGoogleEvents = (options: UseGoogleEventsOptions = {}) => {
                 // Fallback to old color config or default
                 const color = settings?.color || config.google?.calendarColors?.[calId] || '#3b82f6';
                 const alias = settings?.alias || calId;
+                const isBirthday = settings?.isBirthday || false;
 
                 return {
                     id: e.id,
@@ -133,7 +135,8 @@ export const useGoogleEvents = (options: UseGoogleEventsOptions = {}) => {
                     description: e.description,
                     location: e.location,
                     color: color,
-                    calendarName: alias
+                    calendarName: alias,
+                    isBirthday: isBirthday
                 };
             });
 
