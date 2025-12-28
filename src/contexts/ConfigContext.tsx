@@ -56,6 +56,7 @@ export interface AppConfig {
         start: string; // HH:mm
         end: string; // HH:mm
     };
+    weatherAlertExclusions?: string[]; // List of event codes/names to ignore (e.g., 'FROST', 'FOG')
 }
 
 export type CalendarScope = 'today' | 'weekWidget' | 'nextEvent' | 'weekView';
@@ -97,7 +98,8 @@ const defaultConfig: AppConfig = {
         enabled: false,
         start: '22:00',
         end: '06:00'
-    }
+    },
+    weatherAlertExclusions: []
 };
 
 import { getApiUrl } from '../utils/api';
@@ -140,7 +142,8 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
                             enabled: data.screensaver?.enabled ?? prev.screensaver?.enabled ?? false,
                             start: data.screensaver?.start || prev.screensaver?.start || '22:00',
                             end: data.screensaver?.end || prev.screensaver?.end || '06:00'
-                        }
+                        },
+                        weatherAlertExclusions: data.weatherAlertExclusions || prev.weatherAlertExclusions || []
                     };
 
                     // Check for Chore Rotation

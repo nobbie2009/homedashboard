@@ -576,6 +576,49 @@ const AdminSettings: React.FC = () => {
                             </div>
                         </section>
 
+                        <section>
+                            <h3 className="text-xl font-semibold text-slate-300 mb-4">Wetter Warnungen (DWD)</h3>
+                            <div className="bg-slate-900/40 rounded-lg border border-slate-700/50 p-4">
+                                <p className="text-sm text-slate-400 mb-4">
+                                    Wählen Sie aus, welche Warnmeldungen <strong>ignoriert</strong> werden sollen. Aktive Buttons bedeuten, dass diese Warnung <strong>nicht</strong> angezeigt wird.
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                    {[
+                                        { id: 'frost', label: 'Frost' },
+                                        { id: 'ice', label: 'Glätte / Eis' },
+                                        { id: 'fog', label: 'Nebel' },
+                                        { id: 'wind', label: 'Wind / Sturm' },
+                                        { id: 'rain', label: 'Regen' },
+                                        { id: 'snow', label: 'Schnee' },
+                                        { id: 'thunderstorm', label: 'Gewitter' },
+                                        { id: 'heat', label: 'Hitze' },
+                                        { id: 'uv', label: 'UV-Strahlung' },
+                                    ].map(type => {
+                                        const isExcluded = (config.weatherAlertExclusions || []).includes(type.id);
+                                        return (
+                                            <button
+                                                key={type.id}
+                                                onClick={() => {
+                                                    const current = config.weatherAlertExclusions || [];
+                                                    const newExclusions = current.includes(type.id)
+                                                        ? current.filter(id => id !== type.id)
+                                                        : [...current, type.id];
+                                                    updateConfig({ weatherAlertExclusions: newExclusions });
+                                                }}
+                                                className={`px-3 py-1.5 rounded-lg text-sm font-bold transition flex items-center gap-2 ${isExcluded
+                                                        ? 'bg-red-500/20 text-red-400 border border-red-500/50'
+                                                        : 'bg-slate-800 text-slate-400 border border-slate-700 hover:border-slate-500'
+                                                    }`}
+                                            >
+                                                {isExcluded ? <ShieldAlert className="w-4 h-4" /> : <Shield className="w-4 h-4 text-slate-600" />}
+                                                {type.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </section>
+
                         <section className="bg-slate-900/40 rounded-lg border border-slate-700/50 p-4">
                             <h3 className="text-xl font-semibold text-slate-300 mb-4">Bildschirmschoner (Nachtmodus)</h3>
                             <div className="space-y-4">

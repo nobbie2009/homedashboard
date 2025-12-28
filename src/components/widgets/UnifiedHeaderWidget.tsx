@@ -116,9 +116,33 @@ export const UnifiedHeaderWidget: React.FC = () => {
         return () => clearInterval(interval);
     }, [config.weatherLocation]);
 
+    // Filter Alerts
+    const filteredAlerts = alerts.filter(a => {
+        // Event code can be checked, or event_de name
+        // DWD event codes are rough, let's use broad category matching if possible, or just exact string match from exclusions
+        // Exclusions list contains strings like 'FROST', 'THUNDERSTORM', etc.
+        // We need to map DWD event to these categories or just check if event_de contains string? 
+        // Let's assume exclusions are mapped to: 'fog', 'frost', 'rain', 'snow', 'thunderstorm', 'wind', 'heat', 'uv', 'ice'
+
+        const exclusions = (config.weatherAlertExclusions || []).map(e => e.toLowerCase());
+        const eventName = (a.event_en || '').toLowerCase(); // Use English for better mapping if available, otherwise just rely on code? Brightsky gives `event_en`.
+
+        if (exclusions.includes('frost') && eventName.includes('frost')) return false;
+        if (exclusions.includes('fog') && eventName.includes('fog')) return false;
+        if (exclusions.includes('wind') && (eventName.includes('wind') || eventName.includes('storm') || eventName.includes('gust'))) return false;
+        if (exclusions.includes('thunderstorm') && eventName.includes('thunderstorm')) return false;
+        if (exclusions.includes('rain') && eventName.includes('rain')) return false;
+        if (exclusions.includes('snow') && eventName.includes('snow')) return false;
+        if (exclusions.includes('heat') && eventName.includes('heat')) return false;
+        if (exclusions.includes('uv') && eventName.includes('uv')) return false;
+        if (exclusions.includes('ice') && (eventName.includes('ice') || eventName.includes('glaze'))) return false;
+
+        return true;
+    });
+
     // Grid config: 3 columns normally, 4 if alerts exist (Clock | Weather | Alerts | Date)
     // Or adjust the middle section to split. Let's try flexible grid.
-    const hasAlerts = alerts.length > 0;
+    const hasAlerts = filteredAlerts.length > 0;
     const gridClass = hasAlerts
         ? "grid grid-cols-[1fr_1.3fr_1.3fr_1fr]"
         : "grid grid-cols-3";
@@ -179,19 +203,20 @@ export const UnifiedHeaderWidget: React.FC = () => {
 
             {/* CENTER RIGHT: Alerts (Visible only if hasAlerts) */}
             {hasAlerts && (
-                <div className="h-full w-full p-4 flex items-center justify-center border-r border-slate-700/50">
-                    <div className="w-full h-full border-2 border-yellow-500/80 bg-yellow-500/10 rounded-lg shadow-[0_0_15px_rgba(234,179,8,0.3)] flex flex-col justify-center px-4 relative overflow-hidden animate-pulse-slow">
+                <div className="h-full w-full py-4 px-2 flex items-center justify-center border-r border-slate-700/50">
+                    <div className="w-full h-full max-h-[90%] border-2 border-yellow-500/80 bg-yellow-500/10 rounded-lg shadow-[0_0_15px_rgba(234,179,8,0.3)] flex flex-col justify-center px-4 relative overflow-hidden animate-pulse-slow">
                         {/* Header */}
-                        <div className="flex items-center text-yellow-500 mb-1">
-                            <CloudRain className="w-6 h-6 mr-2" />
+                        <div className="flex items-center text-yellow-500 mb-2">
+                            <CloudRain className="w-6 h-6 mr-2 flex-shrink-0" />
                             <span className="font-bold text-lg uppercase tracking-wider">Unwetterwarnung</span>
                         </div>
                         {/* Scroll through alerts if multiple, or show first */}
-                        <div className="text-white text-lg leading-tight font-medium line-clamp-3">
-                            {alerts[0].event_de || alerts[0].headline_de}
+                        <div className="text-white text-lg leading-tight font-medium overflow-y-auto max-h-[70%] custom-scrollbar">
+                            {/* Deduplicate and join by comma */}
+                            {Array.from(new Set(filteredAlerts.map(a => a.event_de || a.headline_de))).join(', ')}
                         </div>
-                        <div className="text-yellow-500/80 text-xs mt-2 font-mono">
-                            {alerts.length > 1 ? `+${alerts.length - 1} weitere` : 'DWD'}
+                        <div className="text-yellow-500/60 text-[10px] mt-2 font-mono absolute bottom-1 right-2">
+                            DWD
                         </div>
                     </div>
                 </div>
