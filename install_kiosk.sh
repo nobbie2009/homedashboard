@@ -35,7 +35,7 @@ else
 fi
 
 # 2. Check & Install Dependencies
-echo "--> Checking dependencies..."
+echo "--> Checking dependencies...."
 
 # Check for Chromium
 if ! command -v chromium &> /dev/null; then
