@@ -4,7 +4,7 @@
 # Features:
 # - Install Chromium & Unclutter (if needed)
 # - Prompt for System Update
-# - Configure Autostart (Kiosk mode, no mouse)
+# - Configure Autostart via XDG .desktop (Compatible with X11/Wayland/Bookworm/Trixie)
 # - No Rotation (Standard)
 # - Remove Keyrings
 # - Schedule Daily Reboot
@@ -20,7 +20,7 @@ if [ -z "$USER_NAME" ]; then
     exit 1
 fi
 
-echo "=== RPi Kiosk Setup ==="
+echo "=== RPi Kiosk Setup (Trixie/Bookworm Ready) ==="
 
 # 1. System Update Prompt
 echo ""
@@ -35,7 +35,7 @@ else
 fi
 
 # 2. Check & Install Dependencies
-echo "--> Checking dependencies...."
+echo "--> Checking dependencies..."
 
 # Check for Chromium
 if ! command -v chromium &> /dev/null; then
@@ -54,29 +54,58 @@ echo ""
 read -p "Enter the Dashboard URL/IP (e.g. http://192.168.1.10:8080): " DASHBOARD_URL
 read -p "Enter daily reboot time (HH:MM, e.g. 04:00): " REBOOT_TIME
 
-# 4. Configure Autostart
+# 4. Configure Autostart (XDG Method)
 echo "--> Configuring Autostart..."
-AUTOSTART_DIR="$USER_HOME/.config/lxsession/LXDE-pi"
-AUTOSTART_FILE="$AUTOSTART_DIR/autostart"
 
-if [ ! -d "$AUTOSTART_DIR" ]; then
-    mkdir -p "$AUTOSTART_DIR"
-fi
+STARTSCRIPT="$USER_HOME/start_kiosk.sh"
+AUTOSTART_DIR="$USER_HOME/.config/autostart"
+DESKTOP_FILE="$AUTOSTART_DIR/kiosk.desktop"
 
-# Create autostart file content
-# chromium command used without -browser as requested and verified by package name
-cat > "$AUTOSTART_FILE" << EOF
-@lxpanel --profile LXDE-pi
-@pcmanfm --desktop --profile LXDE-pi
-@xscreensaver -no-splash
-@xset s off
-@xset -dpms
-@xset s noblank
-@unclutter -idle 0.1 -root
-@chromium --noerrdialogs --disable-infobars --kiosk $DASHBOARD_URL --check-for-update-interval=31536000
+# Create the startup script
+echo "--> Creating startup script: $STARTSCRIPT"
+cat > "$STARTSCRIPT" << EOF
+#!/bin/bash
+
+# Disable screen blanking and power management
+xset s off
+xset -dpms
+xset s noblank
+
+# Hide mouse cursor
+unclutter -idle 0.1 -root &
+
+# Start Chromium in Kiosk mode
+# --no-first-run: Skip first run wizards
+# --kiosk: Fullscreen kiosk mode
+# --noerrdialogs: Suppress error dialogs
+# --disable-infobars: Remove "Chrome is being controlled by..."
+# --check-for-update-interval: massive interval to stop update checks
+chromium --no-first-run --noerrdialogs --disable-infobars --kiosk "$DASHBOARD_URL" --check-for-update-interval=31536000
 EOF
 
-chown -R $USER_NAME:$USER_NAME "$USER_HOME/.config"
+# Make startup script executable and owned by user
+chmod +x "$STARTSCRIPT"
+chown $USER_NAME:$USER_NAME "$STARTSCRIPT"
+
+# Create Autostart Directory
+if [ ! -d "$AUTOSTART_DIR" ]; then
+    mkdir -p "$AUTOSTART_DIR"
+    chown $USER_NAME:$USER_NAME "$USER_HOME/.config"
+    chown $USER_NAME:$USER_NAME "$AUTOSTART_DIR"
+fi
+
+# Create .desktop file for Autostart
+echo "--> Creating autostart entry: $DESKTOP_FILE"
+cat > "$DESKTOP_FILE" << EOF
+[Desktop Entry]
+Type=Application
+Name=Kiosk
+Exec=$STARTSCRIPT
+X-GNOME-Autostart-enabled=true
+Hidden=false
+EOF
+
+chown $USER_NAME:$USER_NAME "$DESKTOP_FILE"
 
 # 5. Handle Keyrings
 echo "--> Removing Keyrings..."
@@ -98,4 +127,5 @@ crontab -l | grep -v "sbin/shutdown -r" | crontab -
 echo "--> Setup Complete!"
 echo "    Target URL: $DASHBOARD_URL"
 echo "    Reboot Time: $REBOOT_TIME"
+echo "    Startup Script: $STARTSCRIPT"
 echo "    Please reboot strictly manually now to apply changes."
