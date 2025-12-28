@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
-import { execFile } from 'child_process';
+import { execFile, exec } from 'child_process';
 import { Client } from '@notionhq/client';
 
 dotenv.config();
@@ -76,6 +76,36 @@ app.get('/api/system/ip', (req, res) => {
     }
     // Return the first one found, or a fallback
     res.json({ ip: results[0] || 'localhost' });
+});
+
+// Maintenance: Git Pull
+app.post('/api/system/update', (req, res) => {
+    console.log("System Update triggered: git pull");
+    exec('git pull', { cwd: path.join(__dirname, '..') }, (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Exec error: ${error}`);
+            // Report both stdout and stderr for better debugging
+            return res.status(500).json({
+                error: "Git Pull Failed",
+                details: error.message,
+                output: `${stdout}\n${stderr}`
+            });
+        }
+        console.log(`Git Pull Output: ${stdout}`);
+        res.json({
+            success: true,
+            output: `${stdout}\n${stderr}`
+        });
+    });
+});
+
+// Maintenance: Clear Cache (Force Reload Content)
+app.post('/api/system/clearcache', (req, res) => {
+    console.log("System Cache cleared manually.");
+    eventCache.clear();
+    // Invalidate Notion? Notion not currently cached in memory significantly, requests go direct.
+    // If we add Notion cache later, clear it here.
+    res.json({ success: true });
 });
 
 // --- Auth Endpoints ---

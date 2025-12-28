@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useKiosk } from '../../contexts/KioskContext';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useSecurity } from '../../contexts/SecurityContext';
-import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download, Smartphone, Trash2, Shield, ShieldAlert, ClipboardCheck, Plus, Cake } from 'lucide-react';
+import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download, Smartphone, Trash2, Shield, ShieldAlert, ClipboardCheck, Plus, Cake, RefreshCw, Server, GitBranch, Database } from 'lucide-react';
 import { IconMap, ChoreIcon } from '../../components/ChoreIcon';
 // import clsx from 'clsx';
 
@@ -99,6 +99,7 @@ const AdminSettings: React.FC = () => {
         { id: 'ansicht', label: 'Ansicht', icon: CheckCircle }, // Reusing CheckCircle as generic icon for View
         { id: 'extern', label: 'Externe Daten', icon: Upload }, // Reusing Upload/Download/Server equivalent
         { id: 'backup', label: 'Datensicherung', icon: Save },
+        { id: 'wartung', label: 'Wartung', icon: Server },
         { id: 'geraete', label: 'Sicherheit', icon: Smartphone },
     ];
 
@@ -201,6 +202,40 @@ const AdminSettings: React.FC = () => {
             }
         };
         reader.readAsText(file);
+    };
+
+    const handleRefresh = () => {
+        window.location.reload();
+    };
+
+    const handleReloadContent = async () => {
+        try {
+            await fetch(`${API_URL}/api/system/clearcache`, { method: 'POST', headers: { 'x-device-id': deviceId } });
+            // Small delay to ensure server processed it
+            setTimeout(() => {
+                window.location.reload();
+            }, 500);
+        } catch (e) {
+            alert('Fehler beim Leeren des Caches');
+        }
+    };
+
+    const handleSystemUpdate = async () => {
+        if (!confirm("System aktualisieren (Git Pull)?")) return;
+        try {
+            // Show some loading state via alert or just blocking (simple)
+            const res = await fetch(`${API_URL}/api/system/update`, { method: 'POST', headers: { 'x-device-id': deviceId } });
+            const data = await res.json();
+
+            if (data.success) {
+                alert(`Update erfolgreich!\nOutput:\n${data.output}`);
+                window.location.reload();
+            } else {
+                alert(`Update fehlgeschlagen:\n${data.details}\n\nOutput:\n${data.output}`);
+            }
+        } catch (e) {
+            alert('Fehler beim Verbinden zum Server für Update.');
+        }
     };
 
     if (isLocked) {
@@ -695,6 +730,69 @@ const AdminSettings: React.FC = () => {
                             </div>
                         </div>
                     </section>
+                )}
+
+                {/* 6. WARTUNG TAB */}
+                {activeTab === 'wartung' && (
+                    <div className="space-y-6">
+                        <section>
+                            <h3 className="text-xl font-semibold text-slate-300 mb-4 flex items-center gap-2">
+                                <Server className="w-6 h-6" /> System Wartung
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {/* 1. Page Refresh */}
+                                <div className="bg-slate-900/40 p-6 rounded-xl border border-slate-700/50 flex flex-col items-start hover:border-blue-500/50 transition">
+                                    <div className="bg-blue-500/20 p-3 rounded-lg text-blue-400 mb-4">
+                                        <RefreshCw className="w-8 h-8" />
+                                    </div>
+                                    <h4 className="text-lg font-bold text-white mb-2">Seite aktualisieren</h4>
+                                    <p className="text-sm text-slate-400 mb-6 flex-grow">
+                                        Lädt die aktuelle Seite im Browser neu. Behebt meistens Darstellungsfehler.
+                                    </p>
+                                    <button
+                                        onClick={handleRefresh}
+                                        className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-medium transition border border-slate-600"
+                                    >
+                                        Neu laden
+                                    </button>
+                                </div>
+
+                                {/* 2. Reload Content */}
+                                <div className="bg-slate-900/40 p-6 rounded-xl border border-slate-700/50 flex flex-col items-start hover:border-yellow-500/50 transition">
+                                    <div className="bg-yellow-500/20 p-3 rounded-lg text-yellow-400 mb-4">
+                                        <Database className="w-8 h-8" />
+                                    </div>
+                                    <h4 className="text-lg font-bold text-white mb-2">Inhalte neuziehen</h4>
+                                    <p className="text-sm text-slate-400 mb-6 flex-grow">
+                                        Leert den Server-Cache (Google, Notion) und lädt die Seite neu, um frische Daten zu erzwingen.
+                                    </p>
+                                    <button
+                                        onClick={handleReloadContent}
+                                        className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-medium transition border border-slate-600"
+                                    >
+                                        Cache leeren & Laden
+                                    </button>
+                                </div>
+
+                                {/* 3. Git Pull */}
+                                <div className="bg-slate-900/40 p-6 rounded-xl border border-slate-700/50 flex flex-col items-start hover:border-green-500/50 transition">
+                                    <div className="bg-green-500/20 p-3 rounded-lg text-green-400 mb-4">
+                                        <GitBranch className="w-8 h-8" />
+                                    </div>
+                                    <h4 className="text-lg font-bold text-white mb-2">System Update</h4>
+                                    <p className="text-sm text-slate-400 mb-6 flex-grow">
+                                        Führt `git pull` aus, um die neueste Version vom Server zu laden und startet neu.
+                                    </p>
+                                    <button
+                                        onClick={handleSystemUpdate}
+                                        className="w-full py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold transition shadow-lg shadow-green-900/20"
+                                    >
+                                        Update starten
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
                 )}
 
                 {/* 7. AUFGABEN TAB */}
