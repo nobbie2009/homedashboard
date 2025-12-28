@@ -43,6 +43,7 @@ export const UnifiedHeaderWidget: React.FC = () => {
     const { config } = useConfig();
     const [time, setTime] = useState(new Date());
     const [weather, setWeather] = useState<WeatherData | null>(null);
+    const [alerts, setAlerts] = useState<any[]>([]); // New State for Alerts
     const [loadingWeather, setLoadingWeather] = useState(false);
 
     // Clock
@@ -51,7 +52,7 @@ export const UnifiedHeaderWidget: React.FC = () => {
         return () => clearInterval(timer);
     }, []);
 
-    // Weather Fetching (OpenMeteo)
+    // Weather Fetching (OpenMeteo + Brightsky)
     useEffect(() => {
         const fetchWeather = async () => {
             if (!config.weatherLocation) return;
@@ -65,7 +66,7 @@ export const UnifiedHeaderWidget: React.FC = () => {
 
                 const { latitude, longitude } = geoData.results[0];
 
-                // 2. Forecast
+                // 2. Forecast (OpenMeteo)
                 const weatherRes = await fetch(
                     `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`
                 );
@@ -86,6 +87,22 @@ export const UnifiedHeaderWidget: React.FC = () => {
                     forecast
                 });
 
+                // 3. Alerts (Brightsky / DWD)
+                try {
+                    const alertRes = await fetch(
+                        `https://api.brightsky.dev/alerts?lat=${latitude}&lon=${longitude}`
+                    );
+                    const alertData = await alertRes.json();
+                    if (alertData.alerts) {
+                        setAlerts(alertData.alerts);
+                    } else {
+                        setAlerts([]);
+                    }
+                } catch (alertError) {
+                    console.error("Failed to fetch alerts", alertError);
+                    setAlerts([]);
+                }
+
             } catch (error) {
                 console.error("Failed to fetch weather", error);
             } finally {
@@ -99,9 +116,15 @@ export const UnifiedHeaderWidget: React.FC = () => {
         return () => clearInterval(interval);
     }, [config.weatherLocation]);
 
+    // Grid config: 3 columns normally, 4 if alerts exist (Clock | Weather | Alerts | Date)
+    // Or adjust the middle section to split. Let's try flexible grid.
+    const hasAlerts = alerts.length > 0;
+    const gridClass = hasAlerts
+        ? "grid grid-cols-[1fr_1.3fr_1.3fr_1fr]"
+        : "grid grid-cols-3";
+
     return (
-        <div className="grid grid-cols-3 items-center bg-slate-800/60 rounded-xl backdrop-blur-md shadow-lg w-full h-full border border-slate-700 text-white relative overflow-hidden">
-            {/* Background Decoration/Gradient could go here */}
+        <div className={`${gridClass} items-center bg-slate-800/60 rounded-xl backdrop-blur-md shadow-lg w-full h-full border border-slate-700 text-white relative overflow-hidden transition-all duration-500`}>
 
             {/* LEFT: Clock */}
             <div className="flex flex-row items-baseline justify-start pl-8 h-full pt-4">
@@ -115,11 +138,10 @@ export const UnifiedHeaderWidget: React.FC = () => {
                 )}
             </div>
 
-            {/* CENTER: Weather */}
-            <div className="flex flex-row items-center justify-center border-l border-r border-slate-700/50 h-full w-full gap-8">
+            {/* CENTER LEFT: Weather */}
+            <div className={`flex flex-row items-center justify-center border-l ${hasAlerts ? 'border-r' : 'border-r'} border-slate-700/50 h-full w-full gap-8`}>
                 {weather ? (
                     <>
-                        {/* Current Weather */}
                         <div className="flex items-center space-x-4">
                             {getWeatherIcon(weather.current.code, "w-16 h-16 text-yellow-400 drop-shadow-lg")}
                             <div className="flex flex-col">
@@ -129,20 +151,24 @@ export const UnifiedHeaderWidget: React.FC = () => {
                                 </span>
                             </div>
                         </div>
-
-                        {/* Divider */}
-                        <div className="h-12 w-px bg-slate-700/50"></div>
-
-                        {/* Forecast */}
-                        <div className="flex space-x-6">
-                            {weather.forecast.map((day, idx) => (
-                                <div key={idx} className="flex flex-col items-center">
-                                    <span className="text-slate-500 text-xs mb-1 uppercase font-bold">{day.day}</span>
-                                    {getWeatherIcon(day.code, "w-6 h-6 text-slate-300 mb-1")}
-                                    <span className="text-base font-semibold">{day.tempMax}° <span className="text-slate-600 text-sm">{day.tempMin}°</span></span>
+                        {/* Hide forecast on small split if needed, but space should be fine */}
+                        {!hasAlerts && (
+                            <>
+                                <div className="h-12 w-px bg-slate-700/50"></div>
+                                <div className="flex space-x-6">
+                                    {weather.forecast.map((day, idx) => (
+                                        <div key={idx} className="flex flex-col items-center">
+                                            <span className="text-slate-500 text-xs mb-1 uppercase font-bold">{day.day}</span>
+                                            {getWeatherIcon(day.code, "w-6 h-6 text-slate-300 mb-1")}
+                                            <span className="text-base font-semibold">{day.tempMax}° <span className="text-slate-600 text-sm">{day.tempMin}°</span></span>
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
+                            </>
+                        )}
+                        {/* If has alerts, maybe just show Today + Tomorrow small or omit forecast to save space? 
+                            Let's keep it simple for now and just show current weather in this block if space is tight.
+                        */}
                     </>
                 ) : (
                     <div className="text-slate-500 animate-pulse text-lg">
@@ -150,6 +176,26 @@ export const UnifiedHeaderWidget: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {/* CENTER RIGHT: Alerts (Visible only if hasAlerts) */}
+            {hasAlerts && (
+                <div className="h-full w-full p-4 flex items-center justify-center border-r border-slate-700/50">
+                    <div className="w-full h-full border-2 border-yellow-500/80 bg-yellow-500/10 rounded-lg shadow-[0_0_15px_rgba(234,179,8,0.3)] flex flex-col justify-center px-4 relative overflow-hidden animate-pulse-slow">
+                        {/* Header */}
+                        <div className="flex items-center text-yellow-500 mb-1">
+                            <CloudRain className="w-6 h-6 mr-2" />
+                            <span className="font-bold text-lg uppercase tracking-wider">Unwetterwarnung</span>
+                        </div>
+                        {/* Scroll through alerts if multiple, or show first */}
+                        <div className="text-white text-lg leading-tight font-medium line-clamp-3">
+                            {alerts[0].event_de || alerts[0].headline_de}
+                        </div>
+                        <div className="text-yellow-500/80 text-xs mt-2 font-mono">
+                            {alerts.length > 1 ? `+${alerts.length - 1} weitere` : 'DWD'}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* RIGHT: Date */}
             <div className="flex flex-col items-end justify-center pr-8 h-full">
