@@ -240,6 +240,45 @@ if (fs.existsSync(CONFIG_PATH)) {
 const eventCache = new Map();
 const CACHE_TTL = 10 * 60 * 1000; // 10 Minutes
 
+// --- CHORE ROTATION ---
+import { checkAndRotateChores } from './choreLogic.js';
+
+const performRotationCheck = () => {
+    if (!appConfig.chores) return;
+
+    const rotationResult = checkAndRotateChores(appConfig);
+    if (rotationResult) {
+        console.log("Rotating Chores...", rotationResult);
+        const newConfig = {
+            ...appConfig,
+            chores: {
+                ...appConfig.chores,
+                tasks: rotationResult.tasks,
+                settings: {
+                    ...appConfig.chores.settings,
+                    ...rotationResult.settings
+                }
+            }
+        };
+
+        appConfig = newConfig;
+        try {
+            fs.writeFileSync(CONFIG_PATH, JSON.stringify(appConfig, null, 2));
+            console.log("Rotated chores saved to config.");
+        } catch (e) {
+            console.error("Failed to save rotated chores:", e);
+        }
+    }
+};
+
+// Check on startup
+if (appConfig.chores) {
+    performRotationCheck();
+}
+
+// Check periodially (e.g. every hour)
+setInterval(performRotationCheck, 60 * 60 * 1000);
+
 // --- Config Endpoints ---
 app.get('/api/config', (req, res) => {
     res.json(appConfig);

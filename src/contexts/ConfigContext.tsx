@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { checkAndRotateChores } from '../utils/choreLogic';
+// import { checkAndRotateChores } from '../utils/choreLogic'; // Removed, moved to server
 
 // Define configuration types
 export interface Kid {
@@ -146,34 +146,9 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
                         weatherAlertExclusions: data.weatherAlertExclusions || prev.weatherAlertExclusions || []
                     };
 
-                    // Check for Chore Rotation
-                    const rotationResult = checkAndRotateChores(merged);
-                    if (rotationResult) {
-                        console.log("Rotating Chores...", rotationResult);
-                        const rotatedConfig = {
-                            ...merged,
-                            chores: {
-                                ...merged.chores!,
-                                tasks: rotationResult.tasks,
-                                settings: {
-                                    ...merged.chores!.settings,
-                                    ...rotationResult.settings
-                                }
-                            }
-                        };
-
-                        // Persist rotated config to backend
-                        fetch(`${API_URL}/api/config`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'x-device-id': deviceId
-                            },
-                            body: JSON.stringify(rotatedConfig)
-                        }).catch(e => console.error("Auto-rotation save failed", e));
-
-                        return rotatedConfig;
-                    }
+                    // Check for Chore Rotation - MOVED TO SERVER
+                    // const rotationResult = checkAndRotateChores(merged);
+                    // if (rotationResult) { ... }
 
                     return merged;
                 });
