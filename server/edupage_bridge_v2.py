@@ -1,7 +1,6 @@
 import sys
 import json
 import datetime
-import inspect
 from edupage_api import Edupage
 from edupage_api.exceptions import BadCredentialsException, CaptchaException
 from edupage_api.login import Login, TwoFactorLogin
@@ -133,10 +132,6 @@ def fixed_login(self, username, password, subdomain="login1"):
         self.edupage.session.get(f"https://{subdomain}.edupage.org/dashboard")
         print(f"DEBUG: Session Cookies after login: {self.edupage.session.cookies.get_dict()}", file=sys.stderr)
 
-        # Introspection: Log available methods
-        print(f"DEBUG: Edupage methods: {[m for m in dir(self.edupage) if not m.startswith('__')]}", file=sys.stderr)
-
-        # 2. Check if GSH is set
         if hasattr(self.edupage, "gsh") and self.edupage.gsh:
              print(f"DEBUG: GSH successfully set to: {self.edupage.gsh}", file=sys.stderr)
         else:
@@ -289,14 +284,13 @@ def fixed_get_date_plan(self, date):
     # If self.edupage has 'selected_child', use it. 
     # Otherwise use None (which means 'me' / parent, which fails for timetable).
     
+    # If using switch_to_child, target_id should likely be None (implied by session)
+    # So we prefer None if selected_child is not set or if we trust switch_to_child.
     target_id = getattr(self.edupage, "selected_child", None)
     
-    # Try converting to int if it's a string number, but for payload sending keep as is or string?
-    # Edupage seems to accept numbers, but let's try string if int failed.
-    # Actually, previous logs showed int failed. Let's force string.
-    if target_id is not None:
-        target_id = str(target_id)
-        
+    # Check if target_id is effectively the same as current user? 
+    # For now, let's allow it to be None.
+    
     print(f"DEBUG: Fetching timetable for target_id: {target_id} (type: {type(target_id)})", file=sys.stderr)
 
     payload = {
@@ -401,14 +395,18 @@ def serialize_lesson(lesson, date_obj):
 def fetch_child_data(edupage, child, days_to_fetch):
     print(f"DEBUG: --- Fetching data for {child['name']} ({child['id']}) ---", file=sys.stderr)
     
-    # Set context
-    edupage.selected_child = child['id']
+    # Do NOT set selected_child manually if using switch_to_child, 
+    # to allow get_date_plan to see it as None and trigger "my timetable" logic on server?
+    # edupage.selected_child = child['id'] 
+
     
     # Try switching to child context on the server
     if hasattr(edupage, 'switch_to_child'):
         try:
-            print(f"DEBUG: Switching context to child {child['id']}...", file=sys.stderr)
-            edupage.switch_to_child(child['id'])
+            # ID must be int for edupage-api
+            cid_int = int(child['id'])
+            print(f"DEBUG: Switching context to child {cid_int}...", file=sys.stderr)
+            edupage.switch_to_child(cid_int)
             # Update GSH if it changed? The library might update text_attributes or gsh.
             if hasattr(edupage, "gsh"):
                  print(f"DEBUG: GSH after switch: {edupage.gsh}", file=sys.stderr)
@@ -525,6 +523,7 @@ def fetch_child_data(edupage, child, days_to_fetch):
              print("DEBUG: Switching back to parent...", file=sys.stderr)
              edupage.switch_to_parent()
         except Exception as e:
+             # Just log, don't fail
              print(f"DEBUG: switch_to_parent failed: {e}", file=sys.stderr)
 
     return {
