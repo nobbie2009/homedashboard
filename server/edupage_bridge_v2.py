@@ -404,6 +404,17 @@ def fetch_child_data(edupage, child, days_to_fetch):
     # Set context
     edupage.selected_child = child['id']
     
+    # Try switching to child context on the server
+    if hasattr(edupage, 'switch_to_child'):
+        try:
+            print(f"DEBUG: Switching context to child {child['id']}...", file=sys.stderr)
+            edupage.switch_to_child(child['id'])
+            # Update GSH if it changed? The library might update text_attributes or gsh.
+            if hasattr(edupage, "gsh"):
+                 print(f"DEBUG: GSH after switch: {edupage.gsh}", file=sys.stderr)
+        except Exception as e:
+            print(f"DEBUG: switch_to_child failed: {e}", file=sys.stderr)
+
     # TIMETABLE
     print("DEBUG: Fetching Timetable...", file=sys.stderr)
     lessons = []
@@ -508,12 +519,23 @@ def fetch_child_data(edupage, child, days_to_fetch):
     except Exception as e:
          print(f"DEBUG: Error fetching messages: {e}", file=sys.stderr)
 
+    # cleanup: switch back to parent for next iteration
+    if hasattr(edupage, 'switch_to_parent'):
+        try:
+             print("DEBUG: Switching back to parent...", file=sys.stderr)
+             edupage.switch_to_parent()
+        except Exception as e:
+             print(f"DEBUG: switch_to_parent failed: {e}", file=sys.stderr)
+
     return {
-        "name": child['name'],
-        "timetable": lessons,
-        "homework": homeworks,
-        "grades": grades_data,
-        "messages": messages
+        'studentId': child['id'],
+        'firstName': child['name'].split()[0], # Simple parse
+        'lastName': " ".join(child['name'].split()[1:]),
+        'className': child.get('class', 'Unknown'), # Extracted earlier or parse from name
+        'timetable': lessons,
+        'homework': homeworks,
+        'grades': grades_data,
+        'messages': messages
     }
 
 
