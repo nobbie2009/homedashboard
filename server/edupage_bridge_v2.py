@@ -7,11 +7,16 @@ from edupage_api.login import Login, TwoFactorLogin
 import re
 
 # Monkey Patch Login.login to fix parsing issues (GitHub Issue #101)
+# Monkey Patch Login.login to fix parsing issues (GitHub Issue #101)
 def fixed_login(self, username, password, subdomain="login1"):
     print("DEBUG: Executing fixed_login monkey patch", file=sys.stderr)
     request_url = f"https://{subdomain}.edupage.org/login/?cmd=MainLogin"
-    response = self.edupage.session.get(request_url)
-    data = response.content.decode()
+    try:
+        response = self.edupage.session.get(request_url)
+        data = response.content.decode()
+    except Exception as e:
+        print(f"DEBUG: Initial GET failed: {e}", file=sys.stderr)
+        raise e
 
     # Robust extraction of csrftoken
     csrf_token = ""
@@ -29,11 +34,10 @@ def fixed_login(self, username, password, subdomain="login1"):
                 if m2:
                     csrf_token = m2.group(1)
                 else:
-                    print('DEBUG: HTML Content snippet:', data[:500], file=sys.stderr) 
-                    raise ValueError("Could not find csrftoken")
+                    print('DEBUG: HTML Content snippet (No CSRF):', data[:300], file=sys.stderr) 
+                    # raise ValueError("Could not find csrftoken") # Soft fail
     except Exception as e:
          print(f"DEBUG: Error extracting csrftoken: {e}", file=sys.stderr)
-         # Don't crash yet, try empty, maybe it works?
          pass
 
     parameters = {
@@ -51,10 +55,26 @@ def fixed_login(self, username, password, subdomain="login1"):
 
     if "bad=1" in response.url:
         print(f"DEBUG: Bad Credentials detected. URL: {response.url}", file=sys.stderr)
-        # print(f"DEBUG: Response Content: {response.content.decode()[:500]}", file=sys.stderr)
         raise BadCredentialsException()
 
     data = response.content.decode()
+
+    # Handle 'eqz:' prefix (New Edupage Format)
+    if data.startswith("eqz:"):
+        import base64
+        try:
+            print("DEBUG: 'eqz:' prefix detected. Decoding...", file=sys.stderr)
+            json_str = base64.b64decode(data[4:]).decode("utf8")
+            # Parse to ensure it's valid, then re-dump or modify invalid logic
+            # The original _Login__parse_login_data likely expects 'data' to be HTML or finding 'user' object?
+            # Actually, standard edupage-api uses 'pdata' extraction from HTML.
+            # If this is JSON, we might need to conform to what __parse_login_data expects OR set user manually.
+            
+            # Let's see what happens if we just pass the decoded string to the parser?
+            # If the parser looks for regex, it might find it in JSON too.
+            data = json_str
+        except Exception as e:
+             print(f"DEBUG: Error decoding eqz data: {e}", file=sys.stderr)
 
     if subdomain == "login1":
         # Robust subdomain extraction
@@ -63,37 +83,61 @@ def fixed_login(self, username, password, subdomain="login1"):
                 subdomain = data.split("-->")[0].split(" ")[-1]
         except IndexError:
              pass 
+        except Exception:
+             pass
 
     self.edupage.subdomain = subdomain
     self.edupage.username = username
 
     if "twofactor" not in response.url:
-        self._Login__parse_login_data(data) # Access private method
+        # Check if we are really logged in?
+        # Sometimes 2FA is required but URL doesn't redirect?
+        # Check data for "need2fa"
+        if "need2fa" in data:
+             print("DEBUG: 'need2fa' found in response data!", file=sys.stderr)
+             # Proceed to 2FA logic if possible, or fail
+             pass
+
+        try:
+            self._Login__parse_login_data(data) # Access private method
+        except Exception as e:
+            print(f"DEBUG: Parse Login Data failed: {e}", file=sys.stderr)
+            print(f"DEBUG: Data snippet: {data[:500]}", file=sys.stderr)
+            raise e
         return
 
     # 2FA Handling
+    print("DEBUG: 2FA Redirect detected. Fetching 2FA page...", file=sys.stderr)
     request_url = f"https://{self.edupage.subdomain}.edupage.org/login/twofactor?sn=1"
     two_factor_response = self.edupage.session.get(request_url)
     data = two_factor_response.content.decode()
 
     # Robust extraction for 2FA tokens
-    try:
-        csrf_token = data.split('csrfauth" value="')[1].split('"')[0]
-    except IndexError:
-        m = re.search(r'name="csrfauth" value="([^"]+)"', data)
-        csrf_token = m.group(1) if m else ""
+    csrf_token = ""
+    authentication_token = ""
+    authentication_endpoint = ""
 
     try:
-        authentication_token = data.split('au" value="')[1].split('"')[0]
-    except IndexError:
-         m = re.search(r'name="au" value="([^"]+)"', data)
-         authentication_token = m.group(1) if m else ""
-
-    try:
-        authentication_endpoint = data.split('gu" value="')[1].split('"')[0]
-    except IndexError:
-         m = re.search(r'name="gu" value="([^"]+)"', data)
-         authentication_endpoint = m.group(1) if m else ""
+        if 'csrfauth" value="' in data:
+             csrf_token = data.split('csrfauth" value="')[1].split('"')[0]
+        else:
+             m = re.search(r'name="csrfauth" value="([^"]+)"', data)
+             csrf_token = m.group(1) if m else ""
+             
+        if 'au" value="' in data:
+            authentication_token = data.split('au" value="')[1].split('"')[0]
+        else:
+            m = re.search(r'name="au" value="([^"]+)"', data)
+            authentication_token = m.group(1) if m else ""
+            
+        if 'gu" value="' in data:
+            authentication_endpoint = data.split('gu" value="')[1].split('"')[0]
+        else:
+            m = re.search(r'name="gu" value="([^"]+)"', data)
+            authentication_endpoint = m.group(1) if m else ""
+            
+    except Exception as e:
+        print(f"DEBUG: Error extracting 2FA tokens: {e}", file=sys.stderr)
 
     return TwoFactorLogin(
         authentication_endpoint, authentication_token, csrf_token, self.edupage
@@ -136,7 +180,10 @@ def main():
     edupage = Edupage()
 
     try:
-        edupage.login(username, password, subdomain)
+        login_result = edupage.login(username, password, subdomain)
+        if isinstance(login_result, TwoFactorLogin):
+            print(json.dumps({"error": "2FA Required - Not supported in Kiosk mode. Please disable 2FA for this account."}))
+            sys.exit(1)
     except BadCredentialsException:
         print(json.dumps({"error": "Wrong username or password"}))
         sys.exit(1)
@@ -180,15 +227,20 @@ def main():
         # However, let's try to fetch everything we can for the CURRENT view.
         
         # TIMETABLE
+        print("DEBUG: Fetching Timetable...", file=sys.stderr)
         timetable_today = edupage.get_my_timetable(today)
         timetable_tomorrow = edupage.get_my_timetable(tomorrow)
         
-        lessons_today = [serialize_lesson(l, today) for l in timetable_today.lessons] if timetable_today else []
-        lessons_tomorrow = [serialize_lesson(l, tomorrow) for l in timetable_tomorrow.lessons] if timetable_tomorrow else []
-        all_lessons = lessons_today + lessons_tomorrow
+        lessons = []
+        if timetable_today:
+            for l in timetable_today.lessons:
+                 lessons.append(serialize_lesson(l, today))
+        if timetable_tomorrow:
+             for l in timetable_tomorrow.lessons:
+                 lessons.append(serialize_lesson(l, tomorrow))
 
-        # HOM EWORK (assignments)
-        # Verify method exists
+        # HOMEWORK (assignments)
+        print("DEBUG: Fetching Homework...", file=sys.stderr)
         homeworks = []
         try:
             # get_homeworks might need arguments or not exist in this version?
@@ -209,6 +261,7 @@ def main():
             print(f"DEBUG: Error fetching homework: {e}", file=sys.stderr)
 
         # GRADES
+        print("DEBUG: Fetching Grades...", file=sys.stderr)
         grades_data = []
         try:
              if hasattr(edupage, "get_grades"):
@@ -223,6 +276,7 @@ def main():
             print(f"DEBUG: Error fetching grades: {e}", file=sys.stderr)
 
         # MESSAGES / NOTIFICATIONS
+        print("DEBUG: Fetching Messages...", file=sys.stderr)
         messages = []
         try:
             if hasattr(edupage, "get_notifications"):
@@ -242,7 +296,7 @@ def main():
         # If the user is a Parent with multiple kids, this might only return one.
         result["students"].append({
             "name": "Student", # Placeholder
-            "timetable": all_lessons,
+            "timetable": lessons,
             "homework": homeworks,
             "grades": grades_data,
             "messages": messages
@@ -251,6 +305,7 @@ def main():
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
+        print(f"DEBUG: Internal Error Traceback:\n{error_details}", file=sys.stderr)
         print(json.dumps({"error": f"Internal Error: {str(e)}", "traceback": error_details}))
         sys.exit(1)
 
