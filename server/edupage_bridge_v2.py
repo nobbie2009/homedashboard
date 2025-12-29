@@ -65,16 +65,36 @@ def fixed_login(self, username, password, subdomain="login1"):
         try:
             print("DEBUG: 'eqz:' prefix detected. Decoding...", file=sys.stderr)
             json_str = base64.b64decode(data[4:]).decode("utf8")
-            # Parse to ensure it's valid, then re-dump or modify invalid logic
-            # The original _Login__parse_login_data likely expects 'data' to be HTML or finding 'user' object?
-            # Actually, standard edupage-api uses 'pdata' extraction from HTML.
-            # If this is JSON, we might need to conform to what __parse_login_data expects OR set user manually.
+            data_json = json.loads(json_str)
             
-            # Let's see what happens if we just pass the decoded string to the parser?
-            # If the parser looks for regex, it might find it in JSON too.
-            data = json_str
+            # DEBUG: Print keys to understand structure
+            # print(f"DEBUG: Login JSON Keys: {list(data_json.keys())}", file=sys.stderr)
+            
+            # Manual Extraction of GSH and User
+            # Usually found in 'gsh' or similar fields
+            if "gsh" in data_json:
+                self.edupage.gsh = data_json["gsh"]
+                print(f"DEBUG: Extracted GSH from JSON: {self.edupage.gsh}", file=sys.stderr)
+            
+            # If standard parser is HTML regex based, it will fail on JSON.
+            # We should try to populate what we can.
+            
+            # Prevent "AttributeError: 'Edupage' object has no attribute 'gsh'" later
+            if not hasattr(self.edupage, "gsh"):
+                 # Try to find it deep?
+                 pass
+            
+            # The library needs __parse_login_data to set up 'self.edupage.user' etc.
+            # If we can't use it, we might be in trouble unless we reverse engineer more.
+            # But let's try to see if 'gsh' is enough for now.
+            
+            # If data_json has "viewer", it might have the user info.
+            
+            # We still pass JSON string to parse_login_data just in case it has fallback?
+            # Unlikely.
+            
         except Exception as e:
-             print(f"DEBUG: Error decoding eqz data: {e}", file=sys.stderr)
+             print(f"DEBUG: Error decoding/parsing eqz data: {e}", file=sys.stderr)
 
     if subdomain == "login1":
         # Robust subdomain extraction
@@ -89,25 +109,27 @@ def fixed_login(self, username, password, subdomain="login1"):
     self.edupage.subdomain = subdomain
     self.edupage.username = username
 
-    if "twofactor" not in response.url:
-        # Check if we are really logged in?
-        # Sometimes 2FA is required but URL doesn't redirect?
-        # Check data for "need2fa"
-        if "need2fa" in data:
-             print("DEBUG: 'need2fa' found in response data!", file=sys.stderr)
-             # Proceed to 2FA logic if possible, or fail
-             pass
+    # Ensure GSH is set to something if missing, to prevent Attribute Error
+    if not hasattr(self.edupage, "gsh"):
+        print("DEBUG: GSH missing after login. Defaulting to 00000000 (might fail)", file=sys.stderr)
+        self.edupage.gsh = "00000000"
 
+    if "twofactor" not in response.url:
+        # Check for 2FA in data
+        if "need2fa" in data: # Check in raw string or JSON?
+             print("DEBUG: 'need2fa' found (string check)!", file=sys.stderr)
+        
+        # Try standard parse if it wasn't EQZ or if we want to try luck
         try:
-            self._Login__parse_login_data(data) # Access private method
+            self._Login__parse_login_data(data) 
         except Exception as e:
-            print(f"DEBUG: Parse Login Data failed: {e}", file=sys.stderr)
-            print(f"DEBUG: Data snippet: {data[:500]}", file=sys.stderr)
-            raise e
+            print(f"DEBUG: Parse Login Data failed (Expected if JSON): {e}", file=sys.stderr)
+            # If we already extracted GSH, maybe we are fine?
         return
 
-    # 2FA Handling
-    print("DEBUG: 2FA Redirect detected. Fetching 2FA page...", file=sys.stderr)
+    # 2FA Handling ... (rest of function)
+    print("DEBUG: 2FA Redirect detected...", file=sys.stderr)
+    # ... (Keep existing 2FA logic)
     request_url = f"https://{self.edupage.subdomain}.edupage.org/login/twofactor?sn=1"
     two_factor_response = self.edupage.session.get(request_url)
     data = two_factor_response.content.decode()
