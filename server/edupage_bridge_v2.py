@@ -253,11 +253,11 @@ def fixed_get_date_plan(self, date):
     target_id = getattr(self.edupage, "selected_child", None)
     
     # Try converting to int if it's a string number
-    if target_id is not None:
-        try:
-            target_id = int(target_id)
-        except:
-            pass
+    # if target_id is not None:
+    #     try:
+    #         target_id = int(target_id)
+    #     except:
+    #         pass
             
     print(f"DEBUG: Fetching timetable for target_id: {target_id} (type: {type(target_id)})", file=sys.stderr)
 
