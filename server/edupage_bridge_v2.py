@@ -302,6 +302,8 @@ def fixed_get_date_plan(self, date):
         "__gsh": getattr(self.edupage, "gsh", "00000000")
     }
     
+    print(f"DEBUG: Timetable Payload: {json.dumps(payload)}", file=sys.stderr)
+    
     response = self.edupage.session.post(request_url, json=payload)
     response_text = response.text
     
@@ -452,6 +454,9 @@ def fetch_child_data(edupage, child, days_to_fetch):
         # Process Timeline Items (Parsed from HTML)
         if hasattr(edupage, "timeline_data"):
             print("DEBUG: Processing extracted timeline data...", file=sys.stderr)
+            if edupage.timeline_data:
+                print(f"DEBUG: First timeline item sample: {edupage.timeline_data[0]}", file=sys.stderr)
+                
             for item in edupage.timeline_data:
                 # Filter relevant items
                 # Typ: 'sprava' (message), 'nastenka' (noticeboard), 'text' (maybe)
