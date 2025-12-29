@@ -252,7 +252,14 @@ def fixed_get_date_plan(self, date):
     
     target_id = getattr(self.edupage, "selected_child", None)
     
-    print(f"DEBUG: Fetching timetable for target_id: {target_id}", file=sys.stderr)
+    # Try converting to int if it's a string number
+    if target_id is not None:
+        try:
+            target_id = int(target_id)
+        except:
+            pass
+            
+    print(f"DEBUG: Fetching timetable for target_id: {target_id} (type: {type(target_id)})", file=sys.stderr)
 
     payload = {
         "__args": [
@@ -478,7 +485,7 @@ def main():
         print(json.dumps({"error": f"Internal Error: {str(e)}", "traceback": error_details}))
         sys.exit(1)
 
-    print(json.dumps(result))
+    print(json.dumps(result, default=str))
 
 
 if __name__ == "__main__":
