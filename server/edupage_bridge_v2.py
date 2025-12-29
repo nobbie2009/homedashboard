@@ -58,40 +58,24 @@ def fixed_login(self, username, password, subdomain="login1"):
         raise BadCredentialsException()
 
     data = response.content.decode()
+    
+    # DEBUG: See what we actually got
+    print(f"DEBUG: Login Response Start: {data[:300]}...", file=sys.stderr)
 
     # Handle 'eqz:' prefix (New Edupage Format)
-    if data.startswith("eqz:"):
+    if data.strip().startswith("eqz:"):
         import base64
         try:
             print("DEBUG: 'eqz:' prefix detected. Decoding...", file=sys.stderr)
-            json_str = base64.b64decode(data[4:]).decode("utf8")
+            json_str = base64.b64decode(data.strip()[4:]).decode("utf8")
             data_json = json.loads(json_str)
             
             # DEBUG: Print keys to understand structure
-            # print(f"DEBUG: Login JSON Keys: {list(data_json.keys())}", file=sys.stderr)
+            print(f"DEBUG: Login JSON Keys: {list(data_json.keys())}", file=sys.stderr)
             
-            # Manual Extraction of GSH and User
-            # Usually found in 'gsh' or similar fields
             if "gsh" in data_json:
                 self.edupage.gsh = data_json["gsh"]
                 print(f"DEBUG: Extracted GSH from JSON: {self.edupage.gsh}", file=sys.stderr)
-            
-            # If standard parser is HTML regex based, it will fail on JSON.
-            # We should try to populate what we can.
-            
-            # Prevent "AttributeError: 'Edupage' object has no attribute 'gsh'" later
-            if not hasattr(self.edupage, "gsh"):
-                 # Try to find it deep?
-                 pass
-            
-            # The library needs __parse_login_data to set up 'self.edupage.user' etc.
-            # If we can't use it, we might be in trouble unless we reverse engineer more.
-            # But let's try to see if 'gsh' is enough for now.
-            
-            # If data_json has "viewer", it might have the user info.
-            
-            # We still pass JSON string to parse_login_data just in case it has fallback?
-            # Unlikely.
             
         except Exception as e:
              print(f"DEBUG: Error decoding/parsing eqz data: {e}", file=sys.stderr)
@@ -110,8 +94,22 @@ def fixed_login(self, username, password, subdomain="login1"):
     self.edupage.username = username
 
     # Ensure GSH is set to something if missing, to prevent Attribute Error
-    if not hasattr(self.edupage, "gsh"):
-        print("DEBUG: GSH missing after login. Defaulting to 00000000 (might fail)", file=sys.stderr)
+    if not hasattr(self.edupage, "gsh") or not self.edupage.gsh:
+        # Regex Fallback for HTML
+        print("DEBUG: GSH not set. Attempting regex extraction...", file=sys.stderr)
+        m = re.search(r'gsh\s*[:=]\s*["\']([^"\']+)["\']', data)
+        if m:
+            self.edupage.gsh = m.group(1)
+            print(f"DEBUG: Extracted GSH via Regex: {self.edupage.gsh}", file=sys.stderr)
+        else:
+            # Check for JSON format in HTML (legacy)
+            m = re.search(r'"gsh":"([^"]+)"', data)
+            if m:
+                self.edupage.gsh = m.group(1)
+                print(f"DEBUG: Extracted GSH via JSON Regex: {self.edupage.gsh}", file=sys.stderr)
+
+    if not hasattr(self.edupage, "gsh") or not self.edupage.gsh:
+        print("DEBUG: GSH still missing. Defaulting to 00000000.", file=sys.stderr)
         self.edupage.gsh = "00000000"
 
     if "twofactor" not in response.url:
