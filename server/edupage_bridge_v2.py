@@ -145,7 +145,117 @@ def fixed_login(self, username, password, subdomain="login1"):
 
 # Apply Patch
 print("DEBUG: Applying monkey patch to Login.login", file=sys.stderr)
+# Apply Patch
+print("DEBUG: Applying monkey patch to Login.login", file=sys.stderr)
 Login.login = fixed_login
+
+# -----------------
+# START TIMETABLE PATCH
+# -----------------
+from edupage_api.timetables import Timetables
+import requests
+
+def fixed_get_date_plan(self, date):
+    request_url = f"https://{self.edupage.subdomain}.edupage.org/timetable/server/ttviewer.js?__func=ttviewer_getDatePlan"
+    today_date = datetime.date.today()
+    
+    # We need to construct parameters carefully as per original library but fix the parsing
+    data = {
+        "__args": [
+            None,
+            date.year,
+            date.month,
+            date.day,
+        ],
+        "__gsh": "00000000" # Placeholder gsh? Library usually fetches it?
+    }
+    
+    # Original library does weird things with GSH, let's look at its source via trace? 
+    # Actually, the parsing error is "split".
+    # The original code expects: response.text.split(response_start)[1]
+    # where response_start = "ttviewer_getDatePlan_res("
+    # The new response might be "eqz:..." or JSON directly.
+
+    # Let's try to fetch and see what goes wrong.
+    # We will use the library's session.
+    
+    payload = {
+        "__args": [
+            None, 
+            date.year,
+            date.month,
+            date.day
+        ],
+        "__gsh": self.edupage.gsh
+    }
+    
+    response = self.edupage.session.post(request_url, json=payload)
+    response_text = response.text
+    
+    if response_text.startswith("eqz:"):
+        import base64
+        print("DEBUG: Timetable response has eqz prefix. Decoding...", file=sys.stderr)
+        json_str = base64.b64decode(response_text[4:]).decode("utf8")
+        response_text = json_str
+    
+    # Check if the response follows the old "callback(" pattern
+    # It seems new Edupage sends pure JSON? Or still callback?
+    # If the prefix "ttviewer_getDatePlan_res(" is missing, the original code fails.
+    
+    print(f"DEBUG: Timetable raw response start: {response_text[:100]}", file=sys.stderr)
+    
+    curriculum_json = None
+    
+    # Attempt 1: Standard JSON
+    try:
+        curriculum_json = json.loads(response_text)
+        # If it's pure JSON, it might be wrapped in "r"
+        if "r" in curriculum_json:
+             curriculum_json = curriculum_json["r"]
+    except:
+        pass
+
+    # Attempt 2: Callback wrapper removal
+    if not curriculum_json:
+        try:
+            if "ttviewer_getDatePlan_res(" in response_text:
+                temp = response_text.split("ttviewer_getDatePlan_res(")[1]
+                temp = temp.rsplit(")", 1)[0]
+                curriculum_json = json.loads(temp)
+                if "r" in curriculum_json:
+                    curriculum_json = curriculum_json["r"]
+        except Exception as e:
+            print(f"DEBUG: Failed to parse Timetable callback format: {e}", file=sys.stderr)
+
+    if not curriculum_json:
+         print("DEBUG: Timetable parsing failed entirely.", file=sys.stderr)
+         return None
+
+    # Now we have the JSON data the library expects.
+    # The library parses THIS json into objects.
+    # We need to call the library's internal method OR just parse it ourselves manually?
+    # Reusing library parsing is hard because it's private.
+    # We will just return the raw lessons ourselves or try to inject it back?
+    
+    # Actually, Timetables class has `_parse_regular_lesson`.
+    # But it is complex.
+    # Let's just create a dummy object that has .lessons attribute?
+    # The library `get_my_timetable` wants `Plan` object.
+    
+    # We are patching `__get_date_plan` (private).
+    # Its role is to return the parsed JSON structure.
+    # If we return the JSON dict, does the caller handle it?
+    # Wait, the traceback says:
+    # curriculum_json = curriculum_response.text.split(response_start)[1]...
+    # So `__get_date_plan` does the fetching AND parsing of raw text.
+    # It returns the JSON dict (or list inside 'r').
+    
+    return curriculum_json
+
+# Apply Timetable Patch
+print("DEBUG: Applying monkey patch to Timetables._Timetables__get_date_plan", file=sys.stderr)
+Timetables._Timetables__get_date_plan = fixed_get_date_plan
+
 
 def serialize_lesson(lesson, date_obj):
     if not lesson:
