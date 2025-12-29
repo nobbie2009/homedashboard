@@ -105,6 +105,43 @@ def fixed_login(self, username, password, subdomain="login1"):
             self._Login__parse_login_data(data)
             print("DEBUG: Standard parsing completed.", file=sys.stderr)
         except Exception as e:
+    # Parse Children
+    print("DEBUG: parsing children profiles...", file=sys.stderr)
+    children = []
+    try:
+        # Regex to find children profiles in the dashboard
+        # pattern matches: <a ... data-sid="-255"> ... <span class="userName">Name</span>
+        
+        # Method 1: Regex over the HTML (edubarProfileChildBtn)
+        # Note: data-sid might be negative for students.
+        child_pattern = re.compile(r'class="[^"]*edubarProfileChildBtn[^"]*"[^>]*data-sid="([^"]+)"[^>]*>.*?<span class="userName">([^<]+)</span>', re.DOTALL)
+        matches = child_pattern.findall(data)
+        
+        seen_ids = set()
+        for cid, cname in matches:
+            if cid not in seen_ids:
+                children.append({"id": cid, "name": cname.strip()})
+                seen_ids.add(cid)
+                
+        print(f"DEBUG: Found children: {children}", file=sys.stderr)
+    except Exception as e:
+        print(f"DEBUG: Error parsing children: {e}", file=sys.stderr)
+
+    self.edupage.children = children
+
+
+    if "twofactor" not in response.url:
+        # 1. Try Standard Library Parsing first
+        try:
+            print("DEBUG: Attempting standard parse_login_data...", file=sys.stderr)
+            if "var pdata =" in data:
+                 print("DEBUG: 'var pdata =' found in response.", file=sys.stderr)
+            else:
+                 print("DEBUG: 'var pdata =' NOT found in response.", file=sys.stderr)
+
+            self._Login__parse_login_data(data)
+            print("DEBUG: Standard parsing completed.", file=sys.stderr)
+        except Exception as e:
             print(f"DEBUG: Standard parse_login_data failed: {e}", file=sys.stderr)
             # Proceed to fallbacks
 
@@ -154,6 +191,13 @@ def fixed_login(self, username, password, subdomain="login1"):
                          if found:
                             self.edupage.gsh = found
                             print(f"DEBUG: Extracted GSH from {url}: {self.edupage.gsh}", file=sys.stderr)
+                            # Also parse children from dashboard if not found yet
+                            if not self.edupage.children:
+                                child_pattern = re.compile(r'class="[^"]*edubarProfileChildBtn[^"]*"[^>]*data-sid="([^"]+)"[^>]*>.*?<span class="userName">([^<]+)</span>', re.DOTALL)
+                                matches = child_pattern.findall(dash_data)
+                                for cid, cname in matches:
+                                     if cid not in [c["id"] for c in self.edupage.children]:
+                                         self.edupage.children.append({"id": cid, "name": cname.strip()})
                             break
                  except Exception as e:
                      print(f"DEBUG: Error during fallback fetches: {e}", file=sys.stderr)
@@ -168,7 +212,6 @@ def fixed_login(self, username, password, subdomain="login1"):
 
     # 2FA Handling
     print("DEBUG: 2FA Redirect detected...", file=sys.stderr)
-    # ... (Keep existing 2FA logic)
     request_url = f"https://{self.edupage.subdomain}.edupage.org/login/twofactor?sn=1"
     two_factor_response = self.edupage.session.get(request_url)
     data = two_factor_response.content.decode()
@@ -206,8 +249,6 @@ def fixed_login(self, username, password, subdomain="login1"):
 
 # Apply Patch
 print("DEBUG: Applying monkey patch to Login.login", file=sys.stderr)
-# Apply Patch
-print("DEBUG: Applying monkey patch to Login.login", file=sys.stderr)
 Login.login = fixed_login
 
 # -----------------
@@ -221,28 +262,18 @@ def fixed_get_date_plan(self, date):
     today_date = datetime.date.today()
     
     # We need to construct parameters carefully as per original library but fix the parsing
-    data = {
-        "__args": [
-            None,
-            date.year,
-            date.month,
-            date.day,
-        ],
-        "__gsh": "00000000" # Placeholder gsh? Library usually fetches it?
-    }
     
-    # Original library does weird things with GSH, let's look at its source via trace? 
-    # Actually, the parsing error is "split".
-    # The original code expects: response.text.split(response_start)[1]
-    # where response_start = "ttviewer_getDatePlan_res("
-    # The new response might be "eqz:..." or JSON directly.
+    # Determine the student/child ID to fetch for.
+    # If self.edupage has 'selected_child', use it. 
+    # Otherwise use None (which means 'me' / parent, which fails for timetable).
+    
+    target_id = getattr(self.edupage, "selected_child", None)
+    
+    print(f"DEBUG: Fetching timetable for target_id: {target_id}", file=sys.stderr)
 
-    # Let's try to fetch and see what goes wrong.
-    # We will use the library's session.
-    
     payload = {
         "__args": [
-            None, 
+            target_id, 
             date.year,
             date.month,
             date.day
@@ -258,10 +289,6 @@ def fixed_get_date_plan(self, date):
         print("DEBUG: Timetable response has eqz prefix. Decoding...", file=sys.stderr)
         json_str = base64.b64decode(response_text[4:]).decode("utf8")
         response_text = json_str
-    
-    # Check if the response follows the old "callback(" pattern
-    # It seems new Edupage sends pure JSON? Or still callback?
-    # If the prefix "ttviewer_getDatePlan_res(" is missing, the original code fails.
     
     print(f"DEBUG: Timetable raw response start: {response_text[:100]}", file=sys.stderr)
     
@@ -291,26 +318,14 @@ def fixed_get_date_plan(self, date):
     if not curriculum_json:
          print("DEBUG: Timetable parsing failed entirely.", file=sys.stderr)
          return None
+         
+    # Check for error response from server
+    if isinstance(curriculum_json, dict) and "e" in curriculum_json:
+        print(f"DEBUG: Edupage Server Error: {curriculum_json.get('e')}", file=sys.stderr)
+        # We return empty listing to avoid crash, but log it
+        # Actually better to return empty list of lessons/r for the parser
+        return []
 
-    # Now we have the JSON data the library expects.
-    # The library parses THIS json into objects.
-    # We need to call the library's internal method OR just parse it ourselves manually?
-    # Reusing library parsing is hard because it's private.
-    # We will just return the raw lessons ourselves or try to inject it back?
-    
-    # Actually, Timetables class has `_parse_regular_lesson`.
-    # But it is complex.
-    # Let's just create a dummy object that has .lessons attribute?
-    # The library `get_my_timetable` wants `Plan` object.
-    
-    # We are patching `__get_date_plan` (private).
-    # Its role is to return the parsed JSON structure.
-    # If we return the JSON dict, does the caller handle it?
-    # Wait, the traceback says:
-    # curriculum_json = curriculum_response.text.split(response_start)[1]...
-    # So `__get_date_plan` does the fetching AND parsing of raw text.
-    # It returns the JSON dict (or list inside 'r').
-    
     return curriculum_json
 
 # Apply Timetable Patch
@@ -338,8 +353,95 @@ def serialize_lesson(lesson, date_obj):
         "class": {"name": ""} # Class info not critical for "my view"
     }
 
+def fetch_child_data(edupage, child, today, tomorrow):
+    print(f"DEBUG: --- Fetching data for {child['name']} ({child['id']}) ---", file=sys.stderr)
+    
+    # Set context
+    edupage.selected_child = child['id']
+    
+    # TIMETABLE
+    print("DEBUG: Fetching Timetable...", file=sys.stderr)
+    lessons = []
+    try:
+        timetable_today = edupage.get_my_timetable(today)
+        timetable_tomorrow = edupage.get_my_timetable(tomorrow)
+        
+        if timetable_today:
+            for l in timetable_today.lessons:
+                 lessons.append(serialize_lesson(l, today))
+        if timetable_tomorrow:
+             for l in timetable_tomorrow.lessons:
+                 lessons.append(serialize_lesson(l, tomorrow))
+    except Exception as e:
+        print(f"DEBUG: Error fetching timetable for {child['name']}: {e}", file=sys.stderr)
+
+    # HOMEWORK (assignments)
+    # The library might default to "my" homework. 
+    # We might need to switch context on the API level if 'get_homeworks' uses internal session state.
+    # But usually edupage cookies/session are for the parent, and specific calls need student ID.
+    # The library 'get_homeworks' doesn't seem to take student ID easily (based on minimal docs).
+    # We might skip HW for now or try.
+    
+    print("DEBUG: Fetching Homework...", file=sys.stderr)
+    homeworks = []
+    # Note: get_homeworks might not be context-aware in the library without modifications. 
+    # But let's try.
+    try:
+        if hasattr(edupage, "get_homeworks"):
+            hws = edupage.get_homeworks() 
+            for hw in hws:
+                homeworks.append({
+                    "id": getattr(hw, "id", None),
+                    "title": getattr(hw, "title", "Hausaufgabe"),
+                    "subject": getattr(hw, "subject", {}).name if getattr(hw, "subject", None) else "",
+                    "dueDate": getattr(hw, "date", ""),
+                    "isDone": getattr(hw, "is_done", False)
+                })
+    except Exception as e:
+        print(f"DEBUG: Error fetching homework: {e}", file=sys.stderr)
+
+    # GRADES
+    print("DEBUG: Fetching Grades...", file=sys.stderr)
+    grades_data = []
+    try:
+         if hasattr(edupage, "get_grades"):
+             grds = edupage.get_grades()
+             for g in grds:
+                 grades_data.append({
+                     "subject": getattr(g, "subject", {}).name if getattr(g, "subject", None) else "?",
+                     "value": getattr(g, "value", ""),
+                     "date": getattr(g, "date", "")
+                 })
+    except Exception as e:
+        print(f"DEBUG: Error fetching grades: {e}", file=sys.stderr)
+
+    # MESSAGES
+    print("DEBUG: Fetching Messages...", file=sys.stderr)
+    messages = []
+    try:
+        if hasattr(edupage, "get_notifications"):
+            notifs = edupage.get_notifications()
+            for n in notifs[:15]: 
+                messages.append({
+                    "title": getattr(n, "title", ""),
+                    "body": getattr(n, "body", ""),
+                    "type": getattr(n, "type", ""),
+                    "date": getattr(n, "timestamp", "")
+                })
+    except Exception as e:
+         print(f"DEBUG: Error fetching messages: {e}", file=sys.stderr)
+
+    return {
+        "name": child['name'],
+        "timetable": lessons,
+        "homework": homeworks,
+        "grades": grades_data,
+        "messages": messages
+    }
+
+
 def main():
-    print("DEBUG: Edupage Bridge Script v1.5 (Monkey-patched)", file=sys.stderr)
+    print("DEBUG: Edupage Bridge Script v1.6 (Multi-Child)", file=sys.stderr)
     if len(sys.argv) < 3:
         print(json.dumps({"error": "Missing credentials"}))
         sys.exit(1)
@@ -374,105 +476,18 @@ def main():
     }
 
     try:
-        # 1. Get Children
-        # The library might not have a direct "get_children" method exposed easily,
-        # but usually parents have multiple 'users' linked or we can try to find them.
-        # Check if we can switch user or if getting data returns data for all?
-        # Standard API often returns data for the "selected" child.
-        # We might need to parse the main page or use internal methods?
+        # Check if we found children during login
+        children = getattr(edupage, "children", [])
         
-        # Let's try to see if we can get provision protocols or related users.
-        # For now, we will perform a standard fetch which USUALLY defaults to the first child 
-        # or the main account.
-        
-        # EXPERIMENTAL: Try to find siblings/children
-        # This is tricky without exact API docs for the python wrapper regarding parents.
-        # We will attempt to fetch data. If the API supports "switch_user", we would use it.
-        # As a fallback for this Kiosk, we will just fetch the main data 
-        # AND if there are multiple personas, we might need to handle that.
-        
-        # Currently, we will fetch for the "Current" context.
-        # If the user needs multiple kids, they might need to use separate logins 
-        # OR we need a way to switch.
-        
-        # However, let's try to fetch everything we can for the CURRENT view.
-        
-        # TIMETABLE
-        print("DEBUG: Fetching Timetable...", file=sys.stderr)
-        timetable_today = edupage.get_my_timetable(today)
-        timetable_tomorrow = edupage.get_my_timetable(tomorrow)
-        
-        lessons = []
-        if timetable_today:
-            for l in timetable_today.lessons:
-                 lessons.append(serialize_lesson(l, today))
-        if timetable_tomorrow:
-             for l in timetable_tomorrow.lessons:
-                 lessons.append(serialize_lesson(l, tomorrow))
-
-        # HOMEWORK (assignments)
-        print("DEBUG: Fetching Homework...", file=sys.stderr)
-        homeworks = []
-        try:
-            # get_homeworks might need arguments or not exist in this version?
-            # We wrap in try/except
-            if hasattr(edupage, "get_homeworks"):
-                hws = edupage.get_homeworks() 
-                # Simplistic serialization
-                for hw in hws:
-                    # Filter for active?
-                    homeworks.append({
-                        "id": getattr(hw, "id", None),
-                        "title": getattr(hw, "title", "Hausaufgabe"),
-                        "subject": getattr(hw, "subject", {}).name if getattr(hw, "subject", None) else "",
-                        "dueDate": getattr(hw, "date", ""), # check format
-                        "isDone": getattr(hw, "is_done", False)
-                    })
-        except Exception as e:
-            print(f"DEBUG: Error fetching homework: {e}", file=sys.stderr)
-
-        # GRADES
-        print("DEBUG: Fetching Grades...", file=sys.stderr)
-        grades_data = []
-        try:
-             if hasattr(edupage, "get_grades"):
-                 grds = edupage.get_grades()
-                 for g in grds:
-                     grades_data.append({
-                         "subject": getattr(g, "subject", {}).name if getattr(g, "subject", None) else "?",
-                         "value": getattr(g, "value", ""),
-                         "date": getattr(g, "date", "")
-                     })
-        except Exception as e:
-            print(f"DEBUG: Error fetching grades: {e}", file=sys.stderr)
-
-        # MESSAGES / NOTIFICATIONS
-        print("DEBUG: Fetching Messages...", file=sys.stderr)
-        messages = []
-        try:
-            if hasattr(edupage, "get_notifications"):
-                notifs = edupage.get_notifications()
-                for n in notifs[:15]: # Limit to 15
-                    messages.append({
-                        "title": getattr(n, "title", ""),
-                        "body": getattr(n, "body", ""),
-                        "type": getattr(n, "type", ""),
-                        "date": getattr(n, "timestamp", "")
-                    })
-        except Exception as e:
-             print(f"DEBUG: Error fetching messages: {e}", file=sys.stderr)
-
-
-        # Add to result (Single Student for now, as library limitation is unclear)
-        # If the user is a Parent with multiple kids, this might only return one.
-        result["students"].append({
-            "name": "Student", # Placeholder
-            "timetable": lessons,
-            "homework": homeworks,
-            "grades": grades_data,
-            "messages": messages
-        })
-
+        if not children:
+            print("DEBUG: No children profiles found. Attempting fallback to main profile.", file=sys.stderr)
+            # Try fetching as "self" (might fail for parents, but works for students)
+            children = [{"id": None, "name": "Myself"}]
+            
+        for child in children:
+            child_data = fetch_child_data(edupage, child, today, tomorrow)
+            result["students"].append(child_data)
+            
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
@@ -481,6 +496,7 @@ def main():
         sys.exit(1)
 
     print(json.dumps(result))
+
 
 if __name__ == "__main__":
     main()
