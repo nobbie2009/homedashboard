@@ -46,9 +46,12 @@ def fixed_login(self, username, password, subdomain="login1"):
     response = self.edupage.session.post(request_url, parameters)
 
     if "cap=1" in response.url or "lerr=b43b43" in response.url:
+        print(f"DEBUG: Captcha detected. URL: {response.url}", file=sys.stderr)
         raise CaptchaException()
 
     if "bad=1" in response.url:
+        print(f"DEBUG: Bad Credentials detected. URL: {response.url}", file=sys.stderr)
+        # print(f"DEBUG: Response Content: {response.content.decode()[:500]}", file=sys.stderr)
         raise BadCredentialsException()
 
     data = response.content.decode()
