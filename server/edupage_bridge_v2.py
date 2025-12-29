@@ -111,39 +111,64 @@ def fixed_login(self, username, password, subdomain="login1"):
     # If GSH is still missing, it's likely we need to visit the main page to initialize the session/get the fresh GSH
     if not hasattr(self.edupage, "gsh") or not self.edupage.gsh:
         print("DEBUG: GSH missing after login. Fetching main dashboard to extract it...", file=sys.stderr)
-        try:
-             # Standard dashboard URL
-             dashboard_url = f"https://{self.edupage.subdomain}.edupage.org/"
-             resp = self.edupage.session.get(dashboard_url)
-             dash_data = resp.content.decode()
-             
-             # Search for GSH in dashboard
-             m = re.search(r'gsh\s*[:=]\s*["\']([^"\']+)["\']', dash_data)
-             if m:
-                self.edupage.gsh = m.group(1)
-                print(f"DEBUG: Extracted GSH from Dashboard Regex: {self.edupage.gsh}", file=sys.stderr)
-             else:
-                m2 = re.search(r'"gsh":"([^"]+)"', dash_data)
-                if m2:
-                    self.edupage.gsh = m2.group(1)
-                    print(f"DEBUG: Extracted GSH from Dashboard JSON Regex: {self.edupage.gsh}", file=sys.stderr)
-                else:
-                    print("DEBUG: Failed to find GSH in dashboard.", file=sys.stderr)
-                    # print(f"DEBUG: Dashboard Start: {dash_data[:500]}", file=sys.stderr)
-                    
-        except Exception as e:
-             print(f"DEBUG: Error fetching dashboard: {e}", file=sys.stderr)
+        
+        # Try finding GSH in the current 'data' first (if it was HTML)
+        
+        # Helper to extract GSH
+        def find_gsh(content):
+            # 1. Standard variable
+            m = re.search(r'gsh\s*[:=]\s*["\']([^"\']+)["\']', content)
+            if m: return m.group(1)
+            # 2. JSON key
+            m = re.search(r'"gsh":"([^"]+)"', content)
+            if m: return m.group(1)
+            # 3. Inside Drupal/Edupage settings
+            m = re.search(r'\"school_gsh\"\s*:\s*\"([0-9a-fA-F]+)\"', content)
+            if m: return m.group(1)
+            return None
 
+        # Check in the response we already have
+        found = find_gsh(data)
+        if found:
+             self.edupage.gsh = found
+             print(f"DEBUG: Extracted GSH from Login Response: {self.edupage.gsh}", file=sys.stderr)
+
+        if not hasattr(self.edupage, "gsh") or not self.edupage.gsh:
+            try:
+                 urls_to_try = [
+                     f"https://{self.edupage.subdomain}.edupage.org/user/",
+                     f"https://{self.edupage.subdomain}.edupage.org/dashboard",
+                     f"https://{self.edupage.subdomain}.edupage.org/"
+                 ]
+                 
+                 for url in urls_to_try:
+                     print(f"DEBUG: Trying to find GSH at {url}...", file=sys.stderr)
+                     resp = self.edupage.session.get(url)
+                     dash_data = resp.content.decode()
+                     
+                     found = find_gsh(dash_data)
+                     if found:
+                        self.edupage.gsh = found
+                        print(f"DEBUG: Extracted GSH from {url}: {self.edupage.gsh}", file=sys.stderr)
+                        break
+                     else:
+                        print(f"DEBUG: No GSH at {url}", file=sys.stderr)
+                        
+            except Exception as e:
+                 print(f"DEBUG: Error fetching dashboard URLs: {e}", file=sys.stderr)
 
     if not hasattr(self.edupage, "gsh") or not self.edupage.gsh:
+        # Final attempt: maybe "reload: true" implies we need to handle a specific reload flow?
+        # But usually we just need GSH.
         print("DEBUG: GSH still missing. Defaulting to 00000000.", file=sys.stderr)
         self.edupage.gsh = "00000000"
 
     # Also, we likely need to check if we are authenticated.
     # If the dashboard redirect us back to login, then login failed silently (or cookie issue).
-    if "login" in self.edupage.session.cookies.get_dict().keys():
-         # Sometimes a specific cookie indicates success?
-         pass
+    if "edupage_session" not in self.edupage.session.cookies.get_dict().keys() and \
+       "PHPSESSID" not in self.edupage.session.cookies.get_dict().keys():
+         print("DEBUG: WARNING: No typical session cookies found!", file=sys.stderr)
+         print(f"DEBUG: Cookies: {self.edupage.session.cookies.get_dict()}", file=sys.stderr)
 
     if "twofactor" not in response.url:
         # Check for 2FA in data
@@ -157,7 +182,8 @@ def fixed_login(self, username, password, subdomain="login1"):
             # If we extracted GSH manually, we might ignore this error, 
             # BUT self.edupage.user might be None, which could crash other things?
             # Let's hope basic requests only need GSH and Cookie.
-            print(f"DEBUG: Parse Login Data failed: {e}", file=sys.stderr)
+            # print(f"DEBUG: Parse Login Data failed: {e}", file=sys.stderr)
+            pass
         return
 
     # 2FA Handling ... (rest of function)
