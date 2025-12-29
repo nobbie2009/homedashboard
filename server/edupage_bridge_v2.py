@@ -105,46 +105,29 @@ def fixed_login(self, username, password, subdomain="login1"):
             self._Login__parse_login_data(data)
             print("DEBUG: Standard parsing completed.", file=sys.stderr)
         except Exception as e:
-    # Parse Children
-    print("DEBUG: parsing children profiles...", file=sys.stderr)
-    children = []
-    try:
-        # Regex to find children profiles in the dashboard
-        # pattern matches: <a ... data-sid="-255"> ... <span class="userName">Name</span>
-        
-        # Method 1: Regex over the HTML (edubarProfileChildBtn)
-        # Note: data-sid might be negative for students.
-        child_pattern = re.compile(r'class="[^"]*edubarProfileChildBtn[^"]*"[^>]*data-sid="([^"]+)"[^>]*>.*?<span class="userName">([^<]+)</span>', re.DOTALL)
-        matches = child_pattern.findall(data)
-        
-        seen_ids = set()
-        for cid, cname in matches:
-            if cid not in seen_ids:
-                children.append({"id": cid, "name": cname.strip()})
-                seen_ids.add(cid)
-                
-        print(f"DEBUG: Found children: {children}", file=sys.stderr)
-    except Exception as e:
-        print(f"DEBUG: Error parsing children: {e}", file=sys.stderr)
-
-    self.edupage.children = children
-
-
-    if "twofactor" not in response.url:
-        # 1. Try Standard Library Parsing first
-        try:
-            print("DEBUG: Attempting standard parse_login_data...", file=sys.stderr)
-            if "var pdata =" in data:
-                 print("DEBUG: 'var pdata =' found in response.", file=sys.stderr)
-            else:
-                 print("DEBUG: 'var pdata =' NOT found in response.", file=sys.stderr)
-
-            self._Login__parse_login_data(data)
-            print("DEBUG: Standard parsing completed.", file=sys.stderr)
-        except Exception as e:
             print(f"DEBUG: Standard parse_login_data failed: {e}", file=sys.stderr)
+            # Find children profile regardless of parse success/failure since we have HTML
             # Proceed to fallbacks
 
+        # Parse Children
+        print("DEBUG: parsing children profiles...", file=sys.stderr)
+        children = []
+        try:
+            # Method 1: Regex over the HTML (edubarProfileChildBtn)
+            child_pattern = re.compile(r'class="[^"]*edubarProfileChildBtn[^"]*"[^>]*data-sid="([^"]+)"[^>]*>.*?<span class="userName">([^<]+)</span>', re.DOTALL)
+            matches = child_pattern.findall(data)
+            
+            seen_ids = set()
+            for cid, cname in matches:
+                if cid not in seen_ids:
+                    children.append({"id": cid, "name": cname.strip()})
+                    seen_ids.add(cid)
+                    
+            print(f"DEBUG: Found children: {children}", file=sys.stderr)
+        except Exception as e:
+            print(f"DEBUG: Error parsing children: {e}", file=sys.stderr)
+
+        self.edupage.children = children
         # 2. Check if GSH is set
         if hasattr(self.edupage, "gsh") and self.edupage.gsh:
              print(f"DEBUG: GSH successfully set to: {self.edupage.gsh}", file=sys.stderr)
