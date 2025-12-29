@@ -43,7 +43,7 @@ export interface StudentData {
     messages: Message[];
 }
 
-export const useEdupage = () => {
+export const useEdupage = (date?: Date) => {
     const { config } = useConfig();
     const { deviceId } = useSecurity();
     const [data, setData] = useState<StudentData[]>([]);
@@ -51,6 +51,9 @@ export const useEdupage = () => {
     const [error, setError] = useState<string | null>(null);
 
     const API_URL = getApiUrl();
+
+    // Format date as YYYY-MM-DD
+    const dateStr = date ? date.toISOString().split('T')[0] : '';
 
     const fetchEdupage = useCallback(async () => {
         if (!config.edupage?.username || !config.edupage?.password) {
@@ -61,7 +64,11 @@ export const useEdupage = () => {
         setError(null);
 
         try {
-            const res = await fetch(`${API_URL}/api/edupage`, {
+            const url = dateStr
+                ? `${API_URL}/api/edupage?date=${dateStr}`
+                : `${API_URL}/api/edupage`;
+
+            const res = await fetch(url, {
                 headers: {
                     'username': config.edupage?.username || '',
                     'password': config.edupage?.password || '',
@@ -75,6 +82,8 @@ export const useEdupage = () => {
                 setData(json.students || []);
             } else {
                 const err = await res.text();
+                // Don't overwrite data if just one refresh fails? 
+                // Currently specific to date, so we probably should show error.
                 setError(err || "Failed to fetch Edupage data");
             }
         } catch (e) {
@@ -83,7 +92,7 @@ export const useEdupage = () => {
         } finally {
             setLoading(false);
         }
-    }, [config.edupage?.username, config.edupage?.password, deviceId]);
+    }, [config.edupage?.username, config.edupage?.password, deviceId, dateStr]);
 
     useEffect(() => {
         fetchEdupage();

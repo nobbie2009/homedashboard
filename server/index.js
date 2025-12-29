@@ -667,6 +667,7 @@ app.get('/api/edupage', (req, res) => {
     const password = req.headers['password'];
     // Default to "login1" if not provided header (though bridge script also defaults)
     const subdomain = req.headers['subdomain'] || 'login1';
+    const date = req.query.date; // Optional date YYYY-MM-DD
 
     // Validate credentials presence
     if (!username || !password) {
@@ -674,10 +675,15 @@ app.get('/api/edupage', (req, res) => {
     }
 
     const scriptPath = path.join(__dirname, 'edupage_bridge_v2.py');
-    console.log(`DEBUG: Executing Python script at: ${scriptPath} with subdomain: ${subdomain}`);
+    console.log(`DEBUG: Executing Python script at: ${scriptPath} with subdomain: ${subdomain} and date: ${date}`);
+
+    const args = [scriptPath, username, password, subdomain];
+    if (date) {
+        args.push(date);
+    }
 
     // Execute python script
-    execFile('python', [scriptPath, username, password, subdomain], (error, stdout, stderr) => {
+    execFile('python', args, (error, stdout, stderr) => {
         // Always log stderr for debugging
         if (stderr) {
             console.error('Wrapper Stderr:', stderr);

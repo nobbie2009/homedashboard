@@ -343,7 +343,7 @@ def serialize_lesson(lesson, date_obj):
         "class": {"name": ""} # Class info not critical for "my view"
     }
 
-def fetch_child_data(edupage, child, today, tomorrow):
+def fetch_child_data(edupage, child, days_to_fetch):
     print(f"DEBUG: --- Fetching data for {child['name']} ({child['id']}) ---", file=sys.stderr)
     
     # Set context
@@ -353,29 +353,19 @@ def fetch_child_data(edupage, child, today, tomorrow):
     print("DEBUG: Fetching Timetable...", file=sys.stderr)
     lessons = []
     try:
-        timetable_today = edupage.get_my_timetable(today)
-        timetable_tomorrow = edupage.get_my_timetable(tomorrow)
-        
-        if timetable_today:
-            for l in timetable_today.lessons:
-                 lessons.append(serialize_lesson(l, today))
-        if timetable_tomorrow:
-             for l in timetable_tomorrow.lessons:
-                 lessons.append(serialize_lesson(l, tomorrow))
+        for day in days_to_fetch:
+            print(f"DEBUG: Fetching Timetable for {day}...", file=sys.stderr)
+            timetable = edupage.get_my_timetable(day)
+            if timetable:
+                for l in timetable.lessons:
+                    lessons.append(serialize_lesson(l, day))
     except Exception as e:
         print(f"DEBUG: Error fetching timetable for {child['name']}: {e}", file=sys.stderr)
 
     # HOMEWORK (assignments)
-    # The library might default to "my" homework. 
-    # We might need to switch context on the API level if 'get_homeworks' uses internal session state.
-    # But usually edupage cookies/session are for the parent, and specific calls need student ID.
-    # The library 'get_homeworks' doesn't seem to take student ID easily (based on minimal docs).
-    # We might skip HW for now or try.
-    
+    # ... (Keep existing HW logic or improve?)
     print("DEBUG: Fetching Homework...", file=sys.stderr)
     homeworks = []
-    # Note: get_homeworks might not be context-aware in the library without modifications. 
-    # But let's try.
     try:
         if hasattr(edupage, "get_homeworks"):
             hws = edupage.get_homeworks() 
@@ -409,15 +399,24 @@ def fetch_child_data(edupage, child, today, tomorrow):
     print("DEBUG: Fetching Messages...", file=sys.stderr)
     messages = []
     try:
+        # Try both notifications and timeline
+        found_msgs = []
         if hasattr(edupage, "get_notifications"):
-            notifs = edupage.get_notifications()
-            for n in notifs[:15]: 
-                messages.append({
-                    "title": getattr(n, "title", ""),
-                    "body": getattr(n, "body", ""),
-                    "type": getattr(n, "type", ""),
-                    "date": getattr(n, "timestamp", "")
-                })
+            found_msgs = edupage.get_notifications()
+        
+        # Also try "timeline" which might contain Bulletin Board info
+        if not found_msgs and hasattr(edupage, "get_timeline"):
+             # Need to implement get_timeline if it exists or verify library support
+             pass
+             
+        # Fallback to whatever found_msgs has
+        for n in found_msgs: 
+            messages.append({
+                "title": getattr(n, "title", "Info"),
+                "body": getattr(n, "body", "") or getattr(n, "text", ""), # some might use 'text'
+                "type": getattr(n, "type", "notice"),
+                "date": getattr(n, "timestamp", "")
+            })
     except Exception as e:
          print(f"DEBUG: Error fetching messages: {e}", file=sys.stderr)
 
@@ -440,6 +439,22 @@ def main():
     password = sys.argv[2]
     subdomain = sys.argv[3] if len(sys.argv) > 3 else "login1"
 
+    # Parse target date
+    target_date_str = sys.argv[4] if len(sys.argv) > 4 else None
+    if target_date_str:
+        try:
+            target_date = datetime.datetime.strptime(target_date_str, "%Y-%m-%d").date()
+        except ValueError:
+             print(json.dumps({"error": "Invalid date format. Use YYYY-MM-DD"}))
+             sys.exit(1)
+    else:
+        target_date = datetime.date.today()
+
+    # Calculate Start/End of Week (Monday - Sunday)
+    start_of_week = target_date - datetime.timedelta(days=target_date.weekday())
+    # We will fetch Monday to Friday for the timetable
+    days_to_fetch = [start_of_week + datetime.timedelta(days=i) for i in range(5)]
+
     edupage = Edupage()
 
     try:
@@ -458,11 +473,11 @@ def main():
         sys.exit(1)
 
     # Fetch Data
-    today = datetime.date.today()
-    tomorrow = today + datetime.timedelta(days=1)
     
     result = {
-        "students": [] 
+        "students": [],
+        "weekStart": start_of_week.isoformat(),
+        "weekDates": [d.isoformat() for d in days_to_fetch]
     }
 
     try:
@@ -475,7 +490,7 @@ def main():
             children = [{"id": None, "name": "Myself"}]
             
         for child in children:
-            child_data = fetch_child_data(edupage, child, today, tomorrow)
+            child_data = fetch_child_data(edupage, child, days_to_fetch)
             result["students"].append(child_data)
             
     except Exception as e:
@@ -490,3 +505,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+```
