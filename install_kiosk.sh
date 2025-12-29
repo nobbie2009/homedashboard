@@ -80,7 +80,7 @@ unclutter -idle 0.1 -root &
 # --noerrdialogs: Suppress error dialogs
 # --disable-infobars: Remove "Chrome is being controlled by..."
 # --check-for-update-interval: massive interval to stop update checks
-chromium --no-first-run --noerrdialogs --disable-infobars --kiosk "$DASHBOARD_URL" --check-for-update-interval=31536000
+chromium --no-first-run --noerrdialogs --disable-infobars --kiosk --password-store=basic "$DASHBOARD_URL" --check-for-update-interval=31536000
 EOF
 
 # Make startup script executable and owned by user
