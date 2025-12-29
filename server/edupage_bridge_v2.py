@@ -283,20 +283,19 @@ def fixed_get_date_plan(self, date):
     
     target_id = getattr(self.edupage, "selected_child", None)
     
-    # Try converting to int if it's a string number
+    # Try converting to int if it's a string number, but for payload sending keep as is or string?
+    # Edupage seems to accept numbers, but let's try string if int failed.
+    # Actually, previous logs showed int failed. Let's force string.
     if target_id is not None:
-        try:
-            target_id = int(target_id)
-        except:
-            pass
-            
+        target_id = str(target_id)
+        
     print(f"DEBUG: Fetching timetable for target_id: {target_id} (type: {type(target_id)})", file=sys.stderr)
 
     payload = {
         "__args": [
             target_id, 
-            date.year,
-            date.month,
+            date.year, 
+            date.month, 
             date.day
         ],
         "__gsh": getattr(self.edupage, "gsh", "00000000")
