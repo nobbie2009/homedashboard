@@ -186,7 +186,7 @@ def fixed_get_date_plan(self, date):
             date.month,
             date.day
         ],
-        "__gsh": self.edupage.gsh
+        "__gsh": getattr(self.edupage, "gsh", "00000000")
     }
     
     response = self.edupage.session.post(request_url, json=payload)
