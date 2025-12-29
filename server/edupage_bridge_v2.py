@@ -190,6 +190,37 @@ def fixed_login(self, username, password, subdomain="login1"):
             print("DEBUG: CRITICAL - GSH could not be found. Requests will likely fail.", file=sys.stderr)
             # Defaulting to 00000000 is usually futile, but keeps 'hasattr' happy.
             self.edupage.gsh = "00000000"
+
+        # ---------------------------
+        # TIMELINE PARSING (UserHome)
+        # ---------------------------
+        print("DEBUG: parsing timeline/userhome data...", file=sys.stderr)
+        try:
+            # Regex to find .userhome({ ... });
+            # We look for .userhome( followed by { and capturing until the end );
+            # This is tricky with nested braces, but usually the structure is simple enough.
+            # Let's try matching the start and finding the matching brace or using a greedy match if it's the last script
+            
+            # Pattern: $j('#id').userhome({ ... });
+            # We focus on capturing the JSON object inside userhome( ... )
+            
+            timeline_match = re.search(r'\.userhome\(\s*(\{.*?\})\s*\);', data, re.DOTALL)
+            if timeline_match:
+                json_str = timeline_match.group(1)
+                # Cleanup potential JS artifacts if any (unlikely in pure JSON arg)
+                try:
+                    timeline_data = json.loads(json_str)
+                    self.edupage.timeline_data = timeline_data.get("items", [])
+                    print(f"DEBUG: Extracted {len(self.edupage.timeline_data)} timeline items.", file=sys.stderr)
+                except json.JSONDecodeError as je:
+                    print(f"DEBUG: JSON parse error for userhome: {je}", file=sys.stderr)
+            else:
+                print("DEBUG: .userhome call not found in HTML.", file=sys.stderr)
+                self.edupage.timeline_data = []
+                
+        except Exception as e:
+            print(f"DEBUG: Error parsing timeline: {e}", file=sys.stderr)
+            self.edupage.timeline_data = []
             
         return
 
@@ -253,11 +284,11 @@ def fixed_get_date_plan(self, date):
     target_id = getattr(self.edupage, "selected_child", None)
     
     # Try converting to int if it's a string number
-    # if target_id is not None:
-    #     try:
-    #         target_id = int(target_id)
-    #     except:
-    #         pass
+    if target_id is not None:
+        try:
+            target_id = int(target_id)
+        except:
+            pass
             
     print(f"DEBUG: Fetching timetable for target_id: {target_id} (type: {type(target_id)})", file=sys.stderr)
 
@@ -417,6 +448,36 @@ def fetch_child_data(edupage, child, days_to_fetch):
                 "type": getattr(n, "type", "notice"),
                 "date": getattr(n, "timestamp", "")
             })
+            
+        # Process Timeline Items (Parsed from HTML)
+        if hasattr(edupage, "timeline_data"):
+            print("DEBUG: Processing extracted timeline data...", file=sys.stderr)
+            for item in edupage.timeline_data:
+                # Filter relevant items
+                # Typ: 'sprava' (message), 'nastenka' (noticeboard), 'text' (maybe)
+                # We also check 'user' or 'user_meno' to see if it matches the child
+                # But typically the feed contains items relevant to the logged in parent/user
+                
+                # Check for relevancy?
+                # The items have "user" field usually like "Rodic-..." or "Ucitel-..." (sender)
+                # They don't always explicitly say "for child X". 
+                # However, the feed is usually filtered for the viewer.
+                # We will include "sprava" and "nastenka" and "homework" (if needed, but we have separate HW)
+                
+                typ = item.get("typ")
+                if typ in ["sprava", "nastenka", "text", "event"]:
+                    # Create message object
+                    msg = {
+                        "title": item.get("user_meno", "Info"), # Use sender as title?
+                        "body": item.get("text", "") or item.get("body", ""),
+                        "type": typ,
+                        "date": item.get("timestamp", "")
+                    }
+                    
+                    # Deduplication check
+                    if not any(m["date"] == msg["date"] and m["body"] == msg["body"] for m in messages):
+                        messages.append(msg)
+                        
     except Exception as e:
          print(f"DEBUG: Error fetching messages: {e}", file=sys.stderr)
 
