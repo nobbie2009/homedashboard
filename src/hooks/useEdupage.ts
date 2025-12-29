@@ -22,11 +22,25 @@ export interface Homework {
     done: boolean;
 }
 
+export interface Grade {
+    subject: string;
+    value: string;
+    date: string;
+}
+
+export interface Message {
+    title: string;
+    body: string;
+    type: string;
+    date: string;
+}
+
 export interface StudentData {
     name: string;
     timetable: Lesson[];
     homework: Homework[];
-    inbox: any[];
+    grades: Grade[];
+    messages: Message[];
 }
 
 export const useEdupage = () => {

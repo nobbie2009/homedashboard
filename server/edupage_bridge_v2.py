@@ -152,36 +152,97 @@ def main():
         "students": [] 
     }
 
-    # Since edupage-api mostly works for the logged-in user (student/parent)
-    # If parent, we might be able to switch students? 
-    # The docs don't explicitly show "switch_student". 
-    # get_all_students returns all students in school (admin feature?).
-    # We will assume single student context for now OR try to find children if parent.
-    # But for now, let's just dump the "my" timetable.
-    
     try:
-        # Timetable (Today & Tomorrow)
+        # 1. Get Children
+        # The library might not have a direct "get_children" method exposed easily,
+        # but usually parents have multiple 'users' linked or we can try to find them.
+        # Check if we can switch user or if getting data returns data for all?
+        # Standard API often returns data for the "selected" child.
+        # We might need to parse the main page or use internal methods?
+        
+        # Let's try to see if we can get provision protocols or related users.
+        # For now, we will perform a standard fetch which USUALLY defaults to the first child 
+        # or the main account.
+        
+        # EXPERIMENTAL: Try to find siblings/children
+        # This is tricky without exact API docs for the python wrapper regarding parents.
+        # We will attempt to fetch data. If the API supports "switch_user", we would use it.
+        # As a fallback for this Kiosk, we will just fetch the main data 
+        # AND if there are multiple personas, we might need to handle that.
+        
+        # Currently, we will fetch for the "Current" context.
+        # If the user needs multiple kids, they might need to use separate logins 
+        # OR we need a way to switch.
+        
+        # However, let's try to fetch everything we can for the CURRENT view.
+        
+        # TIMETABLE
         timetable_today = edupage.get_my_timetable(today)
         timetable_tomorrow = edupage.get_my_timetable(tomorrow)
         
-        lessons = []
-        if timetable_today:
-            for l in timetable_today.lessons:
-                 lessons.append(serialize_lesson(l, today))
-        if timetable_tomorrow:
-             for l in timetable_tomorrow.lessons:
-                 lessons.append(serialize_lesson(l, tomorrow))
+        lessons_today = [serialize_lesson(l, today) for l in timetable_today.lessons] if timetable_today else []
+        lessons_tomorrow = [serialize_lesson(l, tomorrow) for l in timetable_tomorrow.lessons] if timetable_tomorrow else []
+        all_lessons = lessons_today + lessons_tomorrow
 
-        # Notifications (Homeworks often appear here)
-        # notifications = edupage.get_notifications()
-        # simplified_notifs = [{"title": n.title, "body": n.body, "type": n.type} for n in notifications[:10]]
+        # HOM EWORK (assignments)
+        # Verify method exists
+        homeworks = []
+        try:
+            # get_homeworks might need arguments or not exist in this version?
+            # We wrap in try/except
+            if hasattr(edupage, "get_homeworks"):
+                hws = edupage.get_homeworks() 
+                # Simplistic serialization
+                for hw in hws:
+                    # Filter for active?
+                    homeworks.append({
+                        "id": getattr(hw, "id", None),
+                        "title": getattr(hw, "title", "Hausaufgabe"),
+                        "subject": getattr(hw, "subject", {}).name if getattr(hw, "subject", None) else "",
+                        "dueDate": getattr(hw, "date", ""), # check format
+                        "isDone": getattr(hw, "is_done", False)
+                    })
+        except Exception as e:
+            print(f"DEBUG: Error fetching homework: {e}", file=sys.stderr)
 
-        # Construct basic student object
+        # GRADES
+        grades_data = []
+        try:
+             if hasattr(edupage, "get_grades"):
+                 grds = edupage.get_grades()
+                 for g in grds:
+                     grades_data.append({
+                         "subject": getattr(g, "subject", {}).name if getattr(g, "subject", None) else "?",
+                         "value": getattr(g, "value", ""),
+                         "date": getattr(g, "date", "")
+                     })
+        except Exception as e:
+            print(f"DEBUG: Error fetching grades: {e}", file=sys.stderr)
+
+        # MESSAGES / NOTIFICATIONS
+        messages = []
+        try:
+            if hasattr(edupage, "get_notifications"):
+                notifs = edupage.get_notifications()
+                for n in notifs[:15]: # Limit to 15
+                    messages.append({
+                        "title": getattr(n, "title", ""),
+                        "body": getattr(n, "body", ""),
+                        "type": getattr(n, "type", ""),
+                        "date": getattr(n, "timestamp", "")
+                    })
+        except Exception as e:
+             print(f"DEBUG: Error fetching messages: {e}", file=sys.stderr)
+
+
+        # Add to result (Single Student for now, as library limitation is unclear)
+        # If the user is a Parent with multiple kids, this might only return one.
         result["students"].append({
-            "name": "Student", # Can we get the name? edupage.user?
-            "timetable": lessons,
-            "homework": [], # Placeholder until we parse notifications for homework
-            "inbox": []
+            "name": "Student", # Placeholder
+            "timetable": all_lessons,
+            "homework": homeworks,
+            "grades": grades_data,
+            "messages": messages
         })
 
     except Exception as e:
