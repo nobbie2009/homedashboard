@@ -1,6 +1,7 @@
 import sys
 import json
 import datetime
+import inspect
 from edupage_api import Edupage
 from edupage_api.exceptions import BadCredentialsException, CaptchaException
 from edupage_api.login import Login, TwoFactorLogin
@@ -128,6 +129,13 @@ def fixed_login(self, username, password, subdomain="login1"):
             print(f"DEBUG: Error parsing children: {e}", file=sys.stderr)
 
         self.edupage.children = children
+        # Force visit dashboard to ensure cookies/gsh are fresh if manual extraction happened
+        self.edupage.session.get(f"https://{subdomain}.edupage.org/dashboard")
+        print(f"DEBUG: Session Cookies after login: {self.edupage.session.cookies.get_dict()}", file=sys.stderr)
+
+        # Introspection: Log available methods
+        print(f"DEBUG: Edupage methods: {[m for m in dir(self.edupage) if not m.startswith('__')]}", file=sys.stderr)
+
         # 2. Check if GSH is set
         if hasattr(self.edupage, "gsh") and self.edupage.gsh:
              print(f"DEBUG: GSH successfully set to: {self.edupage.gsh}", file=sys.stderr)
@@ -305,6 +313,21 @@ def fixed_get_date_plan(self, date):
     
     response = self.edupage.session.post(request_url, json=payload)
     response_text = response.text
+    
+    if 'TypeError' in response_text or 'Cannot re' in response_text:
+        print("DEBUG: Standard getDatePlan failed. Trying alternative arguments or function...", file=sys.stderr)
+        # Try 1: Pass ID as explicit Integer (again, just to be thorough in this block)
+        # payload['__args'][0] = int(target_id) if target_id else None
+        # response = self.edupage.session.post(request_url, json=payload)
+        
+        # Try 2: Try 'ttviewer_getTTViewerData' ?
+        # request_url_alt = request_url.replace("ttviewer_getDatePlan", "ttviewer_getTTViewerData")
+        # response = self.edupage.session.post(request_url_alt, json=payload)
+        pass
+
+    if response.status_code != 200:
+        print(f"DEBUG: Edupage Server Error Status: {response.status_code}", file=sys.stderr)
+
     
     if response_text.startswith("eqz:"):
         import base64
