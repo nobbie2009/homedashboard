@@ -442,69 +442,74 @@ def fixed_get_date_plan(self, date):
             data = json.loads(txt)
             if "r" in data:
                 result = data["r"]
-                print(f"DEBUG: getTTViewerData success! Keys: {list(result.keys()) if isinstance(result, dict) else type(result)}", file=sys.stderr)
+                print(f"DEBUG: getTTViewerData success! Keys: {list(result.keys())}", file=sys.stderr)
                 
-                if isinstance(result, dict) and 'regular' in result:
-                    regular = result['regular']
-                    print(f"DEBUG: regular keys: {list(regular.keys()) if isinstance(regular, dict) else type(regular)}", file=sys.stderr)
+                if isinstance(result, dict):
+                    # Log defaults structure
+                    if 'defaults' in result:
+                        defaults = result['defaults']
+                        print(f"DEBUG: defaults: {str(defaults)[:300]}", file=sys.stderr)
                     
-                    if 'timetables' in regular:
-                        timetables = regular['timetables']
-                        print(f"DEBUG: timetables type: {type(timetables)}", file=sys.stderr)
+                    # Log ALL timetables to find current one
+                    if 'regular' in result and 'timetables' in result['regular']:
+                        timetables = result['regular']['timetables']
+                        print(f"DEBUG: ALL timetables ({len(timetables)} items):", file=sys.stderr)
+                        for tt in timetables:
+                            print(f"DEBUG:   tt_num={tt.get('tt_num')}, year={tt.get('year')}, hidden={tt.get('hidden')}, text={tt.get('text', '')[:40]}, datefrom={tt.get('datefrom')}", file=sys.stderr)
                         
-                        if isinstance(timetables, dict):
-                            print(f"DEBUG: timetables keys: {list(timetables.keys())[:10]}", file=sys.stderr)
-                            # Often timetables is a dict with numeric keys (timetable IDs)
-                            # or date keys
+                        # Find current/active timetable (not hidden, most recent)
+                        active_tts = [t for t in timetables if not t.get('hidden', False)]
+                        print(f"DEBUG: Active (non-hidden) timetables: {len(active_tts)}", file=sys.stderr)
+                        
+                        if active_tts:
+                            # Sort by year/datefrom to get most recent
+                            current_tt = max(active_tts, key=lambda t: (t.get('year', 0), t.get('datefrom', '')))
+                            print(f"DEBUG: Current timetable: tt_num={current_tt.get('tt_num')}, text={current_tt.get('text')}", file=sys.stderr)
                             
-                            # Check first key's structure
-                            if timetables:
-                                first_key = list(timetables.keys())[0]
-                                first_val = timetables[first_key]
-                                print(f"DEBUG: timetables['{first_key}'] type: {type(first_val)}", file=sys.stderr)
-                                if isinstance(first_val, dict):
-                                    print(f"DEBUG: timetables['{first_key}'] keys: {list(first_val.keys())[:10]}", file=sys.stderr)
-                                    
-                                    # Look for 'dates' or specific date or 'lessons'
-                                    if 'dates' in first_val:
-                                        dates_data = first_val['dates']
-                                        date_str = date.strftime("%Y-%m-%d")
-                                        if date_str in dates_data:
-                                            plan = dates_data[date_str]
-                                            if isinstance(plan, dict) and 'plan' in plan:
-                                                print("DEBUG: Found plan data!", file=sys.stderr)
-                                                return plan['plan']
-                                            return plan
-                                        # Try all dates in timetables
-                                        print(f"DEBUG: Available dates: {list(dates_data.keys())[:5]}", file=sys.stderr)
-                                    
-                                    # Check 'lessons' directly?
-                                    if 'lessons' in first_val:
-                                        print(f"DEBUG: Found 'lessons' key directly", file=sys.stderr)
-                                        return first_val['lessons']
-                        
-                        elif isinstance(timetables, list):
-                            print(f"DEBUG: timetables is list of {len(timetables)} items", file=sys.stderr)
-                            if timetables:
-                                print(f"DEBUG: first item: {str(timetables[0])[:200]}", file=sys.stderr)
-                    
-                    # Also check 'current' which might have today's/current data
-                    if 'current' in result:
-                        current = result['current']
-                        print(f"DEBUG: current keys: {list(current.keys()) if isinstance(current, dict) else type(current)}", file=sys.stderr)
-                        if isinstance(current, dict):
-                            # Look for lessons here too
-                            if 'lessons' in current:
-                                return current['lessons']
-                            # Or 'plan'
-                            if 'plan' in current:
-                                return current['plan']
-                            # Full current might have what we need (log first few keys' values)
-                            for k in list(current.keys())[:3]:
-                                print(f"DEBUG: current['{k}']: {str(current[k])[:100]}", file=sys.stderr)
+                            # Now try to fetch this specific timetable's data
+                            tt_num = current_tt.get('tt_num')
+                            if tt_num:
+                                # Try to get timetable data with this tt_num
+                                tt_url = f"https://{self.edupage.subdomain}.edupage.org/timetable/server/regulartt.js?__func=regularttGetData"
+                                tt_payload = {
+                                    "__args": [None, tt_num],
+                                    "__gsh": gsh
+                                }
+                                try:
+                                    tt_resp = self.edupage.session.post(tt_url, json=tt_payload)
+                                    if tt_resp.status_code == 200 and "Error" not in tt_resp.text[:50]:
+                                        tt_txt = tt_resp.text
+                                        if "regularttGetData_res(" in tt_txt:
+                                            tt_txt = tt_txt.split("regularttGetData_res(")[1].rsplit(")", 1)[0]
+                                        tt_data = json.loads(tt_txt)
+                                        if "r" in tt_data:
+                                            tt_result = tt_data["r"]
+                                            print(f"DEBUG: regularttGetData success! Keys: {list(tt_result.keys()) if isinstance(tt_result, dict) else type(tt_result)}", file=sys.stderr)
+                                            # This should contain actual lessons!
+                                            if isinstance(tt_result, dict):
+                                                for k in list(tt_result.keys())[:5]:
+                                                    val = tt_result[k]
+                                                    if isinstance(val, dict):
+                                                        print(f"DEBUG: tt_result['{k}'] keys: {list(val.keys())[:5]}", file=sys.stderr)
+                                                    elif isinstance(val, list):
+                                                        print(f"DEBUG: tt_result['{k}'] is list of {len(val)} items", file=sys.stderr)
+                                                    else:
+                                                        print(f"DEBUG: tt_result['{k}']: {str(val)[:100]}", file=sys.stderr)
+                                                
+                                                # Look for lessons/cards
+                                                if 'cards' in tt_result:
+                                                    cards = tt_result['cards']
+                                                    print(f"DEBUG: Found 'cards' with {len(cards)} items", file=sys.stderr)
+                                                    if cards:
+                                                        print(f"DEBUG: First card: {str(cards[0] if isinstance(cards, list) else list(cards.values())[0])[:200]}", file=sys.stderr)
+                                                    # Cards typically contain lesson info
+                                                    return tt_result  # Return full data for now
+                                    else:
+                                        print(f"DEBUG: regularttGetData failed: {tt_resp.text[:100]}", file=sys.stderr)
+                                except Exception as e:
+                                    print(f"DEBUG: regularttGetData exception: {e}", file=sys.stderr)
                 
-                # Return full result for now so we can see what caller does with it
-                # But mark it so we know it's raw data
+                # Fallback - return what we have
                 print(f"DEBUG: Returning raw TTViewer result", file=sys.stderr)
                 return {"_raw_ttviewer": result}
                     
