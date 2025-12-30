@@ -969,35 +969,59 @@ def fetch_child_data(edupage, child, days_to_fetch):
                         predmet_id = str(g.get('predmetid', ''))
                         subject_name = subjects_map.get(predmet_id, f"Fach {predmet_id}")
                         
-                        # Get grade value - can be points "23.5" or grade "2"
+                        # Get displayed value (can be points or grade)
                         value_str = str(g.get('data', ''))
                         datum = g.get('datum', '')[:10] if g.get('datum') else ''
                         
-                        # Try to extract numeric value for averaging
-                        # Format can be: "2", "23.5", "2 (2 F.)", "28.5/30"
-                        numeric_value = None
-                        try:
-                            # Remove common suffixes and extract first number
-                            clean_val = value_str.split('/')[0].split('(')[0].strip()
-                            clean_val = clean_val.replace(',', '.')
-                            numeric_value = float(clean_val)
-                        except:
-                            pass
+                        # Get the actual grade (znamka field contains 1-6 grade)
+                        # This is the key field for German grades!
+                        znamka = g.get('znamka')  # This is the actual school grade 1-6
+                        
+                        # Try to get numeric value for averaging
+                        grade_value = None  # Actual grade 1-6
+                        points_value = None  # Points if applicable
+                        
+                        # First try znamka field (most reliable for grades)
+                        if znamka is not None:
+                            try:
+                                znamka_float = float(str(znamka).replace(',', '.'))
+                                if 1 <= znamka_float <= 6:
+                                    grade_value = znamka_float
+                            except:
+                                pass
+                        
+                        # If no znamka, try to parse from data field
+                        if grade_value is None:
+                            try:
+                                # Format can be: "2", "2 (2 F.)", "28.5 / 30 = 95% → 1"
+                                clean_val = value_str.split('/')[0].split('(')[0].split('→')[0].strip()
+                                clean_val = clean_val.replace(',', '.')
+                                parsed = float(clean_val)
+                                if 1 <= parsed <= 6:
+                                    grade_value = parsed
+                                else:
+                                    points_value = parsed
+                            except:
+                                pass
                         
                         if subject_name not in grades_by_subject:
                             grades_by_subject[subject_name] = {
                                 "subject": subject_name,
                                 "grades": [],
-                                "numericValues": []
+                                "gradeValues": [],  # Only 1-6 grades
+                                "hasPoints": False
                             }
                         
                         grades_by_subject[subject_name]["grades"].append({
                             "value": value_str,
-                            "date": datum
+                            "date": datum,
+                            "grade": grade_value  # The actual 1-6 grade
                         })
                         
-                        if numeric_value is not None:
-                            grades_by_subject[subject_name]["numericValues"].append(numeric_value)
+                        if grade_value is not None:
+                            grades_by_subject[subject_name]["gradeValues"].append(grade_value)
+                        if points_value is not None:
+                            grades_by_subject[subject_name]["hasPoints"] = True
                     
                     # Calculate averages and build final structure
                     overall_sum = 0
