@@ -343,19 +343,31 @@ def fixed_get_date_plan(self, date):
         response_end = ",["
         
         resp_text = curriculum_response.text
-        # print(f"DEBUG: GCall Response Response start: {resp_text[:100]}", file=sys.stderr)
+        print(f"DEBUG: GCall Response logic start: {resp_text[:100]}", file=sys.stderr)
 
-        if response_start not in resp_text:
-             print(f"DEBUG: expected response_start '{response_start}' not found in gcall response.", file=sys.stderr)
-             return None
-
-        curriculum_json = resp_text.split(response_start)[1].rsplit(
-            response_end, 1
-        )[0]
-
-        data = json.loads(curriculum_json)
+        # Flexible parsing attempt
+        try:
+            # Common pattern: UserID",[JSON]
+            if '",[' in resp_text:
+                curriculum_json = resp_text.split('",[', 1)[1].rsplit(']', 1)[0]
+                # Re-add brackets since we split them off? 
+                # wait, split('",[')[1] removes the bracket? No, split delimiter is removed.
+                # If we split by '",[', the '[' is gone.
+                # So we wraps it back in []
+                curriculum_json = '[' + curriculum_json + ']'
+            elif resp_text.strip().startswith('{') or resp_text.strip().startswith('['):
+                curriculum_json = resp_text
+            else:
+                 print(f"DEBUG: Could not identify JSON format in gcall response.", file=sys.stderr)
+                 return None
+            
+            data = json.loads(curriculum_json)
+        except Exception as e:
+            print(f"DEBUG: JSON parsing failed: {e}", file=sys.stderr)
+            return None
 
         dates = data.get("dates")
+
         # Handle case where dates is None or empty
         if not dates:
              print("DEBUG: 'dates' is empty or None in gcall data", file=sys.stderr)
