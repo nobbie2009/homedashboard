@@ -877,38 +877,81 @@ def fetch_child_data(edupage, child, days_to_fetch):
         import traceback
         traceback.print_exc(file=sys.stderr)
 
-    # GRADES
-    print("DEBUG: Fetching Grades...", file=sys.stderr)
+    # GRADES - Custom implementation (library has bug with max_points)
+    print("DEBUG: Fetching Grades (custom)...", file=sys.stderr)
     grades_data = []
     try:
-        if hasattr(edupage, "get_grades"):
-            try:
-                grds = edupage.get_grades()
-                print(f"DEBUG: Found {len(grds) if grds else 0} grade items", file=sys.stderr)
-                for g in (grds or []):
-                    try:
-                        subject_name = "?"
-                        if hasattr(g, "subject") and g.subject:
-                            subject_name = getattr(g.subject, "name", str(g.subject))
+        # Fetch the grades page directly
+        znamky_url = f"https://{edupage.subdomain}.edupage.org/znamky/"
+        response = edupage.session.get(znamky_url)
+        
+        if response.status_code == 200:
+            html = response.text
+            
+            # Extract vsetkyZnamky array from JavaScript
+            import re
+            
+            # Find subjects data first
+            predmety_match = re.search(r'"vsetkyPredmety":\s*(\{[^}]+\})', html, re.DOTALL)
+            subjects_map = {}
+            if predmety_match:
+                try:
+                    # Parse subject mappings (predmetid -> subject info)
+                    predmety_str = predmety_match.group(1)
+                    # Simple extraction of subject names
+                    subject_pattern = r'"(-?\d+)":\s*\{[^}]*"p_meno":\s*"([^"]+)"'
+                    for match in re.finditer(subject_pattern, html):
+                        subjects_map[match.group(1)] = match.group(2)
+                except Exception as e:
+                    print(f"DEBUG: Error parsing subjects: {e}", file=sys.stderr)
+            
+            print(f"DEBUG: Found {len(subjects_map)} subjects in map", file=sys.stderr)
+            
+            # Find grades data
+            znamky_match = re.search(r'"vsetkyZnamky":\s*\[(.*?)\](?=\s*,\s*"vsetky)', html, re.DOTALL)
+            if znamky_match:
+                znamky_str = "[" + znamky_match.group(1) + "]"
+                try:
+                    import json
+                    # Clean up potential issues with the JSON
+                    znamky_str = znamky_str.replace("'", '"')
+                    all_grades = json.loads(znamky_str)
+                    
+                    # Filter for current child
+                    child_id = str(edupage.active_child_id) if hasattr(edupage, 'active_child_id') else None
+                    print(f"DEBUG: Filtering grades for child_id: {child_id}", file=sys.stderr)
+                    
+                    for g in all_grades:
+                        if child_id and str(g.get('studentid')) != child_id:
+                            continue
                         
-                        # Handle different grade value formats
-                        value = getattr(g, "value", "") or getattr(g, "grade_value", "")
-                        if not value:
-                            value = getattr(g, "grade_n", "")
+                        predmet_id = str(g.get('predmetid', ''))
+                        subject_name = subjects_map.get(predmet_id, f"Fach {predmet_id}")
+                        
+                        # Get grade value - can be points "23.5" or grade "2"
+                        value = g.get('data', '')
+                        datum = g.get('datum', '')[:10] if g.get('datum') else ''
                         
                         grades_data.append({
                             "subject": subject_name,
                             "value": str(value),
-                            "date": str(getattr(g, "date", "") or getattr(g, "event_date", ""))
+                            "date": datum
                         })
-                    except Exception as g_err:
-                        print(f"DEBUG: Error parsing grade item: {g_err}", file=sys.stderr)
-            except Exception as inner_e:
-                print(f"DEBUG: get_grades() call failed: {inner_e}", file=sys.stderr)
-                import traceback
-                traceback.print_exc(file=sys.stderr)
+                    
+                    print(f"DEBUG: Found {len(grades_data)} grades for student", file=sys.stderr)
+                    
+                except json.JSONDecodeError as je:
+                    print(f"DEBUG: JSON parse error for grades: {je}", file=sys.stderr)
+            else:
+                print("DEBUG: vsetkyZnamky not found in page", file=sys.stderr)
+        else:
+            print(f"DEBUG: Failed to fetch znamky page: {response.status_code}", file=sys.stderr)
+            
     except Exception as e:
-        print(f"DEBUG: Error in grades section: {e}", file=sys.stderr)
+        print(f"DEBUG: Error in custom grades fetcher: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+
 
 
     # MESSAGES
