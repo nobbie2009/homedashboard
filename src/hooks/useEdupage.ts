@@ -22,6 +22,20 @@ export interface Homework {
     done: boolean;
 }
 
+export interface GradeEntry {
+    value: string;
+    date: string;
+}
+
+export interface SubjectGrades {
+    subject: string;
+    grades: GradeEntry[];
+    average: number | null;
+    gradeCount: number;
+    isGradeScale: boolean;
+}
+
+// Keep old Grade interface for backward compatibility
 export interface Grade {
     subject: string;
     value: string;
@@ -39,7 +53,7 @@ export interface StudentData {
     name: string;
     timetable: Lesson[];
     homework: Homework[];
-    grades: Grade[];
+    grades: SubjectGrades[];
     messages: Message[];
 }
 

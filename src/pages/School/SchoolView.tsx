@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useEdupage } from '../../hooks/useEdupage';
-import { GraduationCap, BookOpen, Clock, AlertCircle, MessageSquare, Trophy, RefreshCw } from 'lucide-react';
+import { GraduationCap, BookOpen, Clock, AlertCircle, MessageSquare, Trophy, RefreshCw, ChevronRight, ChevronLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 
@@ -307,26 +307,77 @@ export const SchoolView: React.FC = () => {
                                     </div>
                                 )}
 
-                                {/* GRADES */}
+                                {/* GRADES - Grouped by Subject */}
                                 {currentTab === 'grades' && (
-                                    <div className="space-y-2">
+                                    <div className="space-y-3">
                                         {(!student.grades || student.grades.length === 0) ? (
                                             <div className="flex flex-col items-center justify-center h-40 text-slate-500">
                                                 <Trophy className="w-8 h-8 opacity-20 mb-2" />
                                                 <p className="italic">Keine Noten gefunden.</p>
                                             </div>
                                         ) : (
-                                            student.grades.map((grade, gIdx) => (
-                                                <div key={gIdx} className="flex items-center justify-between bg-slate-700/40 p-3 rounded-lg border border-slate-600/30 hover:bg-slate-700/60 transition">
-                                                    <span className="text-slate-200 font-medium">{grade.subject}</span>
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="text-xs text-slate-500">{grade.date ? format(new Date(grade.date), 'dd.MM') : ''}</span>
-                                                        <span className="text-xl font-bold text-white bg-blue-600 w-10 h-10 flex items-center justify-center rounded-lg shadow-lg border border-blue-400/30">
-                                                            {grade.value}
-                                                        </span>
+                                            <>
+                                                {/* Overall Average - if exists */}
+                                                {student.grades.find(g => g.subject === '__OVERALL__') && (
+                                                    <div className="bg-gradient-to-r from-blue-600/30 to-purple-600/30 p-4 rounded-xl border border-blue-500/50 mb-4">
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-3">
+                                                                <Trophy className="w-6 h-6 text-yellow-400" />
+                                                                <span className="font-bold text-lg text-white">Gesamtdurchschnitt</span>
+                                                            </div>
+                                                            <span className="text-3xl font-black text-white">
+                                                                {student.grades.find(g => g.subject === '__OVERALL__')?.average?.toFixed(2)}
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))
+                                                )}
+
+                                                {/* Per-Subject Grades */}
+                                                {student.grades
+                                                    .filter(g => g.subject !== '__OVERALL__')
+                                                    .map((subjectGrade, gIdx) => {
+                                                        const getGradeColor = (avg: number | null) => {
+                                                            if (avg === null) return 'bg-slate-600';
+                                                            if (avg <= 1.5) return 'bg-green-600';
+                                                            if (avg <= 2.5) return 'bg-green-500';
+                                                            if (avg <= 3.5) return 'bg-yellow-500';
+                                                            if (avg <= 4.5) return 'bg-orange-500';
+                                                            return 'bg-red-500';
+                                                        };
+
+                                                        return (
+                                                            <details key={gIdx} className="group bg-slate-700/40 rounded-lg border border-slate-600/30 overflow-hidden">
+                                                                <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-700/60 transition list-none">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <span className="text-slate-200 font-medium">{subjectGrade.subject}</span>
+                                                                        <span className="text-xs text-slate-500">({subjectGrade.gradeCount} Noten)</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        {subjectGrade.average !== null && (
+                                                                            <span className={`text-lg font-bold text-white px-3 py-1 rounded-lg ${getGradeColor(subjectGrade.average)}`}>
+                                                                                ⌀ {subjectGrade.average.toFixed(2)}
+                                                                            </span>
+                                                                        )}
+                                                                        <ChevronRight className="w-4 h-4 text-slate-400 group-open:rotate-90 transition-transform" />
+                                                                    </div>
+                                                                </summary>
+                                                                <div className="px-3 pb-3 pt-1 border-t border-slate-600/30 bg-slate-800/30">
+                                                                    <div className="grid grid-cols-4 gap-2">
+                                                                        {subjectGrade.grades.map((g, i) => (
+                                                                            <div key={i} className="flex flex-col items-center bg-slate-700/50 p-2 rounded-lg">
+                                                                                <span className="text-lg font-bold text-white">{g.value}</span>
+                                                                                <span className="text-[10px] text-slate-500">
+                                                                                    {g.date ? format(new Date(g.date), 'dd.MM') : ''}
+                                                                                </span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            </details>
+                                                        );
+                                                    })
+                                                }
+                                            </>
                                         )}
                                     </div>
                                 )}

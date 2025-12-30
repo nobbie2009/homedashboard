@@ -951,7 +951,6 @@ def fetch_child_data(edupage, child, days_to_fetch):
             if znamky_match:
                 znamky_str = "[" + znamky_match.group(1) + "]"
                 try:
-                    import json
                     # Clean up potential issues with the JSON
                     znamky_str = znamky_str.replace("'", '"')
                     all_grades = json.loads(znamky_str)
@@ -959,6 +958,9 @@ def fetch_child_data(edupage, child, days_to_fetch):
                     # Filter for current child
                     child_id = str(edupage.active_child_id) if hasattr(edupage, 'active_child_id') else None
                     print(f"DEBUG: Filtering grades for child_id: {child_id}", file=sys.stderr)
+                    
+                    # Group grades by subject
+                    grades_by_subject = {}
                     
                     for g in all_grades:
                         if child_id and str(g.get('studentid')) != child_id:
@@ -968,16 +970,81 @@ def fetch_child_data(edupage, child, days_to_fetch):
                         subject_name = subjects_map.get(predmet_id, f"Fach {predmet_id}")
                         
                         # Get grade value - can be points "23.5" or grade "2"
-                        value = g.get('data', '')
+                        value_str = str(g.get('data', ''))
                         datum = g.get('datum', '')[:10] if g.get('datum') else ''
                         
-                        grades_data.append({
-                            "subject": subject_name,
-                            "value": str(value),
+                        # Try to extract numeric value for averaging
+                        # Format can be: "2", "23.5", "2 (2 F.)", "28.5/30"
+                        numeric_value = None
+                        try:
+                            # Remove common suffixes and extract first number
+                            clean_val = value_str.split('/')[0].split('(')[0].strip()
+                            clean_val = clean_val.replace(',', '.')
+                            numeric_value = float(clean_val)
+                        except:
+                            pass
+                        
+                        if subject_name not in grades_by_subject:
+                            grades_by_subject[subject_name] = {
+                                "subject": subject_name,
+                                "grades": [],
+                                "numericValues": []
+                            }
+                        
+                        grades_by_subject[subject_name]["grades"].append({
+                            "value": value_str,
                             "date": datum
                         })
+                        
+                        if numeric_value is not None:
+                            grades_by_subject[subject_name]["numericValues"].append(numeric_value)
                     
-                    print(f"DEBUG: Found {len(grades_data)} grades for student", file=sys.stderr)
+                    # Calculate averages and build final structure
+                    overall_sum = 0
+                    overall_count = 0
+                    
+                    for subj_name, subj_data in grades_by_subject.items():
+                        numeric_vals = subj_data["numericValues"]
+                        if numeric_vals:
+                            # Check if values look like grades (1-6) or points
+                            avg = sum(numeric_vals) / len(numeric_vals)
+                            is_grade_scale = all(1 <= v <= 6 for v in numeric_vals)
+                            
+                            subj_data["average"] = round(avg, 2)
+                            subj_data["isGradeScale"] = is_grade_scale
+                            subj_data["gradeCount"] = len(numeric_vals)
+                            
+                            # Only include in overall average if it's grade scale (1-6)
+                            if is_grade_scale:
+                                overall_sum += avg
+                                overall_count += 1
+                        else:
+                            subj_data["average"] = None
+                            subj_data["isGradeScale"] = False
+                            subj_data["gradeCount"] = len(subj_data["grades"])
+                        
+                        # Remove helper array
+                        del subj_data["numericValues"]
+                        
+                        grades_data.append(subj_data)
+                    
+                    # Sort by subject name
+                    grades_data.sort(key=lambda x: x["subject"])
+                    
+                    # Add overall average as metadata
+                    overall_average = round(overall_sum / overall_count, 2) if overall_count > 0 else None
+                    
+                    print(f"DEBUG: Found {len(grades_data)} subjects with grades, overall avg: {overall_average}", file=sys.stderr)
+                    
+                    # Store overall average in a special way - prepend to list
+                    if overall_average is not None:
+                        grades_data.insert(0, {
+                            "subject": "__OVERALL__",
+                            "average": overall_average,
+                            "gradeCount": overall_count,
+                            "isGradeScale": True,
+                            "grades": []
+                        })
                     
                 except json.JSONDecodeError as je:
                     print(f"DEBUG: JSON parse error for grades: {je}", file=sys.stderr)
