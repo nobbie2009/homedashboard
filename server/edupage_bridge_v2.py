@@ -537,6 +537,7 @@ def fixed_get_date_plan(self, date):
                                                             subjects_lookup = {}
                                                             classes_lookup = {}
                                                             teachers_lookup = {}
+                                                            lessons_lookup = {}
                                                             
                                                             for t in tables:
                                                                 if isinstance(t, dict):
@@ -554,18 +555,66 @@ def fixed_get_date_plan(self, date):
                                                                     elif tid == 'teachers':
                                                                         for r in rows:
                                                                             teachers_lookup[r.get('id')] = r
+                                                                    elif tid == 'lessons':
+                                                                        for r in rows:
+                                                                            lessons_lookup[r.get('id')] = r
                                                             
-                                                            print(f"DEBUG: Lookups - periods:{len(periods_lookup)}, subjects:{len(subjects_lookup)}, classes:{len(classes_lookup)}", file=sys.stderr)
+                                                            print(f"DEBUG: Lookups - periods:{len(periods_lookup)}, subjects:{len(subjects_lookup)}, classes:{len(classes_lookup)}, lessons:{len(lessons_lookup)}", file=sys.stderr)
                                                             
-                                                            # Return structured data for transformation
-                                                            return {
-                                                                "_cards": cards,
-                                                                "_periods": periods_lookup,
-                                                                "_subjects": subjects_lookup,
-                                                                "_classes": classes_lookup,
-                                                                "_teachers": teachers_lookup,
-                                                                "_tt_num": tt_num
-                                                            }
+                                                            if lessons_lookup:
+                                                                sample_lesson = list(lessons_lookup.values())[0]
+                                                                print(f"DEBUG: Sample lesson: {str(sample_lesson)[:300]}", file=sys.stderr)
+                                                            
+                                                            # Determine which day index we need (0=Mon, 1=Tue, etc)
+                                                            day_index = date.weekday()  # 0=Monday
+                                                            print(f"DEBUG: Looking for day_index={day_index} (date={date})", file=sys.stderr)
+                                                            
+                                                            # Transform cards to lessons for this date
+                                                            result_lessons = []
+                                                            for card in cards:
+                                                                days_str = card.get('days', '00000')
+                                                                # days_str is like '10000' for Monday, '01000' for Tuesday
+                                                                if len(days_str) > day_index and days_str[day_index] == '1':
+                                                                    # This card is for our day!
+                                                                    period_id = card.get('period')
+                                                                    lesson_id = card.get('lessonid')
+                                                                    
+                                                                    period = periods_lookup.get(period_id, {})
+                                                                    lesson = lessons_lookup.get(lesson_id, {})
+                                                                    
+                                                                    # Get subject from lesson
+                                                                    subject_ids = lesson.get('subjectids', [])
+                                                                    subject_id = subject_ids[0] if subject_ids else None
+                                                                    subject = subjects_lookup.get(subject_id, {})
+                                                                    
+                                                                    # Get class from lesson
+                                                                    class_ids = lesson.get('classids', [])
+                                                                    class_id = class_ids[0] if class_ids else None
+                                                                    cls = classes_lookup.get(class_id, {})
+                                                                    
+                                                                    # Get teacher from lesson
+                                                                    teacher_ids = lesson.get('teacherids', [])
+                                                                    teacher_id = teacher_ids[0] if teacher_ids else None
+                                                                    teacher = teachers_lookup.get(teacher_id, {})
+                                                                    
+                                                                    result_lessons.append({
+                                                                        'id': card.get('id'),
+                                                                        'period': period.get('name', period_id),
+                                                                        'starttime': period.get('starttime', ''),
+                                                                        'endtime': period.get('endtime', ''),
+                                                                        'subject': subject.get('name', lesson.get('name', 'Unknown')),
+                                                                        'subject_short': subject.get('short', ''),
+                                                                        'class': cls.get('name', ''),
+                                                                        'teacher': teacher.get('name', ''),
+                                                                        'classroom': ', '.join(card.get('classroomids', []))
+                                                                    })
+                                                            
+                                                            print(f"DEBUG: Found {len(result_lessons)} lessons for {date}", file=sys.stderr)
+                                                            if result_lessons:
+                                                                print(f"DEBUG: First lesson: {result_lessons[0]}", file=sys.stderr)
+                                                            
+                                                            # Return list of lessons (expected format)
+                                                            return result_lessons
                                                         
                                                         if lessons_table:
                                                             print(f"DEBUG: Found lessons table! Keys: {list(lessons_table.keys())}", file=sys.stderr)
