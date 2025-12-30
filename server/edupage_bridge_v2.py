@@ -358,19 +358,110 @@ def fixed_get_date_plan(self, date):
     if not curriculum_json:
          print("DEBUG: Timetable parsing failed entirely.", file=sys.stderr)
          return None
+# from edupage_api.timetables import Timetables
+# import requests
+
+# def fixed_get_date_plan(self, date):
+#     request_url = f"https://{self.edupage.subdomain}.edupage.org/timetable/server/ttviewer.js?__func=ttviewer_getDatePlan"
+#     today_date = datetime.date.today()
+    
+#     # We need to construct parameters carefully as per original library but fix the parsing
+    
+#     # Determine the student/child ID to fetch for.
+#     # If self.edupage has 'selected_child', use it. 
+#     # Otherwise use None (which means 'me' / parent, which fails for timetable).
+    
+#     # If using switch_to_child, target_id should likely be None (implied by session)
+#     # So we prefer None if selected_child is not set or if we trust switch_to_child.
+#     target_id = getattr(self.edupage, "selected_child", None)
+    
+#     # Check if target_id is effectively the same as current user? 
+#     # For now, let's allow it to be None.
+    
+#     print(f"DEBUG: Fetching timetable for target_id: {target_id} (type: {type(target_id)})", file=sys.stderr)
+
+#     payload = {
+#         "__args": [
+#             target_id, 
+#             date.year, 
+#             date.month, 
+#             date.day
+#         ],
+#         "__gsh": getattr(self.edupage, "gsh", "00000000")
+#     }
+    
+#     print(f"DEBUG: Timetable Payload: {json.dumps(payload)}", file=sys.stderr)
+    
+#     response = self.edupage.session.post(request_url, json=payload)
+#     response_text = response.text
+    
+#     if 'TypeError' in response_text or 'Cannot re' in response_text:
+#         print("DEBUG: Standard getDatePlan failed. Trying ttviewer_getTTViewerData...", file=sys.stderr)
+#         # Try 2: Try 'ttviewer_getTTViewerData' with same payload
+#         request_url_alt = request_url.replace("ttviewer_getDatePlan", "ttviewer_getTTViewerData")
+#         try:
+#              response = self.edupage.session.post(request_url_alt, json=payload)
+#              response_text = response.text
+#              print(f"DEBUG: Fallback response code: {response.status_code}", file=sys.stderr)
+#         except Exception as e:
+#              print(f"DEBUG: Fallback failed: {e}", file=sys.stderr)
+
+
+#     if response.status_code != 200:
+#         print(f"DEBUG: Edupage Server Error Status: {response.status_code}", file=sys.stderr)
+
+    
+#     if response_text.startswith("eqz:"):
+#         import base64
+#         print("DEBUG: Timetable response has eqz prefix. Decoding...", file=sys.stderr)
+#         json_str = base64.b64decode(response_text[4:]).decode("utf8")
+#         response_text = json_str
+    
+#     print(f"DEBUG: Timetable raw response start: {response_text[:100]}", file=sys.stderr)
+    
+#     curriculum_json = None
+    
+#     # Attempt 1: Standard JSON
+#     try:
+#         curriculum_json = json.loads(response_text)
+#         # If it's pure JSON, it might be wrapped in "r"
+#         if "r" in curriculum_json:
+#              curriculum_json = curriculum_json["r"]
+#     except:
+#         pass
+
+#     # Attempt 2: Callback wrapper removal
+#     if not curriculum_json:
+#         try:
+#             if "ttviewer_getDatePlan_res(" in response_text:
+#                 temp = response_text.split("ttviewer_getDatePlan_res(")[1]
+#                 temp = temp.rsplit(")", 1)[0]
+#                 curriculum_json = json.loads(temp)
+#                 if "r" in curriculum_json:
+#                     curriculum_json = curriculum_json["r"]
+#         except Exception as e:
+#             print(f"DEBUG: Failed to parse Timetable callback format: {e}", file=sys.stderr)
+
+#     if not curriculum_json:
+#          print("DEBUG: Timetable parsing failed entirely.", file=sys.stderr)
+#          return None
          
-    # Check for error response from server
-    if isinstance(curriculum_json, dict) and "e" in curriculum_json:
-        print(f"DEBUG: Edupage Server Error: {curriculum_json.get('e')}", file=sys.stderr)
-        # We return empty listing to avoid crash, but log it
-        # Actually better to return empty list of lessons/r for the parser
-        return []
+#     # Check for error response from server
+#     if isinstance(curriculum_json, dict) and "e" in curriculum_json:
+#         print(f"DEBUG: Edupage Server Error: {curriculum_json.get('e')}", file=sys.stderr)
+#         # We return empty listing to avoid crash, but log it
+#         # Actually better to return empty list of lessons/r for the parser
+#         return []
 
-    return curriculum_json
+#     return curriculum_json
 
-# Apply Timetable Patch
-print("DEBUG: Applying monkey patch to Timetables._Timetables__get_date_plan", file=sys.stderr)
-Timetables._Timetables__get_date_plan = fixed_get_date_plan
+# Apply monkey patch to Login.login
+print("DEBUG: Applying monkey patch to Login.login", file=sys.stderr)
+Login.login = fixed_login
+
+# DO NOT Apply monkey patch to Timetables. The original implementation uses /gcall and should work if context is switched.
+# print("DEBUG: Applying monkey patch to Timetables._Timetables__get_date_plan", file=sys.stderr)
+# Timetables._Timetables__get_date_plan = fixed_get_date_plan
 
 
 def serialize_lesson(lesson, date_obj):
