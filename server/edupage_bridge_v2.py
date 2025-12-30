@@ -283,122 +283,133 @@ def fixed_get_date_plan(self, date):
     
 # Clean up old implementation completely
 def fixed_get_date_plan(self, date):
-    # This replaces the library's __get_date_plan with a more robust version
-    # that logs errors during gpid/gsh extraction from eb.php
-    
     print(f"DEBUG: fixed_get_date_plan called for {date}", file=sys.stderr)
-    print(f"DEBUG: Current Cookies: {self.edupage.session.cookies.get_dict()}", file=sys.stderr)
     
-    csrf_request_url = (
-        f"https://{self.edupage.subdomain}.edupage.org/dashboard/eb.php?mode=ttday"
-    )
+    # 1. Prepare shared data
+    gsh = getattr(self.edupage, "gsh", "00000000")
+    active_child = getattr(self.edupage, 'active_child_id', None)
     
+    # Try fetching eb.php to refresh GSH or check session? 
+    # (Optional, maybe skipping this speeds things up if we blindly trust cached gsh)
+    # But gcall needs valid gpid.
+    gpid = None
     try:
-        csrf_response = self.edupage.session.get(csrf_request_url)
-        csrf_text = csrf_response.text
-        # Log snippet to identify context (Parent vs Child)
-        print(f"DEBUG: eb.php snippet: {csrf_text[:300].replace(chr(10), ' ')}", file=sys.stderr)
-    except Exception as e:
-        print(f"DEBUG: Failed to fetch eb.php: {e}", file=sys.stderr)
-        return None
-
+        csrf_url = f"https://{self.edupage.subdomain}.edupage.org/dashboard/eb.php?mode=ttday"
+        csrf_resp = self.edupage.session.get(csrf_url)
+        if "gpid=" in csrf_resp.text:
+            gpid = csrf_resp.text.split("gpid=")[1].split("&")[0]
+            if "gsh=" in csrf_resp.text:
+                gsh = csrf_resp.text.split("gsh=")[1].split('"')[0]
+    except:
+        pass
+    
+    # Strategy 1: GCall (The official way)
     try:
-        if "gpid=" not in csrf_text:
-             print(f"DEBUG: 'gpid=' not found in eb.php response. Response start: {csrf_text[:200]}...", file=sys.stderr)
-             # Fallback: Can we guess GPID? Or use a stored one?
-             # For now, maybe try to regex it or fail gracefully.
-             raise ValueError("gpid missing")
-             
-        gpid = csrf_text.split("gpid=")[1].split("&")[0]
-        
-        if "gsh=" in csrf_text:
-            gsh = csrf_text.split("gsh=")[1].split('"')[0]
-        else:
-            gsh = getattr(self.edupage, "gsh", "00000000")
-
-        next_gpid = int(gpid) + 1
-        
-        # Determine correct user ID for payload
-        user_id_param = self.edupage.get_user_id()
-        active_child = getattr(self.edupage, 'active_child_id', None)
-        if active_child:
-            # Assuming format 'Ziak-ID' for students
-            child_num = str(active_child).lstrip('-')
-            user_id_param = f"Ziak-{child_num}"
-            print(f"DEBUG: Using Child User ID: {user_id_param}", file=sys.stderr)
-        else:
-            print(f"DEBUG: Using Standard User ID: {user_id_param}", file=sys.stderr)
-
-        
-        url = f"https://{self.edupage.subdomain}.edupage.org/gcall"
-        
-        # Prepare GCall data
-        gcall_data = {
-            "gpid": str(next_gpid),
-            "gsh": gsh,
-            "action": "loadData",
-            "user": user_id_param,
-            "changes": "{}",
-            "date": date.strftime("%Y-%m-%d"),
-            "dateto": date.strftime("%Y-%m-%d"),
-            "_LJSL": "4096",
-        }
-        
-        # print(f"DEBUG: GCall Payload: {gcall_data}", file=sys.stderr)
-
-        curriculum_response = self.edupage.session.post(
-            url,
-            data=RequestUtil.encode_form_data(gcall_data),
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-        )
-
-        response_start = self.edupage.get_user_id() + '",'
-        response_end = ",["
-        
-        resp_text = curriculum_response.text
-        print(f"DEBUG: GCall Response logic start: {resp_text[:100]}", file=sys.stderr)
-
-        # Flexible parsing attempt
-        try:
-            # Common pattern: UserID",[JSON]
-            if '",[' in resp_text:
-                curriculum_json = resp_text.split('",[', 1)[1].rsplit(']', 1)[0]
-                # Re-add brackets since we split them off? 
-                # wait, split('",[')[1] removes the bracket? No, split delimiter is removed.
-                # If we split by '",[', the '[' is gone.
-                # So we wraps it back in []
-                curriculum_json = '[' + curriculum_json + ']'
-            elif resp_text.strip().startswith('{') or resp_text.strip().startswith('['):
-                curriculum_json = resp_text
-            else:
-                 print(f"DEBUG: Could not identify JSON format in gcall response.", file=sys.stderr)
-                 return None
+        if gpid:
+            next_gpid = int(gpid) + 1
+            user_id_param = f"Ziak-{str(active_child).lstrip('-')}" if active_child else self.edupage.get_user_id()
             
-            data = json.loads(curriculum_json)
-        except Exception as e:
-            print(f"DEBUG: JSON parsing failed: {e}", file=sys.stderr)
-            return None
-
-        dates = data.get("dates")
-
-        # Handle case where dates is None or empty
-        if not dates:
-             print("DEBUG: 'dates' is empty or None in gcall data", file=sys.stderr)
-             return None
-             
-        date_plans = dates.get(date.strftime("%Y-%m-%d"))
-        if date_plans is None:
-            # raise MissingDataException()
-            print(f"DEBUG: No date_plans found for {date}", file=sys.stderr)
-            return None
-
-        return date_plans.get("plan")
-
+            gcall_data = {
+                "gpid": str(next_gpid),
+                "gsh": gsh,
+                "action": "loadData",
+                "user": user_id_param,
+                "changes": "{}",
+                "date": date.strftime("%Y-%m-%d"),
+                "dateto": date.strftime("%Y-%m-%d"),
+                "_LJSL": "4096",
+            }
+            url = f"https://{self.edupage.subdomain}.edupage.org/gcall"
+            resp = self.edupage.session.post(url, data=RequestUtil.encode_form_data(gcall_data), headers={"Content-Type": "application/x-www-form-urlencoded"})
+            
+            if "Insuficient privileg" not in resp.text and ('"r":' in resp.text or '",[' in resp.text):
+                # Try parsing
+                if '",[' in resp.text:
+                     json_str = resp.text.split('",[', 1)[1].rsplit(']', 1)[0]
+                     json_str = '[' + json_str + ']'
+                     data = json.loads(json_str) 
+                     if data.get("dates") and data.get("dates").get(date.strftime("%Y-%m-%d")):
+                         print("DEBUG: GCall success!", file=sys.stderr)
+                         return data.get("dates").get(date.strftime("%Y-%m-%d")).get("plan")
     except Exception as e:
-        print(f"DEBUG: Error in fixed_get_date_plan: {e}", file=sys.stderr)
-        import traceback
-        traceback.print_exc()
-        return None
+        print(f"DEBUG: GCall attempt failed: {e}", file=sys.stderr)
+
+    
+    # Strategy 2: TTViewer (The old way / fallback)
+    # Try with explicit target ID first (since switch_to_child might be flaky)
+    targets_to_try = [active_child, None]
+    
+    for tid in targets_to_try:
+        try:
+            print(f"DEBUG: Trying TTViewer with target={tid}", file=sys.stderr)
+            url = f"https://{self.edupage.subdomain}.edupage.org/timetable/server/ttviewer.js?__func=ttviewer_getTTViewerData"
+            payload = {
+                "__args": [
+                    tid, 
+                    date.year, 
+                    date.month, 
+                    date.day
+                ],
+                "__gsh": gsh
+            }
+            resp = self.edupage.session.post(url, json=payload)
+            if resp.status_code == 200 and "TypeError" not in resp.text:
+                 # Parse TTViewer response
+                 # It might be in eqz format or standard JSON or callback
+                 txt = resp.text
+                 if txt.startswith("eqz:"):
+                     import base64
+                     txt = base64.b64decode(txt[4:]).decode("utf8")
+                 
+                 if "ttviewer_getTTViewerData_res(" in txt:
+                     txt = txt.split("ttviewer_getTTViewerData_res(")[1].rsplit(")", 1)[0]
+                 
+                 data = json.loads(txt)
+                 if "r" in data: data = data["r"]
+                 
+                 # Validate data (check if it has 'ttviewerData' or 'regular')
+                 # TTViewer response structure is different? 
+                 # Usually it returns { "regular": { ... } } or similar?
+                 # Start by blindly returning it if it looks like a list or dict with plan?
+                 # Actually getDatePlan returns a list of lessons.
+                 # TTViewerData returns the whole viewer structure.
+                 # We need to extract lessons from it.
+                 # This is complex. 
+                 # BUT: if ttviewer_getDatePlan failed, maybe we should TRY ttviewer_getDatePlan AGAIN with these targets?
+                 pass
+        except:
+             pass
+
+    # Strategy 3: Retry ttviewer_getDatePlan with fixed targets
+    # (Since earlier failure was 'TypeError', likely due to wrong target type or None)
+    for tid in targets_to_try:
+        print(f"DEBUG: Trying TTViewer.getDatePlan with target={tid}", file=sys.stderr)
+        try:
+            url = f"https://{self.edupage.subdomain}.edupage.org/timetable/server/ttviewer.js?__func=ttviewer_getDatePlan"
+            payload = {
+                "__args": [
+                    tid, 
+                    date.year, 
+                    date.month, 
+                    date.day
+                ],
+                "__gsh": gsh
+            }
+            resp = self.edupage.session.post(url, json=payload)
+            if "TypeError" not in resp.text and '"r":' in resp.text:
+                 txt = resp.text
+                 if "ttviewer_getDatePlan_res(" in txt:
+                     txt = txt.split("ttviewer_getDatePlan_res(")[1].rsplit(")", 1)[0]
+                 data = json.loads(txt)
+                 if "r" in data: 
+                     print("DEBUG: getDatePlan success via fallback!", file=sys.stderr)
+                     return data["r"]
+        except Exception as e:
+            print(f"DEBUG: getDatePlan fallback failed: {e}", file=sys.stderr)
+            
+    print("DEBUG: All strategies failed.", file=sys.stderr)
+    return None
+
 
 # Apply monkey patch to Login.login
 print("DEBUG: Applying monkey patch to Login.login", file=sys.stderr)
