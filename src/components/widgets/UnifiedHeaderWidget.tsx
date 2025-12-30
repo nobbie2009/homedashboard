@@ -157,15 +157,15 @@ export const UnifiedHeaderWidget: React.FC = () => {
         : "grid grid-cols-[auto_1fr_auto]";
 
     return (
-        <div className={`${gridClass} items-center bg-slate-800/60 rounded-xl backdrop-blur-md shadow-lg w-full h-full border border-slate-700 text-white relative overflow-hidden transition-all duration-500`}>
+        <div className={`${gridClass} items-center bg-slate-800/60 rounded-xl backdrop-blur-md shadow-lg w-full h-full border border-slate-700 text-white relative transition-all duration-500`}>
 
             {/* LEFT: Clock */}
-            <div className="flex flex-row items-baseline justify-start pl-8 h-full pt-4">
-                <div className="text-[10rem] font-black tracking-tighter tabular-nums leading-none bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent transform translate-y-[-0.05em]">
+            <div className="flex flex-row items-center justify-start pl-8 h-full">
+                <div className="text-[9rem] font-black tracking-tighter tabular-nums leading-none bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">
                     {format(time, 'HH:mm')}
                 </div>
                 {config.showSeconds && (
-                    <div className="text-6xl text-slate-500 font-mono ml-4 font-medium mb-8">
+                    <div className="text-5xl text-slate-500 font-mono ml-3 font-medium">
                         {format(time, ':ss')}
                     </div>
                 )}
