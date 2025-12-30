@@ -337,22 +337,8 @@ def fixed_get_date_plan(self, date):
     # Attempt 1: Standard JSON
     try:
         curriculum_json = json.loads(response_text)
-        # If it's pure JSON, it might be wrapped in "r"
-        if "r" in curriculum_json:
-             curriculum_json = curriculum_json["r"]
-    except:
-        pass
-
-    # Attempt 2: Callback wrapper removal
-    if not curriculum_json:
-        try:
-            if "ttviewer_getDatePlan_res(" in response_text:
-                temp = response_text.split("ttviewer_getDatePlan_res(")[1]
-                temp = temp.rsplit(")", 1)[0]
-                curriculum_json = json.loads(temp)
-                if "r" in curriculum_json:
-                    curriculum_json = curriculum_json["r"]
-        except Exception as e:
+# Clean up old implementation completely
+def fixed_get_date_plan(self, date):
     # This replaces the library's __get_date_plan with a more robust version
     # that logs errors during gpid/gsh extraction from eb.php
     
