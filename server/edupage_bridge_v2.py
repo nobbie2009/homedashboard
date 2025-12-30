@@ -287,6 +287,7 @@ def fixed_get_date_plan(self, date):
     # that logs errors during gpid/gsh extraction from eb.php
     
     print(f"DEBUG: fixed_get_date_plan called for {date}", file=sys.stderr)
+    print(f"DEBUG: Current Cookies: {self.edupage.session.cookies.get_dict()}", file=sys.stderr)
     
     csrf_request_url = (
         f"https://{self.edupage.subdomain}.edupage.org/dashboard/eb.php?mode=ttday"
@@ -295,6 +296,8 @@ def fixed_get_date_plan(self, date):
     try:
         csrf_response = self.edupage.session.get(csrf_request_url)
         csrf_text = csrf_response.text
+        # Log snippet to identify context (Parent vs Child)
+        print(f"DEBUG: eb.php snippet: {csrf_text[:300].replace(chr(10), ' ')}", file=sys.stderr)
     except Exception as e:
         print(f"DEBUG: Failed to fetch eb.php: {e}", file=sys.stderr)
         return None
