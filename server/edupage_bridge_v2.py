@@ -786,13 +786,39 @@ def fetch_child_data(edupage, child, days_to_fetch):
     # TIMETABLE
     print("DEBUG: Fetching Timetable...", file=sys.stderr)
     lessons = []
+    
+    # Thuringia (Thüringen) School Holidays - hardcoded since API doesn't provide them
+    # Christmas 2025/26: 22.12.2025 - 03.01.2026
+    # Winter 2026: 10.02.2026 - 14.02.2026
+    # Easter 2026: 06.04.2026 - 18.04.2026
+    # TODO: Fetch from external calendar or configure in admin
+    def is_school_holiday(check_date):
+        from datetime import date
+        holidays = [
+            (date(2025, 12, 22), date(2026, 1, 3)),   # Weihnachtsferien 2025/26
+            (date(2026, 2, 10), date(2026, 2, 14)),    # Winterferien 2026
+            (date(2026, 4, 6), date(2026, 4, 18)),     # Osterferien 2026
+        ]
+        d = check_date if isinstance(check_date, date) else check_date.date() if hasattr(check_date, 'date') else check_date
+        for start, end in holidays:
+            if start <= d <= end:
+                return True
+        return False
+    
     try:
         for day in days_to_fetch:
             print(f"DEBUG: Fetching Timetable for {day}...", file=sys.stderr)
+            
+            # Check if it's a school holiday
+            if is_school_holiday(day):
+                print(f"DEBUG: {day} is a school holiday - skipping timetable fetch", file=sys.stderr)
+                continue
+                
             timetable = edupage.get_my_timetable(day)
             
             if timetable is None:
                 continue
+
                 
             # Handle new format (list of dicts from our fixed_get_date_plan)
             if isinstance(timetable, list):
@@ -924,11 +950,17 @@ def fetch_child_data(edupage, child, days_to_fetch):
              # Just log, don't fail
              print(f"DEBUG: switch_to_parent failed: {repr(e)}", file=sys.stderr)
 
+    # Determine className from child name (e.g. "Johanna Jahn, 1b" -> "1b")
+    class_name = ''
+    if ',' in child['name']:
+        class_name = child['name'].split(',')[-1].strip()
+    
     return {
         'studentId': child['id'],
+        'name': child['name'],  # Full name for frontend header
         'firstName': child['name'].split()[0], # Simple parse
         'lastName': " ".join(child['name'].split()[1:]),
-        'className': child.get('class', 'Unknown'), # Extracted earlier or parse from name
+        'className': class_name or child.get('class', 'Unknown'),
         'timetable': lessons,
         'homework': homeworks,
         'grades': grades_data,
