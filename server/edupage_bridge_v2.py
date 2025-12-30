@@ -978,6 +978,45 @@ def fetch_child_data(edupage, child, days_to_fetch):
             
             print(f"DEBUG: Final subject map: {subjects_map}", file=sys.stderr)
             
+            # Find events data (contains max points for each grade)
+            events_map = {}
+            try:
+                udalosti_start = html.find('"vsetkyUdalosti":')
+                if udalosti_start != -1:
+                    brace_start = html.find('[', udalosti_start)
+                    if brace_start != -1:
+                        depth = 0
+                        i = brace_start
+                        while i < len(html) and i < brace_start + 200000:
+                            if html[i] == '[':
+                                depth += 1
+                            elif html[i] == ']':
+                                depth -= 1
+                                if depth == 0:
+                                    try:
+                                        udalosti_arr = json.loads(html[brace_start:i+1])
+                                        for ud in udalosti_arr:
+                                            if isinstance(ud, dict):
+                                                ud_id = str(ud.get('udalostid', ''))
+                                                max_points = ud.get('maxbody')
+                                                grade_type = ud.get('typ_znamky')  # Type of grade
+                                                nazov = ud.get('nazov', '')  # Name/title
+                                                if ud_id:
+                                                    events_map[ud_id] = {
+                                                        'maxbody': max_points,
+                                                        'typ': grade_type,
+                                                        'nazov': nazov
+                                                    }
+                                        print(f"DEBUG: Found {len(events_map)} events with max points", file=sys.stderr)
+                                    except json.JSONDecodeError as e:
+                                        print(f"DEBUG: Failed to parse vsetkyUdalosti: {e}", file=sys.stderr)
+                                    break
+                            i += 1
+                else:
+                    print("DEBUG: vsetkyUdalosti not found in HTML", file=sys.stderr)
+            except Exception as e:
+                print(f"DEBUG: Error extracting vsetkyUdalosti: {e}", file=sys.stderr)
+            
             # Find grades data
             znamky_match = re.search(r'"vsetkyZnamky":\s*\[(.*?)\](?=\s*,\s*"vsetky)', html, re.DOTALL)
             if znamky_match:
@@ -1010,74 +1049,56 @@ def fetch_child_data(edupage, child, days_to_fetch):
                         predmet_id = str(g.get('predmetid', ''))
                         subject_name = subjects_map.get(predmet_id, f"Fach {predmet_id}")
                         
-                        # Get displayed value (can be points or grade)
+                        # Get displayed value (points)
                         value_str = str(g.get('data', ''))
                         datum = g.get('datum', '')[:10] if g.get('datum') else ''
-                        
-                        # Get the actual grade from various fields
-                        znamka = g.get('znamka')  # Direct grade field
-                        zn_hodnotenie = g.get('zn_hodnotenie')  # Alternative grade field
-                        maxbody = g.get('maxbody')  # Max points for percentage calculation
+                        udalost_id = str(g.get('udalostid', ''))
                         
                         # Try to get numeric value for averaging
                         grade_value = None  # Actual grade 1-6
-                        points_value = None  # Points if applicable
+                        points_value = None  # Points achieved
                         max_points = None  # Maximum points
+                        percentage = None  # Percentage achieved
                         
-                        # First try znamka or zn_hodnotenie field
-                        for grade_field in [znamka, zn_hodnotenie]:
-                            if grade_field is not None and grade_value is None:
+                        # Get max points from event
+                        if udalost_id and udalost_id in events_map:
+                            event_data = events_map[udalost_id]
+                            if event_data.get('maxbody'):
                                 try:
-                                    grade_float = float(str(grade_field).replace(',', '.'))
-                                    if 1 <= grade_float <= 6:
-                                        grade_value = grade_float
+                                    max_points = float(str(event_data['maxbody']).replace(',', '.'))
                                 except:
                                     pass
                         
-                        # If no grade field, try to parse from data string
-                        # Format: "28.5 / 30 = 95% → 2" or "2" or "2 (2 F.)"
-                        if grade_value is None:
-                            # Try to find grade after → symbol (most common format)
-                            if '→' in value_str or '->' in value_str:
-                                arrow_parts = value_str.replace('->', '→').split('→')
-                                if len(arrow_parts) > 1:
-                                    try:
-                                        grade_after_arrow = arrow_parts[-1].strip()
-                                        parsed_grade = float(grade_after_arrow.replace(',', '.'))
-                                        if 1 <= parsed_grade <= 6:
-                                            grade_value = parsed_grade
-                                    except:
-                                        pass
+                        # Parse points from data field
+                        try:
+                            points_value = float(value_str.replace(',', '.'))
+                        except:
+                            pass
+                        
+                        # Calculate percentage and grade if we have both points and max
+                        if points_value is not None and max_points is not None and max_points > 0:
+                            percentage = (points_value / max_points) * 100
                             
-                            # Try to extract points from format "X / Y = ..."
-                            if '/' in value_str:
-                                try:
-                                    parts = value_str.split('/')
-                                    points_value = float(parts[0].strip().replace(',', '.'))
-                                    max_part = parts[1].split('=')[0].strip()
-                                    max_points = float(max_part.replace(',', '.'))
-                                except:
-                                    pass
-                            
-                            # Fallback: simple number that's a grade
-                            if grade_value is None:
-                                try:
-                                    clean_val = value_str.split('(')[0].strip()
-                                    clean_val = clean_val.replace(',', '.')
-                                    parsed = float(clean_val)
-                                    if 1 <= parsed <= 6:
-                                        grade_value = parsed
-                                    else:
-                                        points_value = parsed
-                                except:
-                                    pass
+                            # German grading scale (Thüringen standard)
+                            # 100-85%: 1, 84-70%: 2, 69-55%: 3, 54-40%: 4, 39-20%: 5, <20%: 6
+                            if percentage >= 85:
+                                grade_value = 1
+                            elif percentage >= 70:
+                                grade_value = 2
+                            elif percentage >= 55:
+                                grade_value = 3
+                            elif percentage >= 40:
+                                grade_value = 4
+                            elif percentage >= 20:
+                                grade_value = 5
+                            else:
+                                grade_value = 6
                         
-                        # Try maxbody field for max points
-                        if max_points is None and maxbody:
-                            try:
-                                max_points = float(str(maxbody).replace(',', '.'))
-                            except:
-                                pass
+                        # If data is already a grade (1-6), use it directly
+                        if grade_value is None and points_value is not None:
+                            if 1 <= points_value <= 6:
+                                grade_value = points_value
+                                points_value = None  # It's not points, it's a grade
                         
                         if subject_name not in grades_by_subject:
                             grades_by_subject[subject_name] = {
@@ -1087,15 +1108,24 @@ def fetch_child_data(edupage, child, days_to_fetch):
                                 "hasPoints": False
                             }
                         
+                        # Build display value
+                        display_value = value_str
+                        if points_value is not None and max_points is not None and grade_value is not None:
+                            # Format like Edupage: "28.5 / 30 → 2"
+                            display_value = f"{points_value} / {int(max_points)} → {int(grade_value)}"
+                        elif grade_value is not None and points_value is None:
+                            # Simple grade
+                            display_value = str(int(grade_value))
+                        
                         grades_by_subject[subject_name]["grades"].append({
-                            "value": value_str,
+                            "value": display_value,
                             "date": datum,
                             "grade": grade_value  # The actual 1-6 grade
                         })
                         
                         if grade_value is not None:
                             grades_by_subject[subject_name]["gradeValues"].append(grade_value)
-                        if points_value is not None:
+                        if points_value is not None and max_points is not None:
                             grades_by_subject[subject_name]["hasPoints"] = True
                     
                     # Calculate averages and build final structure
