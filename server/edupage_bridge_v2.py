@@ -494,30 +494,54 @@ def fixed_get_date_plan(self, date):
                                                 if 'tables' in dbi:
                                                     tables = dbi['tables']
                                                     print(f"DEBUG: tables type: {type(tables)}", file=sys.stderr)
-                                                    if isinstance(tables, dict):
+                                                    
+                                                    if isinstance(tables, list):
+                                                        print(f"DEBUG: tables is list of {len(tables)} items", file=sys.stderr)
+                                                        # Each item in tables might be a table definition
+                                                        # Log first few items
+                                                        for i, item in enumerate(tables[:5]):
+                                                            if isinstance(item, dict):
+                                                                print(f"DEBUG: tables[{i}] keys: {list(item.keys())[:10]}", file=sys.stderr)
+                                                                # Log id/name if present
+                                                                if 'id' in item:
+                                                                    print(f"DEBUG: tables[{i}]['id']: {item['id']}", file=sys.stderr)
+                                                                if 'data_rows' in item:
+                                                                    rows = item['data_rows']
+                                                                    print(f"DEBUG: tables[{i}]['data_rows'] has {len(rows)} rows", file=sys.stderr)
+                                                                    if rows:
+                                                                        print(f"DEBUG: First row: {str(rows[0])[:200]}", file=sys.stderr)
+                                                            else:
+                                                                print(f"DEBUG: tables[{i}]: {str(item)[:100]}", file=sys.stderr)
+                                                        
+                                                        # Look for cards/lessons table
+                                                        cards_table = None
+                                                        lessons_table = None
+                                                        for t in tables:
+                                                            if isinstance(t, dict):
+                                                                tid = t.get('id', '')
+                                                                if 'cards' in str(tid).lower():
+                                                                    cards_table = t
+                                                                elif 'lessons' in str(tid).lower():
+                                                                    lessons_table = t
+                                                        
+                                                        if cards_table:
+                                                            print(f"DEBUG: Found cards table! Keys: {list(cards_table.keys())}", file=sys.stderr)
+                                                            if 'data_rows' in cards_table:
+                                                                print(f"DEBUG: Cards has {len(cards_table['data_rows'])} rows", file=sys.stderr)
+                                                                return {"_tables": tables, "_tt_num": tt_num, "_cards": cards_table.get('data_rows', [])}
+                                                        
+                                                        if lessons_table:
+                                                            print(f"DEBUG: Found lessons table! Keys: {list(lessons_table.keys())}", file=sys.stderr)
+                                                            if 'data_rows' in lessons_table:
+                                                                return {"_tables": tables, "_tt_num": tt_num, "_lessons": lessons_table.get('data_rows', [])}
+                                                        
+                                                        # Just return all tables
+                                                        print(f"DEBUG: Returning all tables data", file=sys.stderr)
+                                                        return {"_tables": tables, "_tt_num": tt_num}
+                                                    
+                                                    elif isinstance(tables, dict):
                                                         print(f"DEBUG: tables keys: {list(tables.keys())}", file=sys.stderr)
-                                                        
-                                                        # Look for cards, lessons, periods, etc
-                                                        for key in ['cards', 'lessons', 'periods', 'subjects', 'classes']:
-                                                            if key in tables:
-                                                                val = tables[key]
-                                                                if isinstance(val, list):
-                                                                    print(f"DEBUG: tables['{key}'] is list of {len(val)} items", file=sys.stderr)
-                                                                    if val:
-                                                                        print(f"DEBUG: First {key}: {str(val[0])[:200]}", file=sys.stderr)
-                                                                elif isinstance(val, dict):
-                                                                    print(f"DEBUG: tables['{key}'] is dict with {len(val)} keys: {list(val.keys())[:5]}", file=sys.stderr)
-                                                        
-                                                        # Found cards? Return them
-                                                        if 'cards' in tables and tables['cards']:
-                                                            print(f"DEBUG: Found {len(tables['cards'])} cards!", file=sys.stderr)
-                                                            # Return the full tables data - it contains subjects, classes, etc too
-                                                            return {"_tables": tables, "_tt_num": tt_num}
-                                                        
-                                                        # Or lessons?
-                                                        if 'lessons' in tables and tables['lessons']:
-                                                            print(f"DEBUG: Found {len(tables['lessons'])} lessons!", file=sys.stderr)
-                                                            return {"_tables": tables, "_tt_num": tt_num}
+                                                        # ... previous dict handling
                                     else:
                                         print(f"DEBUG: regularttGetData failed: {tt_resp.text[:100]}", file=sys.stderr)
                                 except Exception as e:
