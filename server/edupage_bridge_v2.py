@@ -297,48 +297,7 @@ def fixed_get_date_plan(self, date):
         "__args": [
             target_id, 
             date.year, 
-            date.month, 
-            date.day
-        ],
-        "__gsh": getattr(self.edupage, "gsh", "00000000")
-    }
-    
-    print(f"DEBUG: Timetable Payload: {json.dumps(payload)}", file=sys.stderr)
-    
-    response = self.edupage.session.post(request_url, json=payload)
-    response_text = response.text
-    
-    if 'TypeError' in response_text or 'Cannot re' in response_text:
-        print("DEBUG: Standard getDatePlan failed. Trying ttviewer_getTTViewerData...", file=sys.stderr)
-        # Try 2: Try 'ttviewer_getTTViewerData' with same payload
-        request_url_alt = request_url.replace("ttviewer_getDatePlan", "ttviewer_getTTViewerData")
-        try:
-             response = self.edupage.session.post(request_url_alt, json=payload)
-             response_text = response.text
-             print(f"DEBUG: Fallback response code: {response.status_code}", file=sys.stderr)
-        except Exception as e:
-             print(f"DEBUG: Fallback failed: {e}", file=sys.stderr)
 
-
-    if response.status_code != 200:
-        print(f"DEBUG: Edupage Server Error Status: {response.status_code}", file=sys.stderr)
-
-    
-    if response_text.startswith("eqz:"):
-        import base64
-        print("DEBUG: Timetable response has eqz prefix. Decoding...", file=sys.stderr)
-        json_str = base64.b64decode(response_text[4:]).decode("utf8")
-        response_text = json_str
-    
-    print(f"DEBUG: Timetable raw response start: {response_text[:100]}", file=sys.stderr)
-    
-    curriculum_json = None
-    
-    # Attempt 1: Standard JSON
-    try:
-        curriculum_json = json.loads(response_text)
-# Clean up old implementation completely
-def fixed_get_date_plan(self, date):
     # This replaces the library's __get_date_plan with a more robust version
     # that logs errors during gpid/gsh extraction from eb.php
     
