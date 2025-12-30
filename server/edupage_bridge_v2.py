@@ -990,6 +990,15 @@ def fetch_child_data(edupage, child, days_to_fetch):
                     # Filter for current child
                     child_id = str(edupage.active_child_id) if hasattr(edupage, 'active_child_id') else None
                     print(f"DEBUG: Filtering grades for child_id: {child_id}", file=sys.stderr)
+                    print(f"DEBUG: Total grades in array: {len(all_grades)}", file=sys.stderr)
+                    
+                    # Debug: Print first grade object to see available fields
+                    if all_grades and len(all_grades) > 0:
+                        first_grade = all_grades[0]
+                        print(f"DEBUG: ===== GRADE OBJECT STRUCTURE =====", file=sys.stderr)
+                        print(f"DEBUG: Keys: {list(first_grade.keys())}", file=sys.stderr)
+                        print(f"DEBUG: First grade: {first_grade}", file=sys.stderr)
+                        print(f"DEBUG: ===================================", file=sys.stderr)
                     
                     # Group grades by subject
                     grades_by_subject = {}
