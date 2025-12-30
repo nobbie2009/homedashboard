@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useEdupage } from '../../hooks/useEdupage';
-import { GraduationCap, BookOpen, Clock, AlertCircle, MessageSquare, Trophy, RefreshCw, ChevronRight, ChevronLeft } from 'lucide-react';
+import { GraduationCap, BookOpen, Clock, AlertCircle, MessageSquare, Trophy, RefreshCw, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 
