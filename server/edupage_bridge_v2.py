@@ -411,13 +411,80 @@ def fixed_get_date_plan(self, date):
                 print(f"DEBUG: {func_name} exception: {e}", file=sys.stderr)
         return None
 
-    # Try getDatePlan first (simpler)
-    res = try_ttviewer_func("ttviewer_getDatePlan", unique_targets)
-    if res: return res
-    
-    # Try getTTViewerData (complex)
-    # res = try_ttviewer_func("ttviewer_getTTViewerData", unique_targets)
-    # if res: ... (need parser)
+    # Try getTTViewerData (the only function that exists on this server!)
+    for tid in unique_targets:
+        try:
+            print(f"DEBUG: Trying getTTViewerData with target={tid}", file=sys.stderr)
+            url = f"https://{self.edupage.subdomain}.edupage.org/timetable/server/ttviewer.js?__func=getTTViewerData"
+            payload = {
+                "__args": [tid, date.year, date.month, date.day],
+                "__gsh": gsh
+            }
+            resp = self.edupage.session.post(url, json=payload)
+            
+            if resp.status_code != 200:
+                print(f"DEBUG: getTTViewerData HTTP {resp.status_code}", file=sys.stderr)
+                continue
+                
+            if "TypeError" in resp.text or "Error" in resp.text[:50]:
+                print(f"DEBUG: getTTViewerData error in response: {resp.text[:100]}", file=sys.stderr)
+                continue
+            
+            # Parse response
+            txt = resp.text
+            if txt.startswith("eqz:"):
+                import base64
+                txt = base64.b64decode(txt[4:]).decode("utf8")
+            
+            if "getTTViewerData_res(" in txt:
+                txt = txt.split("getTTViewerData_res(")[1].rsplit(")", 1)[0]
+            
+            data = json.loads(txt)
+            if "r" in data:
+                result = data["r"]
+                print(f"DEBUG: getTTViewerData success! Keys: {list(result.keys()) if isinstance(result, dict) else type(result)}", file=sys.stderr)
+                
+                # Try to extract timetable for specific date
+                date_str = date.strftime("%Y-%m-%d")
+                
+                # Look for 'regular' which often contains timetable data
+                if isinstance(result, dict):
+                    # Log structure for debugging
+                    for key in list(result.keys())[:5]:
+                        print(f"DEBUG: result['{key}'] type: {type(result[key])}", file=sys.stderr)
+                    
+                    # Try various paths to find lessons
+                    # Path 1: result['regular']['periods'] or similar
+                    if 'regular' in result:
+                        regular = result['regular']
+                        if isinstance(regular, dict):
+                            print(f"DEBUG: regular keys: {list(regular.keys())[:10]}", file=sys.stderr)
+                            # Look for date-based data
+                            if date_str in regular:
+                                return regular[date_str]
+                            # Or 'timetable' key
+                            if 'timetable' in regular:
+                                return regular['timetable']
+                    
+                    # Path 2: Direct date key in result
+                    if date_str in result:
+                        return result[date_str]
+                    
+                    # Path 3: 'dates' key
+                    if 'dates' in result:
+                        dates = result['dates']
+                        if date_str in dates:
+                            return dates[date_str].get('plan') if isinstance(dates[date_str], dict) else dates[date_str]
+                    
+                    # If we got data but can't parse specific date, return the whole thing
+                    # The caller might iterate it
+                    print(f"DEBUG: Could not find date {date_str} in response, returning full result", file=sys.stderr)
+                    return result
+                    
+        except Exception as e:
+            print(f"DEBUG: getTTViewerData exception: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
 
     print("DEBUG: All strategies failed.", file=sys.stderr)
     return None
