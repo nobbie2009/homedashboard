@@ -309,15 +309,16 @@ def fixed_get_date_plan(self, date):
     response_text = response.text
     
     if 'TypeError' in response_text or 'Cannot re' in response_text:
-        print("DEBUG: Standard getDatePlan failed. Trying alternative arguments or function...", file=sys.stderr)
-        # Try 1: Pass ID as explicit Integer (again, just to be thorough in this block)
-        # payload['__args'][0] = int(target_id) if target_id else None
-        # response = self.edupage.session.post(request_url, json=payload)
-        
-        # Try 2: Try 'ttviewer_getTTViewerData' ?
-        # request_url_alt = request_url.replace("ttviewer_getDatePlan", "ttviewer_getTTViewerData")
-        # response = self.edupage.session.post(request_url_alt, json=payload)
-        pass
+        print("DEBUG: Standard getDatePlan failed. Trying ttviewer_getTTViewerData...", file=sys.stderr)
+        # Try 2: Try 'ttviewer_getTTViewerData' with same payload
+        request_url_alt = request_url.replace("ttviewer_getDatePlan", "ttviewer_getTTViewerData")
+        try:
+             response = self.edupage.session.post(request_url_alt, json=payload)
+             response_text = response.text
+             print(f"DEBUG: Fallback response code: {response.status_code}", file=sys.stderr)
+        except Exception as e:
+             print(f"DEBUG: Fallback failed: {e}", file=sys.stderr)
+
 
     if response.status_code != 200:
         print(f"DEBUG: Edupage Server Error Status: {response.status_code}", file=sys.stderr)
@@ -524,7 +525,7 @@ def fetch_child_data(edupage, child, days_to_fetch):
              edupage.switch_to_parent()
         except Exception as e:
              # Just log, don't fail
-             print(f"DEBUG: switch_to_parent failed: {e}", file=sys.stderr)
+             print(f"DEBUG: switch_to_parent failed: {repr(e)}", file=sys.stderr)
 
     return {
         'studentId': child['id'],
