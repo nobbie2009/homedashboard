@@ -3,7 +3,8 @@ import json
 import datetime
 from edupage_api import Edupage
 from edupage_api.timetables import Timetables
-from edupage_api.helpers import RequestUtil
+from edupage_api.utils import RequestUtil
+
 from edupage_api.exceptions import BadCredentialsException, CaptchaException
 from edupage_api.login import Login, TwoFactorLogin
 import re
