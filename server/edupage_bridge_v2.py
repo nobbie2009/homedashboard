@@ -498,7 +498,11 @@ def fixed_get_date_plan(self, date):
                                                     if isinstance(tables, list):
                                                         print(f"DEBUG: tables is list of {len(tables)} items", file=sys.stderr)
                                                         # Each item in tables might be a table definition
-                                                        # Log first few items
+                                                        # Log ALL table IDs first
+                                                        all_table_ids = [t.get('id', '?') for t in tables if isinstance(t, dict)]
+                                                        print(f"DEBUG: All table IDs: {all_table_ids}", file=sys.stderr)
+                                                        
+                                                        # Log first few items in detail
                                                         for i, item in enumerate(tables[:5]):
                                                             if isinstance(item, dict):
                                                                 print(f"DEBUG: tables[{i}] keys: {list(item.keys())[:10]}", file=sys.stderr)
