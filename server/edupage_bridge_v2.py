@@ -511,6 +511,16 @@ def fixed_get_date_plan(self, date):
                                                                     print(f"DEBUG: TERMS table has {len(rows)} rows", file=sys.stderr)
                                                                     for tr in rows[:5]:
                                                                         print(f"DEBUG: Term: {str(tr)[:200]}", file=sys.stderr)
+                                                                elif tid == 'weeks':
+                                                                    rows = t.get('data_rows', [])
+                                                                    print(f"DEBUG: WEEKS table has {len(rows)} rows", file=sys.stderr)
+                                                                    for wr in rows[:3]:
+                                                                        print(f"DEBUG: Week: {str(wr)[:250]}", file=sys.stderr)
+                                                                elif tid == 'days':
+                                                                    rows = t.get('data_rows', [])
+                                                                    print(f"DEBUG: DAYS table has {len(rows)} rows", file=sys.stderr)
+                                                                    for dr in rows[:3]:
+                                                                        print(f"DEBUG: Day: {str(dr)[:250]}", file=sys.stderr)
                                                         
                                                         # Log first few items in detail
                                                         for i, item in enumerate(tables[:5]):
