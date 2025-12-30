@@ -851,37 +851,65 @@ def fetch_child_data(edupage, child, days_to_fetch):
         traceback.print_exc()
 
     # HOMEWORK (assignments)
-    # ... (Keep existing HW logic or improve?)
     print("DEBUG: Fetching Homework...", file=sys.stderr)
     homeworks = []
     try:
         if hasattr(edupage, "get_homeworks"):
             hws = edupage.get_homeworks() 
-            for hw in hws:
-                homeworks.append({
-                    "id": getattr(hw, "id", None),
-                    "title": getattr(hw, "title", "Hausaufgabe"),
-                    "subject": getattr(hw, "subject", {}).name if getattr(hw, "subject", None) else "",
-                    "dueDate": getattr(hw, "date", ""),
-                    "isDone": getattr(hw, "is_done", False)
-                })
+            print(f"DEBUG: Found {len(hws) if hws else 0} homework items", file=sys.stderr)
+            for hw in (hws or []):
+                try:
+                    subject_name = ""
+                    if hasattr(hw, "subject") and hw.subject:
+                        subject_name = getattr(hw.subject, "name", str(hw.subject))
+                    
+                    homeworks.append({
+                        "id": str(getattr(hw, "id", "")),
+                        "title": getattr(hw, "title", "") or getattr(hw, "text", "Hausaufgabe"),
+                        "subject": subject_name,
+                        "date": str(getattr(hw, "date", "") or getattr(hw, "due_date", "")),
+                        "done": bool(getattr(hw, "is_done", False))
+                    })
+                except Exception as hw_err:
+                    print(f"DEBUG: Error parsing homework item: {hw_err}", file=sys.stderr)
     except Exception as e:
         print(f"DEBUG: Error fetching homework: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
 
     # GRADES
     print("DEBUG: Fetching Grades...", file=sys.stderr)
     grades_data = []
     try:
-         if hasattr(edupage, "get_grades"):
-             grds = edupage.get_grades()
-             for g in grds:
-                 grades_data.append({
-                     "subject": getattr(g, "subject", {}).name if getattr(g, "subject", None) else "?",
-                     "value": getattr(g, "value", ""),
-                     "date": getattr(g, "date", "")
-                 })
+        if hasattr(edupage, "get_grades"):
+            try:
+                grds = edupage.get_grades()
+                print(f"DEBUG: Found {len(grds) if grds else 0} grade items", file=sys.stderr)
+                for g in (grds or []):
+                    try:
+                        subject_name = "?"
+                        if hasattr(g, "subject") and g.subject:
+                            subject_name = getattr(g.subject, "name", str(g.subject))
+                        
+                        # Handle different grade value formats
+                        value = getattr(g, "value", "") or getattr(g, "grade_value", "")
+                        if not value:
+                            value = getattr(g, "grade_n", "")
+                        
+                        grades_data.append({
+                            "subject": subject_name,
+                            "value": str(value),
+                            "date": str(getattr(g, "date", "") or getattr(g, "event_date", ""))
+                        })
+                    except Exception as g_err:
+                        print(f"DEBUG: Error parsing grade item: {g_err}", file=sys.stderr)
+            except Exception as inner_e:
+                print(f"DEBUG: get_grades() call failed: {inner_e}", file=sys.stderr)
+                import traceback
+                traceback.print_exc(file=sys.stderr)
     except Exception as e:
-        print(f"DEBUG: Error fetching grades: {e}", file=sys.stderr)
+        print(f"DEBUG: Error in grades section: {e}", file=sys.stderr)
+
 
     # MESSAGES
     print("DEBUG: Fetching Messages...", file=sys.stderr)
