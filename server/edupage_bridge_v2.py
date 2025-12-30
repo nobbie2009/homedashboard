@@ -582,9 +582,11 @@ def fixed_get_date_plan(self, date):
                                                                     period = periods_lookup.get(period_id, {})
                                                                     lesson = lessons_lookup.get(lesson_id, {})
                                                                     
-                                                                    # Get subject from lesson
-                                                                    subject_ids = lesson.get('subjectids', [])
-                                                                    subject_id = subject_ids[0] if subject_ids else None
+                                                                    # Get subject from lesson (try both subjectid and subjectids)
+                                                                    subject_id = lesson.get('subjectid')
+                                                                    if not subject_id:
+                                                                        subject_ids = lesson.get('subjectids', [])
+                                                                        subject_id = subject_ids[0] if subject_ids else None
                                                                     subject = subjects_lookup.get(subject_id, {})
                                                                     
                                                                     # Get class from lesson
@@ -652,6 +654,22 @@ Login.login = fixed_login
 
 print("DEBUG: Applying monkey patch to Timetables._Timetables__get_date_plan (Generic GCall)", file=sys.stderr)
 Timetables._Timetables__get_date_plan = fixed_get_date_plan
+
+# Also patch get_my_timetable to handle our list format
+original_get_my_timetable = Timetables.get_my_timetable
+
+def patched_get_my_timetable(self, date):
+    plan = self._Timetables__get_date_plan(date)
+    if plan is None:
+        return None
+    # If plan is already a list (from our custom parsing), return it directly
+    if isinstance(plan, list):
+        return plan
+    # Otherwise use original parsing
+    return self._Timetables__parse_timetable(plan)
+
+Timetables.get_my_timetable = patched_get_my_timetable
+print("DEBUG: Applying monkey patch to Timetables.get_my_timetable", file=sys.stderr)
 
 
 def serialize_lesson(lesson, date_obj):
