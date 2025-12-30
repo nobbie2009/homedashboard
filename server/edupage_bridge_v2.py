@@ -705,11 +705,39 @@ def fetch_child_data(edupage, child, days_to_fetch):
         for day in days_to_fetch:
             print(f"DEBUG: Fetching Timetable for {day}...", file=sys.stderr)
             timetable = edupage.get_my_timetable(day)
-            if timetable:
+            
+            if timetable is None:
+                continue
+                
+            # Handle new format (list of dicts from our fixed_get_date_plan)
+            if isinstance(timetable, list):
+                for l in timetable:
+                    # Already in dict format, just add date
+                    lesson_dict = {
+                        "id": l.get('id', ''),
+                        "startTime": l.get('starttime', ''),
+                        "endTime": l.get('endtime', ''),
+                        "date": day.isoformat(),
+                        "subject": {"name": l.get('subject', 'Unknown'), "short": l.get('subject_short', '')},
+                        "classroom": {"name": l.get('classroom', '')},
+                        "teacher": {"name": l.get('teacher', '')},
+                        "class": {"name": l.get('class', '')}
+                    }
+                    lessons.append(lesson_dict)
+            # Handle old format (Timetable object with .lessons)
+            elif hasattr(timetable, 'lessons'):
                 for l in timetable.lessons:
                     lessons.append(serialize_lesson(l, day))
+            # Handle dict format (raw TTViewer result)
+            elif isinstance(timetable, dict):
+                print(f"DEBUG: Timetable is dict with keys: {list(timetable.keys())}", file=sys.stderr)
+                # Try to extract lessons from various possible structures
+                pass
+                
     except Exception as e:
         print(f"DEBUG: Error fetching timetable for {child['name']}: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
 
     # HOMEWORK (assignments)
     # ... (Keep existing HW logic or improve?)
