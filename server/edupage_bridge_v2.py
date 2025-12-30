@@ -526,9 +526,46 @@ def fixed_get_date_plan(self, date):
                                                         
                                                         if cards_table:
                                                             print(f"DEBUG: Found cards table! Keys: {list(cards_table.keys())}", file=sys.stderr)
-                                                            if 'data_rows' in cards_table:
-                                                                print(f"DEBUG: Cards has {len(cards_table['data_rows'])} rows", file=sys.stderr)
-                                                                return {"_tables": tables, "_tt_num": tt_num, "_cards": cards_table.get('data_rows', [])}
+                                                            cards = cards_table.get('data_rows', [])
+                                                            print(f"DEBUG: Cards has {len(cards)} rows", file=sys.stderr)
+                                                            if cards:
+                                                                # Log first card structure
+                                                                print(f"DEBUG: Sample card: {str(cards[0])[:400]}", file=sys.stderr)
+                                                            
+                                                            # Find periods and subjects tables for lookups
+                                                            periods_lookup = {}
+                                                            subjects_lookup = {}
+                                                            classes_lookup = {}
+                                                            teachers_lookup = {}
+                                                            
+                                                            for t in tables:
+                                                                if isinstance(t, dict):
+                                                                    tid = t.get('id', '')
+                                                                    rows = t.get('data_rows', [])
+                                                                    if tid == 'periods':
+                                                                        for r in rows:
+                                                                            periods_lookup[r.get('id')] = r
+                                                                    elif tid == 'subjects':
+                                                                        for r in rows:
+                                                                            subjects_lookup[r.get('id')] = r
+                                                                    elif tid == 'classes':
+                                                                        for r in rows:
+                                                                            classes_lookup[r.get('id')] = r
+                                                                    elif tid == 'teachers':
+                                                                        for r in rows:
+                                                                            teachers_lookup[r.get('id')] = r
+                                                            
+                                                            print(f"DEBUG: Lookups - periods:{len(periods_lookup)}, subjects:{len(subjects_lookup)}, classes:{len(classes_lookup)}", file=sys.stderr)
+                                                            
+                                                            # Return structured data for transformation
+                                                            return {
+                                                                "_cards": cards,
+                                                                "_periods": periods_lookup,
+                                                                "_subjects": subjects_lookup,
+                                                                "_classes": classes_lookup,
+                                                                "_teachers": teachers_lookup,
+                                                                "_tt_num": tt_num
+                                                            }
                                                         
                                                         if lessons_table:
                                                             print(f"DEBUG: Found lessons table! Keys: {list(lessons_table.keys())}", file=sys.stderr)
