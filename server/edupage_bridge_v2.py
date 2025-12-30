@@ -569,8 +569,16 @@ def fixed_get_date_plan(self, date):
                                                             day_index = date.weekday()  # 0=Monday
                                                             print(f"DEBUG: Looking for day_index={day_index} (date={date})", file=sys.stderr)
                                                             
+                                                            # Get the active child's student ID for filtering
+                                                            active_child = getattr(self.edupage, 'active_child_id', None)
+                                                            # Student IDs in lessons are like '-53', child ID is like '-255'
+                                                            # Convert to string for comparison
+                                                            child_student_id = str(active_child).lstrip('-') if active_child else None
+                                                            print(f"DEBUG: Filtering lessons for student ID: {active_child} (numeric: {child_student_id})", file=sys.stderr)
+                                                            
                                                             # Transform cards to lessons for this date
                                                             result_lessons = []
+                                                            matched_count = 0
                                                             for card in cards:
                                                                 days_str = card.get('days', '00000')
                                                                 # days_str is like '10000' for Monday, '01000' for Tuesday
@@ -579,14 +587,27 @@ def fixed_get_date_plan(self, date):
                                                                     period_id = card.get('period')
                                                                     lesson_id = card.get('lessonid')
                                                                     
-                                                                    period = periods_lookup.get(period_id, {})
                                                                     lesson = lessons_lookup.get(lesson_id, {})
+                                                                    
+                                                                    # Check if this lesson is for our child
+                                                                    student_ids = lesson.get('studentids', [])
+                                                                    # Also check classids - extract child's class from their name if needed
+                                                                    class_ids = lesson.get('classids', [])
+                                                                    
+                                                                    # Filter: only include if child's ID is in studentids
+                                                                    if active_child and student_ids:
+                                                                        # Child IDs are like '-255', studentids are like '-53'
+                                                                        if str(active_child) not in student_ids and f"-{child_student_id}" not in student_ids:
+                                                                            continue  # Skip this lesson, not for this child
+                                                                        matched_count += 1
+                                                                    
+                                                                    period = periods_lookup.get(period_id, {})
                                                                     
                                                                     # Get subject from lesson (try both subjectid and subjectids)
                                                                     subject_id = lesson.get('subjectid')
                                                                     if not subject_id:
-                                                                        subject_ids = lesson.get('subjectids', [])
-                                                                        subject_id = subject_ids[0] if subject_ids else None
+                                                                        subject_ids_list = lesson.get('subjectids', [])
+                                                                        subject_id = subject_ids_list[0] if subject_ids_list else None
                                                                     subject = subjects_lookup.get(subject_id, {})
                                                                     
                                                                     # Get class from lesson
@@ -611,7 +632,7 @@ def fixed_get_date_plan(self, date):
                                                                         'classroom': ', '.join(card.get('classroomids', []))
                                                                     })
                                                             
-                                                            print(f"DEBUG: Found {len(result_lessons)} lessons for {date}", file=sys.stderr)
+                                                            print(f"DEBUG: Found {len(result_lessons)} lessons for {date} (matched {matched_count} by student filter)", file=sys.stderr)
                                                             if result_lessons:
                                                                 print(f"DEBUG: First lesson: {result_lessons[0]}", file=sys.stderr)
                                                             
