@@ -502,6 +502,16 @@ def fixed_get_date_plan(self, date):
                                                         all_table_ids = [t.get('id', '?') for t in tables if isinstance(t, dict)]
                                                         print(f"DEBUG: All table IDs: {all_table_ids}", file=sys.stderr)
                                                         
+                                                        # Check for terms/holidays table
+                                                        for t in tables:
+                                                            if isinstance(t, dict):
+                                                                tid = t.get('id', '')
+                                                                if tid == 'terms':
+                                                                    rows = t.get('data_rows', [])
+                                                                    print(f"DEBUG: TERMS table has {len(rows)} rows", file=sys.stderr)
+                                                                    for tr in rows[:5]:
+                                                                        print(f"DEBUG: Term: {str(tr)[:200]}", file=sys.stderr)
+                                                        
                                                         # Log first few items in detail
                                                         for i, item in enumerate(tables[:5]):
                                                             if isinstance(item, dict):
@@ -622,6 +632,7 @@ def fixed_get_date_plan(self, date):
                                                                     if not is_child_lesson:
                                                                         continue  # Skip this lesson
                                                                     
+                                                                    matched_count += 1
                                                                     period = periods_lookup.get(period_id, {})
                                                                     
                                                                     # Get subject from lesson (try both subjectid and subjectids)
