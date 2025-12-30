@@ -289,9 +289,7 @@ def fixed_get_date_plan(self, date):
     gsh = getattr(self.edupage, "gsh", "00000000")
     active_child = getattr(self.edupage, 'active_child_id', None)
     
-    # Try fetching eb.php to refresh GSH or check session? 
-    # (Optional, maybe skipping this speeds things up if we blindly trust cached gsh)
-    # But gcall needs valid gpid.
+    # Refresh logic omitted for brevity (eb.php check)
     gpid = None
     try:
         csrf_url = f"https://{self.edupage.subdomain}.edupage.org/dashboard/eb.php?mode=ttday"
@@ -303,14 +301,15 @@ def fixed_get_date_plan(self, date):
     except:
         pass
     
-    # Strategy 1: GCall (The official way)
+    # Strategy 1: GCall
     try:
         if gpid:
-            next_gpid = int(gpid) + 1
-            user_id_param = f"Ziak-{str(active_child).lstrip('-')}" if active_child else self.edupage.get_user_id()
+            # Try plain active_child first? No, Ziak format for gcall.
+            child_num = str(active_child).lstrip('-') if active_child else "0"
+            user_id_param = f"Ziak-{child_num}" if active_child else self.edupage.get_user_id()
             
             gcall_data = {
-                "gpid": str(next_gpid),
+                "gpid": str(int(gpid) + 1),
                 "gsh": gsh,
                 "action": "loadData",
                 "user": user_id_param,
@@ -331,82 +330,95 @@ def fixed_get_date_plan(self, date):
                      if data.get("dates") and data.get("dates").get(date.strftime("%Y-%m-%d")):
                          print("DEBUG: GCall success!", file=sys.stderr)
                          return data.get("dates").get(date.strftime("%Y-%m-%d")).get("plan")
+            else:
+                print(f"DEBUG: GCall rejected. Resp: {resp.text[:150]}", file=sys.stderr)
+                
     except Exception as e:
         print(f"DEBUG: GCall attempt failed: {e}", file=sys.stderr)
 
     
-    # Strategy 2: TTViewer (The old way / fallback)
-    # Try with explicit target ID first (since switch_to_child might be flaky)
-    targets_to_try = [active_child, None]
+    # Strategy 2 & 3: TTViewer
+    targets_to_try = []
+    if active_child:
+        targets_to_try.append(active_child) # "-255"
+        targets_to_try.append(str(active_child).lstrip('-')) # "255"
+        targets_to_try.append(int(str(active_child).lstrip('-'))) # 255 (int)
+        targets_to_try.append(f"Ziak-{str(active_child).lstrip('-')}") # "Ziak-255"
+    targets_to_try.append(None)
     
-    for tid in targets_to_try:
-        try:
-            print(f"DEBUG: Trying TTViewer with target={tid}", file=sys.stderr)
-            url = f"https://{self.edupage.subdomain}.edupage.org/timetable/server/ttviewer.js?__func=ttviewer_getTTViewerData"
-            payload = {
-                "__args": [
-                    tid, 
-                    date.year, 
-                    date.month, 
-                    date.day
-                ],
-                "__gsh": gsh
-            }
-            resp = self.edupage.session.post(url, json=payload)
-            if resp.status_code == 200 and "TypeError" not in resp.text:
-                 # Parse TTViewer response
-                 # It might be in eqz format or standard JSON or callback
-                 txt = resp.text
-                 if txt.startswith("eqz:"):
+    # Deduplicate (preserving order)
+    seen = set()
+    unique_targets = []
+    for t in targets_to_try:
+        t_str = str(t)
+        if t_str not in seen:
+            unique_targets.append(t)
+            seen.add(t_str)
+    
+    # Function to try TTViewer
+    def try_ttviewer_func(func_name, targets):
+        for tid in targets:
+            try:
+                print(f"DEBUG: Trying {func_name} with target={tid} (type {type(tid)})", file=sys.stderr)
+                url = f"https://{self.edupage.subdomain}.edupage.org/timetable/server/ttviewer.js?__func={func_name}"
+                payload = {
+                    "__args": [tid, date.year, date.month, date.day],
+                    "__gsh": gsh
+                }
+                resp = self.edupage.session.post(url, json=payload)
+                
+                if resp.status_code != 200:
+                    print(f"DEBUG: {func_name} HTTP {resp.status_code}", file=sys.stderr)
+                    continue
+                    
+                if "TypeError" in resp.text:
+                    print(f"DEBUG: {func_name} TypeError in response", file=sys.stderr)
+                    continue
+                    
+                # Parsing logic
+                txt = resp.text
+                if txt.startswith("eqz:"):
                      import base64
                      txt = base64.b64decode(txt[4:]).decode("utf8")
                  
-                 if "ttviewer_getTTViewerData_res(" in txt:
-                     txt = txt.split("ttviewer_getTTViewerData_res(")[1].rsplit(")", 1)[0]
-                 
-                 data = json.loads(txt)
-                 if "r" in data: data = data["r"]
-                 
-                 # Validate data (check if it has 'ttviewerData' or 'regular')
-                 # TTViewer response structure is different? 
-                 # Usually it returns { "regular": { ... } } or similar?
-                 # Start by blindly returning it if it looks like a list or dict with plan?
-                 # Actually getDatePlan returns a list of lessons.
-                 # TTViewerData returns the whole viewer structure.
-                 # We need to extract lessons from it.
-                 # This is complex. 
-                 # BUT: if ttviewer_getDatePlan failed, maybe we should TRY ttviewer_getDatePlan AGAIN with these targets?
-                 pass
-        except:
-             pass
+                marker = f"{func_name}_res("
+                if marker in txt:
+                     txt = txt.split(marker)[1].rsplit(")", 1)[0]
+                
+                try:
+                    data = json.loads(txt)
+                except:
+                    print(f"DEBUG: {func_name} JSON parse error", file=sys.stderr)
+                    continue
+                    
+                if "r" in data:
+                    res_data = data["r"]
+                    if func_name == "ttviewer_getTTViewerData":
+                         # This returns complex structure. 
+                         # Try regular > timetable > lessons?
+                         pass # Not implemented fully yet, just return success if not empty?
+                         # For now, if it didn't error, assume we might be able to use it?
+                         # But we need to return standardized format.
+                         # Let's skip parsing exacts for getTTViewerData unless we know format.
+                         continue 
+                    elif func_name == "ttviewer_getDatePlan":
+                         print(f"DEBUG: {func_name} success!", file=sys.stderr)
+                         return res_data
+                else:
+                    print(f"DEBUG: {func_name} 'r' missing. Keys: {list(data.keys())}", file=sys.stderr)
 
-    # Strategy 3: Retry ttviewer_getDatePlan with fixed targets
-    # (Since earlier failure was 'TypeError', likely due to wrong target type or None)
-    for tid in targets_to_try:
-        print(f"DEBUG: Trying TTViewer.getDatePlan with target={tid}", file=sys.stderr)
-        try:
-            url = f"https://{self.edupage.subdomain}.edupage.org/timetable/server/ttviewer.js?__func=ttviewer_getDatePlan"
-            payload = {
-                "__args": [
-                    tid, 
-                    date.year, 
-                    date.month, 
-                    date.day
-                ],
-                "__gsh": gsh
-            }
-            resp = self.edupage.session.post(url, json=payload)
-            if "TypeError" not in resp.text and '"r":' in resp.text:
-                 txt = resp.text
-                 if "ttviewer_getDatePlan_res(" in txt:
-                     txt = txt.split("ttviewer_getDatePlan_res(")[1].rsplit(")", 1)[0]
-                 data = json.loads(txt)
-                 if "r" in data: 
-                     print("DEBUG: getDatePlan success via fallback!", file=sys.stderr)
-                     return data["r"]
-        except Exception as e:
-            print(f"DEBUG: getDatePlan fallback failed: {e}", file=sys.stderr)
-            
+            except Exception as e:
+                print(f"DEBUG: {func_name} exception: {e}", file=sys.stderr)
+        return None
+
+    # Try getDatePlan first (simpler)
+    res = try_ttviewer_func("ttviewer_getDatePlan", unique_targets)
+    if res: return res
+    
+    # Try getTTViewerData (complex)
+    # res = try_ttviewer_func("ttviewer_getTTViewerData", unique_targets)
+    # if res: ... (need parser)
+
     print("DEBUG: All strategies failed.", file=sys.stderr)
     return None
 
