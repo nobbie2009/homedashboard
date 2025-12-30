@@ -139,6 +139,51 @@ export const SchoolView: React.FC = () => {
                                     <div className="space-y-4">
                                         {/* Group by Day */}
                                         {(() => {
+                                            // Subject color mapping - similar to Edupage
+                                            const getSubjectColor = (subjectName: string, subjectShort: string): string => {
+                                                const name = subjectName.toLowerCase();
+                                                const short = subjectShort.toLowerCase();
+
+                                                // Deutsch = Red/Purple (like Edupage)
+                                                if (name.includes('deutsch') || short === 'de') {
+                                                    return 'bg-purple-600/60 border-purple-400/50 text-purple-100';
+                                                }
+                                                // Mathematik = Blue
+                                                if (name.includes('mathe') || short === 'ma') {
+                                                    return 'bg-blue-600/60 border-blue-400/50 text-blue-100';
+                                                }
+                                                // Heimat- und Sachkunde = Green
+                                                if (name.includes('heimat') || name.includes('sachkunde') || short === 'hsk' || short === 'hus') {
+                                                    return 'bg-green-600/60 border-green-400/50 text-green-100';
+                                                }
+                                                // Sport = Light Green
+                                                if (name.includes('sport') || short === 'sp') {
+                                                    return 'bg-lime-600/60 border-lime-400/50 text-lime-100';
+                                                }
+                                                // Musik = Orange/Peach
+                                                if (name.includes('musik') || short === 'mu') {
+                                                    return 'bg-orange-500/60 border-orange-400/50 text-orange-100';
+                                                }
+                                                // Kunst/Werken = Pink
+                                                if (name.includes('kunst') || name.includes('werken') || short === 'ku' || short === 'wk') {
+                                                    return 'bg-pink-600/60 border-pink-400/50 text-pink-100';
+                                                }
+                                                // Religion/Ethik = Amber
+                                                if (name.includes('religion') || name.includes('ethik') || short === 'rel' || short === 'eth') {
+                                                    return 'bg-amber-600/60 border-amber-400/50 text-amber-100';
+                                                }
+                                                // Ergänzung = Cyan
+                                                if (name.includes('ergänz') || short === 'erg') {
+                                                    return 'bg-cyan-600/60 border-cyan-400/50 text-cyan-100';
+                                                }
+                                                // Schulgarten = Teal
+                                                if (name.includes('garten') || short === 'sg') {
+                                                    return 'bg-teal-600/60 border-teal-400/50 text-teal-100';
+                                                }
+                                                // Default = Slate
+                                                return 'bg-slate-600/60 border-slate-400/50 text-slate-100';
+                                            };
+
                                             if (student.timetable.length === 0) {
                                                 return (
                                                     <div className="flex flex-col items-center justify-center h-40 text-slate-500">
@@ -165,27 +210,31 @@ export const SchoolView: React.FC = () => {
                                                         {format(new Date(dateKey), 'EEEE, dd.MM.', { locale: de })}
                                                     </h3>
                                                     <div className="space-y-2 pl-2 border-l-2 border-slate-700/50">
-                                                        {groupedLessons[dateKey].map((lesson) => (
-                                                            <div key={lesson.id} className="flex items-center bg-slate-700/40 p-2 rounded-lg border border-slate-600/30 hover:border-slate-500/50 transition">
-                                                                <div className="w-14 text-center border-r border-slate-600/50 pr-2 mr-3 flex flex-col justify-center">
-                                                                    <div className="text-white font-bold text-sm leading-none">{lesson.startTime}</div>
-                                                                    <div className="text-[10px] text-slate-400 mt-1">{lesson.endTime}</div>
-                                                                </div>
-                                                                <div className="flex-1">
-                                                                    <div className="font-semibold text-blue-200 text-sm mb-0.5">{lesson.subject.name}</div>
-                                                                    <div className="text-[11px] text-slate-400 flex justify-between items-center">
-                                                                        <span className="bg-slate-800/50 px-1.5 py-0.5 rounded">{lesson.classroom?.name}</span>
-                                                                        <span className="italic opacity-75">{lesson.teacher?.name}</span>
+                                                        {groupedLessons[dateKey].map((lesson) => {
+                                                            const subjectColor = getSubjectColor(lesson.subject.name, lesson.subject.short);
+                                                            return (
+                                                                <div key={lesson.id} className={`flex items-center p-2 rounded-lg border transition ${subjectColor}`}>
+                                                                    <div className="w-14 text-center border-r border-white/20 pr-2 mr-3 flex flex-col justify-center">
+                                                                        <div className="font-bold text-sm leading-none">{lesson.startTime}</div>
+                                                                        <div className="text-[10px] opacity-70 mt-1">{lesson.endTime}</div>
+                                                                    </div>
+                                                                    <div className="flex-1">
+                                                                        <div className="font-bold text-sm mb-0.5">{lesson.subject.name}</div>
+                                                                        <div className="text-[11px] opacity-80 flex justify-between items-center">
+                                                                            <span className="bg-black/20 px-1.5 py-0.5 rounded">{lesson.classroom?.name}</span>
+                                                                            <span className="italic">{lesson.teacher?.name}</span>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
-                                                            </div>
-                                                        ))}
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
                                             ));
                                         })()}
                                     </div>
                                 )}
+
 
                                 {/* HOMEWORK */}
                                 {currentTab === 'homework' && (
