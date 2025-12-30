@@ -444,42 +444,69 @@ def fixed_get_date_plan(self, date):
                 result = data["r"]
                 print(f"DEBUG: getTTViewerData success! Keys: {list(result.keys()) if isinstance(result, dict) else type(result)}", file=sys.stderr)
                 
-                # Try to extract timetable for specific date
-                date_str = date.strftime("%Y-%m-%d")
+                if isinstance(result, dict) and 'regular' in result:
+                    regular = result['regular']
+                    print(f"DEBUG: regular keys: {list(regular.keys()) if isinstance(regular, dict) else type(regular)}", file=sys.stderr)
+                    
+                    if 'timetables' in regular:
+                        timetables = regular['timetables']
+                        print(f"DEBUG: timetables type: {type(timetables)}", file=sys.stderr)
+                        
+                        if isinstance(timetables, dict):
+                            print(f"DEBUG: timetables keys: {list(timetables.keys())[:10]}", file=sys.stderr)
+                            # Often timetables is a dict with numeric keys (timetable IDs)
+                            # or date keys
+                            
+                            # Check first key's structure
+                            if timetables:
+                                first_key = list(timetables.keys())[0]
+                                first_val = timetables[first_key]
+                                print(f"DEBUG: timetables['{first_key}'] type: {type(first_val)}", file=sys.stderr)
+                                if isinstance(first_val, dict):
+                                    print(f"DEBUG: timetables['{first_key}'] keys: {list(first_val.keys())[:10]}", file=sys.stderr)
+                                    
+                                    # Look for 'dates' or specific date or 'lessons'
+                                    if 'dates' in first_val:
+                                        dates_data = first_val['dates']
+                                        date_str = date.strftime("%Y-%m-%d")
+                                        if date_str in dates_data:
+                                            plan = dates_data[date_str]
+                                            if isinstance(plan, dict) and 'plan' in plan:
+                                                print("DEBUG: Found plan data!", file=sys.stderr)
+                                                return plan['plan']
+                                            return plan
+                                        # Try all dates in timetables
+                                        print(f"DEBUG: Available dates: {list(dates_data.keys())[:5]}", file=sys.stderr)
+                                    
+                                    # Check 'lessons' directly?
+                                    if 'lessons' in first_val:
+                                        print(f"DEBUG: Found 'lessons' key directly", file=sys.stderr)
+                                        return first_val['lessons']
+                        
+                        elif isinstance(timetables, list):
+                            print(f"DEBUG: timetables is list of {len(timetables)} items", file=sys.stderr)
+                            if timetables:
+                                print(f"DEBUG: first item: {str(timetables[0])[:200]}", file=sys.stderr)
+                    
+                    # Also check 'current' which might have today's/current data
+                    if 'current' in result:
+                        current = result['current']
+                        print(f"DEBUG: current keys: {list(current.keys()) if isinstance(current, dict) else type(current)}", file=sys.stderr)
+                        if isinstance(current, dict):
+                            # Look for lessons here too
+                            if 'lessons' in current:
+                                return current['lessons']
+                            # Or 'plan'
+                            if 'plan' in current:
+                                return current['plan']
+                            # Full current might have what we need (log first few keys' values)
+                            for k in list(current.keys())[:3]:
+                                print(f"DEBUG: current['{k}']: {str(current[k])[:100]}", file=sys.stderr)
                 
-                # Look for 'regular' which often contains timetable data
-                if isinstance(result, dict):
-                    # Log structure for debugging
-                    for key in list(result.keys())[:5]:
-                        print(f"DEBUG: result['{key}'] type: {type(result[key])}", file=sys.stderr)
-                    
-                    # Try various paths to find lessons
-                    # Path 1: result['regular']['periods'] or similar
-                    if 'regular' in result:
-                        regular = result['regular']
-                        if isinstance(regular, dict):
-                            print(f"DEBUG: regular keys: {list(regular.keys())[:10]}", file=sys.stderr)
-                            # Look for date-based data
-                            if date_str in regular:
-                                return regular[date_str]
-                            # Or 'timetable' key
-                            if 'timetable' in regular:
-                                return regular['timetable']
-                    
-                    # Path 2: Direct date key in result
-                    if date_str in result:
-                        return result[date_str]
-                    
-                    # Path 3: 'dates' key
-                    if 'dates' in result:
-                        dates = result['dates']
-                        if date_str in dates:
-                            return dates[date_str].get('plan') if isinstance(dates[date_str], dict) else dates[date_str]
-                    
-                    # If we got data but can't parse specific date, return the whole thing
-                    # The caller might iterate it
-                    print(f"DEBUG: Could not find date {date_str} in response, returning full result", file=sys.stderr)
-                    return result
+                # Return full result for now so we can see what caller does with it
+                # But mark it so we know it's raw data
+                print(f"DEBUG: Returning raw TTViewer result", file=sys.stderr)
+                return {"_raw_ttviewer": result}
                     
         except Exception as e:
             print(f"DEBUG: getTTViewerData exception: {e}", file=sys.stderr)
