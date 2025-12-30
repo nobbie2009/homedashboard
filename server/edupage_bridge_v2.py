@@ -484,26 +484,40 @@ def fixed_get_date_plan(self, date):
                                         tt_data = json.loads(tt_txt)
                                         if "r" in tt_data:
                                             tt_result = tt_data["r"]
-                                            print(f"DEBUG: regularttGetData success! Keys: {list(tt_result.keys()) if isinstance(tt_result, dict) else type(tt_result)}", file=sys.stderr)
-                                            # This should contain actual lessons!
-                                            if isinstance(tt_result, dict):
-                                                for k in list(tt_result.keys())[:5]:
-                                                    val = tt_result[k]
-                                                    if isinstance(val, dict):
-                                                        print(f"DEBUG: tt_result['{k}'] keys: {list(val.keys())[:5]}", file=sys.stderr)
-                                                    elif isinstance(val, list):
-                                                        print(f"DEBUG: tt_result['{k}'] is list of {len(val)} items", file=sys.stderr)
-                                                    else:
-                                                        print(f"DEBUG: tt_result['{k}']: {str(val)[:100]}", file=sys.stderr)
+                                            print(f"DEBUG: regularttGetData success! Keys: {list(tt_result.keys())}", file=sys.stderr)
+                                            
+                                            # Explore dbiAccessorRes structure
+                                            if 'dbiAccessorRes' in tt_result:
+                                                dbi = tt_result['dbiAccessorRes']
+                                                print(f"DEBUG: dbiAccessorRes keys: {list(dbi.keys())}", file=sys.stderr)
                                                 
-                                                # Look for lessons/cards
-                                                if 'cards' in tt_result:
-                                                    cards = tt_result['cards']
-                                                    print(f"DEBUG: Found 'cards' with {len(cards)} items", file=sys.stderr)
-                                                    if cards:
-                                                        print(f"DEBUG: First card: {str(cards[0] if isinstance(cards, list) else list(cards.values())[0])[:200]}", file=sys.stderr)
-                                                    # Cards typically contain lesson info
-                                                    return tt_result  # Return full data for now
+                                                if 'tables' in dbi:
+                                                    tables = dbi['tables']
+                                                    print(f"DEBUG: tables type: {type(tables)}", file=sys.stderr)
+                                                    if isinstance(tables, dict):
+                                                        print(f"DEBUG: tables keys: {list(tables.keys())}", file=sys.stderr)
+                                                        
+                                                        # Look for cards, lessons, periods, etc
+                                                        for key in ['cards', 'lessons', 'periods', 'subjects', 'classes']:
+                                                            if key in tables:
+                                                                val = tables[key]
+                                                                if isinstance(val, list):
+                                                                    print(f"DEBUG: tables['{key}'] is list of {len(val)} items", file=sys.stderr)
+                                                                    if val:
+                                                                        print(f"DEBUG: First {key}: {str(val[0])[:200]}", file=sys.stderr)
+                                                                elif isinstance(val, dict):
+                                                                    print(f"DEBUG: tables['{key}'] is dict with {len(val)} keys: {list(val.keys())[:5]}", file=sys.stderr)
+                                                        
+                                                        # Found cards? Return them
+                                                        if 'cards' in tables and tables['cards']:
+                                                            print(f"DEBUG: Found {len(tables['cards'])} cards!", file=sys.stderr)
+                                                            # Return the full tables data - it contains subjects, classes, etc too
+                                                            return {"_tables": tables, "_tt_num": tt_num}
+                                                        
+                                                        # Or lessons?
+                                                        if 'lessons' in tables and tables['lessons']:
+                                                            print(f"DEBUG: Found {len(tables['lessons'])} lessons!", file=sys.stderr)
+                                                            return {"_tables": tables, "_tt_num": tt_num}
                                     else:
                                         print(f"DEBUG: regularttGetData failed: {tt_resp.text[:100]}", file=sys.stderr)
                                 except Exception as e:
