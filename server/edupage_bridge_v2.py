@@ -278,26 +278,8 @@ def fixed_get_date_plan(self, date):
     request_url = f"https://{self.edupage.subdomain}.edupage.org/timetable/server/ttviewer.js?__func=ttviewer_getDatePlan"
     today_date = datetime.date.today()
     
-    # We need to construct parameters carefully as per original library but fix the parsing
-    
-    # Determine the student/child ID to fetch for.
-    # If self.edupage has 'selected_child', use it. 
-    # Otherwise use None (which means 'me' / parent, which fails for timetable).
-    
-    # If using switch_to_child, target_id should likely be None (implied by session)
-    # So we prefer None if selected_child is not set or if we trust switch_to_child.
-    target_id = getattr(self.edupage, "selected_child", None)
-    
-    # Check if target_id is effectively the same as current user? 
-    # For now, let's allow it to be None.
-    
-    print(f"DEBUG: Fetching timetable for target_id: {target_id} (type: {type(target_id)})", file=sys.stderr)
-
-    payload = {
-        "__args": [
-            target_id, 
-            date.year, 
-
+# Clean up old implementation completely
+def fixed_get_date_plan(self, date):
     # This replaces the library's __get_date_plan with a more robust version
     # that logs errors during gpid/gsh extraction from eb.php
     
