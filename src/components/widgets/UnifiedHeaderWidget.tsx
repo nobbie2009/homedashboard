@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { Cloud, CloudRain, Sun, CloudSnow } from 'lucide-react';
+import { Cloud, CloudRain, Sun, CloudSnow, Sunrise, Sunset } from 'lucide-react';
 import { useConfig } from '../../contexts/ConfigContext';
 
 // --- Weather Types & Helper ---
@@ -16,6 +16,8 @@ interface WeatherData {
         tempMin: number;
         code: number;
     }[];
+    sunrise?: string;
+    sunset?: string;
 }
 
 const getWeatherIcon = (code: number, className?: string) => {
@@ -66,9 +68,9 @@ export const UnifiedHeaderWidget: React.FC = () => {
 
                 const { latitude, longitude } = geoData.results[0];
 
-                // 2. Forecast (OpenMeteo)
+                // 2. Forecast (OpenMeteo) - now including sunrise/sunset
                 const weatherRes = await fetch(
-                    `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`
+                    `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&timezone=auto`
                 );
                 const data = await weatherRes.json();
 
@@ -79,12 +81,18 @@ export const UnifiedHeaderWidget: React.FC = () => {
                     code: data.daily.weather_code[i]
                 }));
 
+                // Extract sunrise/sunset for today (first entry)
+                const sunriseTime = data.daily.sunrise?.[0] ? format(new Date(data.daily.sunrise[0]), 'HH:mm') : undefined;
+                const sunsetTime = data.daily.sunset?.[0] ? format(new Date(data.daily.sunset[0]), 'HH:mm') : undefined;
+
                 setWeather({
                     current: {
                         temp: Math.round(data.current.temperature_2m),
                         code: data.current.weather_code
                     },
-                    forecast
+                    forecast,
+                    sunrise: sunriseTime,
+                    sunset: sunsetTime
                 });
 
                 // 3. Alerts (Brightsky / DWD)
@@ -143,9 +151,10 @@ export const UnifiedHeaderWidget: React.FC = () => {
     // Grid config: 3 columns normally, 4 if alerts exist (Clock | Weather | Alerts | Date)
     // Or adjust the middle section to split. Let's try flexible grid.
     const hasAlerts = filteredAlerts.length > 0;
+    // Wider columns to prevent text cutoff
     const gridClass = hasAlerts
-        ? "grid grid-cols-[1fr_1.3fr_1.3fr_1fr]"
-        : "grid grid-cols-3";
+        ? "grid grid-cols-[auto_1fr_minmax(280px,1.5fr)_auto]"
+        : "grid grid-cols-[auto_1fr_auto]";
 
     return (
         <div className={`${gridClass} items-center bg-slate-800/60 rounded-xl backdrop-blur-md shadow-lg w-full h-full border border-slate-700 text-white relative overflow-hidden transition-all duration-500`}>
@@ -222,7 +231,7 @@ export const UnifiedHeaderWidget: React.FC = () => {
                 </div>
             )}
 
-            {/* RIGHT: Date */}
+            {/* RIGHT: Date + Sunrise/Sunset */}
             <div className="flex flex-col items-end justify-center pr-8 h-full">
                 <div className="text-5xl font-bold text-blue-400 uppercase tracking-wide">
                     {format(time, 'EEEE', { locale: de })}
@@ -230,8 +239,22 @@ export const UnifiedHeaderWidget: React.FC = () => {
                 <div className="text-4xl text-slate-200 font-light mt-1">
                     {format(time, 'd. MMMM', { locale: de })}
                 </div>
-                <div className="text-slate-500 mt-2 font-medium text-lg">
-                    KW {format(time, 'w', { locale: de })}
+                <div className="flex items-center gap-4 mt-2">
+                    <span className="text-slate-500 font-medium text-lg">
+                        KW {format(time, 'w', { locale: de })}
+                    </span>
+                    {weather?.sunrise && weather?.sunset && (
+                        <div className="flex items-center gap-3 text-sm">
+                            <span className="flex items-center gap-1 text-orange-400">
+                                <Sunrise className="w-4 h-4" />
+                                {weather.sunrise}
+                            </span>
+                            <span className="flex items-center gap-1 text-indigo-400">
+                                <Sunset className="w-4 h-4" />
+                                {weather.sunset}
+                            </span>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
