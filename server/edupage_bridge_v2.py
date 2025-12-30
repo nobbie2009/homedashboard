@@ -892,31 +892,59 @@ def fetch_child_data(edupage, child, days_to_fetch):
             import re
             import json
             
-            # Find subjects data - try multiple patterns
+            # Debug: Save HTML to file for analysis
+            debug_file = "/tmp/edupage_znamky_debug.html"
+            try:
+                with open(debug_file, "w", encoding="utf-8") as f:
+                    f.write(html)
+                print(f"DEBUG: Saved HTML to {debug_file}", file=sys.stderr)
+            except:
+                pass
+            
+            # Find subjects data - look for vsetkyPredmety JSON object
             subjects_map = {}
             
-            # Pattern 1: Look for "predmety" object with subject definitions
-            # Format: "-1": {"p_meno": "Deutsch", ...}
-            predmety_pattern = r'"(-?\d+)":\s*\{\s*[^}]*"p_meno":\s*"([^"]+)"[^}]*\}'
-            for match in re.finditer(predmety_pattern, html):
-                subjects_map[match.group(1)] = match.group(2)
+            # Try to find the vsetkyPredmety object and parse it as JSON
+            # Format in HTML: "vsetkyPredmety": {"-1": {"p_meno": "Deutsch", ...}, "-2": {...}}
+            try:
+                # Find the complete vsetkyPredmety object
+                predmety_start = html.find('"vsetkyPredmety":')
+                if predmety_start != -1:
+                    # Find opening brace
+                    brace_start = html.find('{', predmety_start)
+                    if brace_start != -1:
+                        # Count braces to find the end
+                        depth = 0
+                        i = brace_start
+                        while i < len(html):
+                            if html[i] == '{':
+                                depth += 1
+                            elif html[i] == '}':
+                                depth -= 1
+                                if depth == 0:
+                                    predmety_json = html[brace_start:i+1]
+                                    try:
+                                        predmety_obj = json.loads(predmety_json)
+                                        for pid, pdata in predmety_obj.items():
+                                            if isinstance(pdata, dict) and 'p_meno' in pdata:
+                                                subjects_map[pid] = pdata['p_meno']
+                                        print(f"DEBUG: Parsed vsetkyPredmety, found {len(subjects_map)} subjects", file=sys.stderr)
+                                    except json.JSONDecodeError as e:
+                                        print(f"DEBUG: Failed to parse vsetkyPredmety JSON: {e}", file=sys.stderr)
+                                    break
+                            i += 1
+            except Exception as e:
+                print(f"DEBUG: Error extracting vsetkyPredmety: {e}", file=sys.stderr)
             
-            # Pattern 2: Look for predmetid with nazov in different format
+            # Fallback: Try regex if JSON parsing failed
             if not subjects_map:
-                alt_pattern = r'"predmetid":\s*"?(-?\d+)"?[^}]*"nazov":\s*"([^"]+)"'
-                for match in re.finditer(alt_pattern, html):
+                # Look for pattern: "PredmetID": "-1"... followed by "p_meno": "Deutsch"
+                pattern = r'"(-?\d+)":\s*\{[^{}]*"p_meno":\s*"([^"]+)"'
+                for match in re.finditer(pattern, html):
                     subjects_map[match.group(1)] = match.group(2)
+                print(f"DEBUG: Regex fallback found {len(subjects_map)} subjects", file=sys.stderr)
             
-            # Pattern 3: Look in vsetkyPredmety section specifically
-            if not subjects_map:
-                predmety_section = re.search(r'"vsetkyPredmety":\s*\{([^}]+(?:\{[^}]*\}[^}]*)*)\}', html, re.DOTALL)
-                if predmety_section:
-                    section_str = predmety_section.group(1)
-                    name_pattern = r'"(-?\d+)":\s*\{[^}]*"p_meno":\s*"([^"]+)"'
-                    for match in re.finditer(name_pattern, section_str):
-                        subjects_map[match.group(1)] = match.group(2)
-            
-            print(f"DEBUG: Found {len(subjects_map)} subjects in map: {subjects_map}", file=sys.stderr)
+            print(f"DEBUG: Subject map: {subjects_map}", file=sys.stderr)
             
             # Find grades data
             znamky_match = re.search(r'"vsetkyZnamky":\s*\[(.*?)\](?=\s*,\s*"vsetky)', html, re.DOTALL)
