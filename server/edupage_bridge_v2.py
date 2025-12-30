@@ -311,11 +311,21 @@ def fixed_get_date_plan(self, date):
         if "gsh=" in csrf_text:
             gsh = csrf_text.split("gsh=")[1].split('"')[0]
         else:
-            # Fallback to instance GSH if available
             gsh = getattr(self.edupage, "gsh", "00000000")
-            print(f"DEBUG: 'gsh=' not found in eb.php, using instance gsh: {gsh}", file=sys.stderr)
 
         next_gpid = int(gpid) + 1
+        
+        # Determine correct user ID for payload
+        user_id_param = self.edupage.get_user_id()
+        active_child = getattr(self.edupage, 'active_child_id', None)
+        if active_child:
+            # Assuming format 'Ziak-ID' for students
+            child_num = str(active_child).lstrip('-')
+            user_id_param = f"Ziak-{child_num}"
+            print(f"DEBUG: Using Child User ID: {user_id_param}", file=sys.stderr)
+        else:
+            print(f"DEBUG: Using Standard User ID: {user_id_param}", file=sys.stderr)
+
         
         url = f"https://{self.edupage.subdomain}.edupage.org/gcall"
         
@@ -324,7 +334,7 @@ def fixed_get_date_plan(self, date):
             "gpid": str(next_gpid),
             "gsh": gsh,
             "action": "loadData",
-            "user": self.edupage.get_user_id(),
+            "user": user_id_param,
             "changes": "{}",
             "date": date.strftime("%Y-%m-%d"),
             "dateto": date.strftime("%Y-%m-%d"),
@@ -418,6 +428,9 @@ def serialize_lesson(lesson, date_obj):
 def fetch_child_data(edupage, child, days_to_fetch):
     print(f"DEBUG: --- Fetching data for {child['name']} ({child['id']}) ---", file=sys.stderr)
     
+    # Store active child ID for fixed_get_date_plan payload construction
+    edupage.active_child_id = child['id']
+
     # Do NOT set selected_child manually if using switch_to_child, 
     # to allow get_date_plan to see it as None and trigger "my timetable" logic on server?
     # edupage.selected_child = child['id'] 
