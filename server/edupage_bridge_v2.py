@@ -1005,34 +1005,68 @@ def fetch_child_data(edupage, child, days_to_fetch):
                         value_str = str(g.get('data', ''))
                         datum = g.get('datum', '')[:10] if g.get('datum') else ''
                         
-                        # Get the actual grade (znamka field contains 1-6 grade)
-                        # This is the key field for German grades!
-                        znamka = g.get('znamka')  # This is the actual school grade 1-6
+                        # Get the actual grade from various fields
+                        znamka = g.get('znamka')  # Direct grade field
+                        zn_hodnotenie = g.get('zn_hodnotenie')  # Alternative grade field
+                        maxbody = g.get('maxbody')  # Max points for percentage calculation
                         
                         # Try to get numeric value for averaging
                         grade_value = None  # Actual grade 1-6
                         points_value = None  # Points if applicable
+                        max_points = None  # Maximum points
                         
-                        # First try znamka field (most reliable for grades)
-                        if znamka is not None:
-                            try:
-                                znamka_float = float(str(znamka).replace(',', '.'))
-                                if 1 <= znamka_float <= 6:
-                                    grade_value = znamka_float
-                            except:
-                                pass
+                        # First try znamka or zn_hodnotenie field
+                        for grade_field in [znamka, zn_hodnotenie]:
+                            if grade_field is not None and grade_value is None:
+                                try:
+                                    grade_float = float(str(grade_field).replace(',', '.'))
+                                    if 1 <= grade_float <= 6:
+                                        grade_value = grade_float
+                                except:
+                                    pass
                         
-                        # If no znamka, try to parse from data field
+                        # If no grade field, try to parse from data string
+                        # Format: "28.5 / 30 = 95% → 2" or "2" or "2 (2 F.)"
                         if grade_value is None:
+                            # Try to find grade after → symbol (most common format)
+                            if '→' in value_str or '->' in value_str:
+                                arrow_parts = value_str.replace('->', '→').split('→')
+                                if len(arrow_parts) > 1:
+                                    try:
+                                        grade_after_arrow = arrow_parts[-1].strip()
+                                        parsed_grade = float(grade_after_arrow.replace(',', '.'))
+                                        if 1 <= parsed_grade <= 6:
+                                            grade_value = parsed_grade
+                                    except:
+                                        pass
+                            
+                            # Try to extract points from format "X / Y = ..."
+                            if '/' in value_str:
+                                try:
+                                    parts = value_str.split('/')
+                                    points_value = float(parts[0].strip().replace(',', '.'))
+                                    max_part = parts[1].split('=')[0].strip()
+                                    max_points = float(max_part.replace(',', '.'))
+                                except:
+                                    pass
+                            
+                            # Fallback: simple number that's a grade
+                            if grade_value is None:
+                                try:
+                                    clean_val = value_str.split('(')[0].strip()
+                                    clean_val = clean_val.replace(',', '.')
+                                    parsed = float(clean_val)
+                                    if 1 <= parsed <= 6:
+                                        grade_value = parsed
+                                    else:
+                                        points_value = parsed
+                                except:
+                                    pass
+                        
+                        # Try maxbody field for max points
+                        if max_points is None and maxbody:
                             try:
-                                # Format can be: "2", "2 (2 F.)", "28.5 / 30 = 95% → 1"
-                                clean_val = value_str.split('/')[0].split('(')[0].split('→')[0].strip()
-                                clean_val = clean_val.replace(',', '.')
-                                parsed = float(clean_val)
-                                if 1 <= parsed <= 6:
-                                    grade_value = parsed
-                                else:
-                                    points_value = parsed
+                                max_points = float(str(maxbody).replace(',', '.'))
                             except:
                                 pass
                         
