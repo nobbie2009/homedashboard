@@ -931,20 +931,52 @@ def fetch_child_data(edupage, child, days_to_fetch):
                                         print(f"DEBUG: Parsed vsetkyPredmety, found {len(subjects_map)} subjects", file=sys.stderr)
                                     except json.JSONDecodeError as e:
                                         print(f"DEBUG: Failed to parse vsetkyPredmety JSON: {e}", file=sys.stderr)
+                                        # Print first 500 chars for debugging
+                                        print(f"DEBUG: JSON snippet: {predmety_json[:500]}", file=sys.stderr)
                                     break
                             i += 1
+                else:
+                    print("DEBUG: vsetkyPredmety not found in HTML", file=sys.stderr)
             except Exception as e:
                 print(f"DEBUG: Error extracting vsetkyPredmety: {e}", file=sys.stderr)
             
-            # Fallback: Try regex if JSON parsing failed
+            # Fallback 1: Try to find predmety in different format
             if not subjects_map:
-                # Look for pattern: "PredmetID": "-1"... followed by "p_meno": "Deutsch"
-                pattern = r'"(-?\d+)":\s*\{[^{}]*"p_meno":\s*"([^"]+)"'
+                # Look for "predmety": {...} format
+                predmety_alt = html.find('"predmety":')
+                if predmety_alt != -1:
+                    print(f"DEBUG: Found 'predmety' at position {predmety_alt}", file=sys.stderr)
+                    brace_start = html.find('{', predmety_alt)
+                    if brace_start != -1:
+                        depth = 0
+                        i = brace_start
+                        while i < len(html) and i < brace_start + 50000:  # Limit search
+                            if html[i] == '{':
+                                depth += 1
+                            elif html[i] == '}':
+                                depth -= 1
+                                if depth == 0:
+                                    try:
+                                        predmety_obj = json.loads(html[brace_start:i+1])
+                                        for pid, pdata in predmety_obj.items():
+                                            if isinstance(pdata, dict):
+                                                name = pdata.get('p_meno') or pdata.get('nazov') or pdata.get('name')
+                                                if name:
+                                                    subjects_map[pid] = name
+                                        print(f"DEBUG: Alt predmety found {len(subjects_map)} subjects", file=sys.stderr)
+                                    except:
+                                        pass
+                                    break
+                            i += 1
+            
+            # Fallback 2: Regex for p_meno or nazov
+            if not subjects_map:
+                pattern = r'"(-?\d+)":\s*\{[^{}]*"(?:p_meno|nazov)":\s*"([^"]+)"'
                 for match in re.finditer(pattern, html):
                     subjects_map[match.group(1)] = match.group(2)
                 print(f"DEBUG: Regex fallback found {len(subjects_map)} subjects", file=sys.stderr)
             
-            print(f"DEBUG: Subject map: {subjects_map}", file=sys.stderr)
+            print(f"DEBUG: Final subject map: {subjects_map}", file=sys.stderr)
             
             # Find grades data
             znamky_match = re.search(r'"vsetkyZnamky":\s*\[(.*?)\](?=\s*,\s*"vsetky)', html, re.DOTALL)
@@ -1028,27 +1060,27 @@ def fetch_child_data(edupage, child, days_to_fetch):
                     overall_count = 0
                     
                     for subj_name, subj_data in grades_by_subject.items():
-                        numeric_vals = subj_data["numericValues"]
-                        if numeric_vals:
-                            # Check if values look like grades (1-6) or points
-                            avg = sum(numeric_vals) / len(numeric_vals)
-                            is_grade_scale = all(1 <= v <= 6 for v in numeric_vals)
+                        grade_vals = subj_data["gradeValues"]  # Only contains 1-6 grades
+                        
+                        if grade_vals:
+                            # Calculate average only from actual grades (1-6)
+                            avg = sum(grade_vals) / len(grade_vals)
                             
                             subj_data["average"] = round(avg, 2)
-                            subj_data["isGradeScale"] = is_grade_scale
-                            subj_data["gradeCount"] = len(numeric_vals)
+                            subj_data["isGradeScale"] = True
+                            subj_data["gradeCount"] = len(grade_vals)
                             
-                            # Only include in overall average if it's grade scale (1-6)
-                            if is_grade_scale:
-                                overall_sum += avg
-                                overall_count += 1
+                            # Include in overall average
+                            overall_sum += avg
+                            overall_count += 1
                         else:
+                            # No grades, only points
                             subj_data["average"] = None
                             subj_data["isGradeScale"] = False
                             subj_data["gradeCount"] = len(subj_data["grades"])
                         
-                        # Remove helper array
-                        del subj_data["numericValues"]
+                        # Remove helper arrays
+                        del subj_data["gradeValues"]
                         
                         grades_data.append(subj_data)
                     
