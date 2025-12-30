@@ -571,10 +571,16 @@ def fixed_get_date_plan(self, date):
                                                             
                                                             # Get the active child's student ID for filtering
                                                             active_child = getattr(self.edupage, 'active_child_id', None)
+                                                            # Get child's name to extract class (e.g., "Johanna Jahn, 1b" -> "1b")
+                                                            child_name = getattr(self.edupage, 'active_child_name', None)
+                                                            child_class_name = None
+                                                            if child_name and ',' in child_name:
+                                                                child_class_name = child_name.split(',')[-1].strip().lower()
+                                                            
                                                             # Student IDs in lessons are like '-53', child ID is like '-255'
                                                             # Convert to string for comparison
                                                             child_student_id = str(active_child).lstrip('-') if active_child else None
-                                                            print(f"DEBUG: Filtering lessons for student ID: {active_child} (numeric: {child_student_id})", file=sys.stderr)
+                                                            print(f"DEBUG: Filtering lessons for student ID: {active_child}, class: {child_class_name}", file=sys.stderr)
                                                             
                                                             # Transform cards to lessons for this date
                                                             result_lessons = []
@@ -591,15 +597,26 @@ def fixed_get_date_plan(self, date):
                                                                     
                                                                     # Check if this lesson is for our child
                                                                     student_ids = lesson.get('studentids', [])
-                                                                    # Also check classids - extract child's class from their name if needed
                                                                     class_ids = lesson.get('classids', [])
                                                                     
                                                                     # Filter: only include if child's ID is in studentids
-                                                                    if active_child and student_ids:
-                                                                        # Child IDs are like '-255', studentids are like '-53'
-                                                                        if str(active_child) not in student_ids and f"-{child_student_id}" not in student_ids:
-                                                                            continue  # Skip this lesson, not for this child
-                                                                        matched_count += 1
+                                                                    is_child_lesson = False
+                                                                    
+                                                                    if student_ids:
+                                                                        # Check if child is in studentids
+                                                                        if str(active_child) in student_ids or f"-{child_student_id}" in student_ids:
+                                                                            is_child_lesson = True
+                                                                    elif class_ids and child_class_name:
+                                                                        # No studentids, check by class
+                                                                        for cid in class_ids:
+                                                                            cls = classes_lookup.get(cid, {})
+                                                                            cls_name = cls.get('name', '').lower()
+                                                                            if cls_name == child_class_name:
+                                                                                is_child_lesson = True
+                                                                                break
+                                                                    
+                                                                    if not is_child_lesson:
+                                                                        continue  # Skip this lesson
                                                                     
                                                                     period = periods_lookup.get(period_id, {})
                                                                     
@@ -723,6 +740,9 @@ def fetch_child_data(edupage, child, days_to_fetch):
     # to allow get_date_plan to see it as None and trigger "my timetable" logic on server?
     # edupage.selected_child = child['id'] 
 
+    # Store active child info for filtering in fixed_get_date_plan
+    edupage.active_child_id = child['id']
+    edupage.active_child_name = child['name']
     
     # Try switching to child context on the server
     if hasattr(edupage, 'switch_to_child'):
@@ -736,6 +756,7 @@ def fetch_child_data(edupage, child, days_to_fetch):
                  print(f"DEBUG: GSH after switch: {edupage.gsh}", file=sys.stderr)
         except Exception as e:
             print(f"DEBUG: switch_to_child failed: {e}", file=sys.stderr)
+
 
     # TIMETABLE
     print("DEBUG: Fetching Timetable...", file=sys.stderr)
