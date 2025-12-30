@@ -297,31 +297,66 @@ app.post('/api/config', (req, res) => {
     }
 });
 
-// Backup & Restore
+// Backup & Restore - Complete backup includes ALL settings
 app.get('/api/config/backup', (req, res) => {
-    if (fs.existsSync(CONFIG_PATH)) {
-        res.download(CONFIG_PATH, 'homedashboard-config.json');
-    } else {
-        res.json(appConfig); // If no file yet, send in-memory
-    }
+    // Create comprehensive backup with all settings
+    const backup = {
+        version: 2,  // Backup format version for future compatibility
+        timestamp: new Date().toISOString(),
+        config: appConfig,  // All app configuration (Notion, Edupage, Chores, etc.)
+        googleTokens: userTokens  // Google OAuth tokens for calendar integration
+    };
+
+    // Set headers for file download
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename=homedashboard-backup.json');
+    res.json(backup);
 });
 
 app.post('/api/config/restore', (req, res) => {
     try {
-        const newConfig = req.body;
+        const data = req.body;
+
         // Basic validation
-        if (typeof newConfig !== 'object') {
-            return res.status(400).send("Invalid config format");
+        if (typeof data !== 'object') {
+            return res.status(400).send("Invalid backup format");
         }
-        appConfig = newConfig;
-        fs.writeFileSync(CONFIG_PATH, JSON.stringify(appConfig, null, 2));
-        console.log("Config restored from backup.");
-        res.json({ success: true });
+
+        // Handle v2 backup format (with version field)
+        if (data.version === 2) {
+            console.log("Restoring v2 backup from", data.timestamp || 'unknown date');
+
+            // Restore config
+            if (data.config) {
+                appConfig = data.config;
+                fs.writeFileSync(CONFIG_PATH, JSON.stringify(appConfig, null, 2));
+                console.log("Config restored from backup.");
+            }
+
+            // Restore Google OAuth tokens
+            if (data.googleTokens) {
+                userTokens = data.googleTokens;
+                fs.writeFileSync(TOKEN_PATH, JSON.stringify(userTokens));
+                if (oauth2Client) {
+                    oauth2Client.setCredentials(userTokens);
+                }
+                console.log("Google tokens restored from backup.");
+            }
+        } else {
+            // Legacy v1 backup (only config, no version field)
+            console.log("Restoring legacy v1 backup");
+            appConfig = data;
+            fs.writeFileSync(CONFIG_PATH, JSON.stringify(appConfig, null, 2));
+            console.log("Config restored from backup (legacy format).");
+        }
+
+        res.json({ success: true, message: "Backup vollständig wiederhergestellt" });
     } catch (err) {
         console.error("Restore failed:", err);
-        res.status(500).send("Restore failed");
+        res.status(500).send("Restore failed: " + err.message);
     }
 });
+
 
 
 
