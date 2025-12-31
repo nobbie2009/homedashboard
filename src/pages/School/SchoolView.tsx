@@ -113,8 +113,9 @@ export const SchoolView: React.FC = () => {
                             <div className="flex bg-slate-900/40 p-1 border-b border-slate-800">
                                 {[
                                     { id: 'timetable', label: 'Plan', icon: Clock },
-                                    { id: 'homework', label: 'Hausaufgaben', icon: BookOpen },
-                                    { id: 'grades', label: 'Noten', icon: Trophy },
+                                    // Temporarily disabled - uncomment when ready:
+                                    // { id: 'homework', label: 'Hausaufgaben', icon: BookOpen },
+                                    // { id: 'grades', label: 'Noten', icon: Trophy },
                                     { id: 'messages', label: 'Infos', icon: MessageSquare },
                                 ].map(tab => (
                                     <button
@@ -363,15 +364,26 @@ export const SchoolView: React.FC = () => {
                                                                 </summary>
                                                                 <div className="px-3 pb-3 pt-1 border-t border-slate-600/30 bg-slate-800/30">
                                                                     <div className="grid grid-cols-4 gap-2">
-                                                                        {subjectGrade.grades.map((g, i) => (
-                                                                            <div key={i} className="flex flex-col items-center bg-slate-700/50 p-2 rounded-lg">
-                                                                                <span className="text-lg font-bold text-white">{g.value}</span>
-                                                                                <span className="text-[10px] text-slate-500">
-                                                                                    {g.date ? format(new Date(g.date), 'dd.MM') : ''}
-                                                                                </span>
-                                                                            </div>
-                                                                        ))}
+                                                                        {subjectGrade.grades.map((g, i) => {
+                                                                            const isGrade = g.type === 'grade';
+                                                                            return (
+                                                                                <div key={i} className="flex flex-col items-center bg-slate-700/50 p-2 rounded-lg">
+                                                                                    <span className={`text-lg font-bold ${isGrade ? 'text-white' : 'text-slate-300'}`}>
+                                                                                        {isGrade ? g.grade : g.value}
+                                                                                    </span>
+                                                                                    {!isGrade && <span className="text-xs ml-1 text-slate-400">P</span>}
+                                                                                    <span className="text-[10px] text-slate-500">
+                                                                                        {g.date ? format(new Date(g.date), 'dd.MM') : ''}
+                                                                                    </span>
+                                                                                </div>
+                                                                            );
+                                                                        })}
                                                                     </div>
+                                                                    {subjectGrade.hasPoints && (
+                                                                        <p className="text-xs text-slate-500 mt-2 italic">
+                                                                            P = Punkte (nicht im Durchschnitt)
+                                                                        </p>
+                                                                    )}
                                                                 </div>
                                                             </details>
                                                         );

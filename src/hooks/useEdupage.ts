@@ -23,8 +23,10 @@ export interface Homework {
 }
 
 export interface GradeEntry {
+    type: string;
     value: string;
     date: string;
+    grade: number | null;  // Actual grade 1-6, null if just points
 }
 
 export interface SubjectGrades {
@@ -33,6 +35,7 @@ export interface SubjectGrades {
     average: number | null;
     gradeCount: number;
     isGradeScale: boolean;
+    hasPoints?: boolean;  // True if subject has point-based grades
 }
 
 // Keep old Grade interface for backward compatibility
