@@ -981,45 +981,54 @@ def fetch_child_data(edupage, child, days_to_fetch):
             # Find events data (contains max points for each grade)
             events_map = {}
             try:
-                udalosti_start = html.find('"vsetkyUdalosti":')
-                if udalosti_start != -1:
-                    brace_start = html.find('[', udalosti_start)
-                    if brace_start != -1:
-                        depth = 0
-                        i = brace_start
-                        while i < len(html) and i < brace_start + 200000:
-                            if html[i] == '[':
-                                depth += 1
-                            elif html[i] == ']':
-                                depth -= 1
-                                if depth == 0:
-                                    try:
-                                        udalosti_arr = json.loads(html[brace_start:i+1])
-                                        for ud in udalosti_arr:
-                                            if isinstance(ud, dict):
-                                                ud_id = str(ud.get('udalostid', ''))
-                                                max_points = ud.get('maxbody')
-                                                grade_type = ud.get('typ_znamky')  # Type of grade
-                                                nazov = ud.get('nazov', '')  # Name/title
-                                                if ud_id:
-                                                    events_map[ud_id] = {
-                                                        'maxbody': max_points,
-                                                        'typ': grade_type,
-                                                        'nazov': nazov
-                                                    }
-                                        print(f"DEBUG: Found {len(events_map)} events with max points", file=sys.stderr)
-                                        # Show sample event
-                                        if events_map:
-                                            sample_id = list(events_map.keys())[0]
-                                            print(f"DEBUG: Sample event {sample_id}: {events_map[sample_id]}", file=sys.stderr)
-                                    except json.JSONDecodeError as e:
-                                        print(f"DEBUG: Failed to parse vsetkyUdalosti: {e}", file=sys.stderr)
-                                    break
-                            i += 1
-                else:
-                    print("DEBUG: vsetkyUdalosti not found in HTML", file=sys.stderr)
+                # Try multiple possible keys
+                for key in ['"vsetkyUdalosti":', '"udalosti":', '"znamkyUdalosti":']:
+                    udalosti_start = html.find(key)
+                    if udalosti_start != -1:
+                        print(f"DEBUG: Found events under key {key}", file=sys.stderr)
+                        brace_start = html.find('[', udalosti_start)
+                        if brace_start != -1:
+                            depth = 0
+                            i = brace_start
+                            while i < len(html) and i < brace_start + 200000:
+                                if html[i] == '[':
+                                    depth += 1
+                                elif html[i] == ']':
+                                    depth -= 1
+                                    if depth == 0:
+                                        try:
+                                            udalosti_arr = json.loads(html[brace_start:i+1])
+                                            for ud in udalosti_arr:
+                                                if isinstance(ud, dict):
+                                                    ud_id = str(ud.get('udalostid', ''))
+                                                    max_points = ud.get('maxbody')
+                                                    grade_type = ud.get('typ_znamky')
+                                                    nazov = ud.get('nazov', '')
+                                                    if ud_id and max_points is not None:
+                                                        events_map[ud_id] = {
+                                                            'maxbody': max_points,
+                                                            'typ': grade_type,
+                                                            'nazov': nazov
+                                                        }
+                                            print(f"DEBUG: Found {len(events_map)} events with max points", file=sys.stderr)
+                                            if events_map:
+                                                sample_id = list(events_map.keys())[0]
+                                                print(f"DEBUG: Sample event {sample_id}: {events_map[sample_id]}", file=sys.stderr)
+                                        except json.JSONDecodeError as e:
+                                            print(f"DEBUG: Failed to parse events: {e}", file=sys.stderr)
+                                        break
+                                i += 1
+                        if events_map:
+                            break  # Stop looking for other keys
+                
+                if not events_map:
+                    print("DEBUG: No events with maxbody found in any key", file=sys.stderr)
+                    # Debug: print small snippet around 'udalost' if found
+                    test_pos = html.find('udalost')
+                    if test_pos != -1:
+                        print(f"DEBUG: Found 'udalost' at pos {test_pos}, snippet: {html[test_pos:test_pos+100]}", file=sys.stderr)
             except Exception as e:
-                print(f"DEBUG: Error extracting vsetkyUdalosti: {e}", file=sys.stderr)
+                print(f"DEBUG: Error extracting events: {e}", file=sys.stderr)
             
             # Find grades data
             znamky_match = re.search(r'"vsetkyZnamky":\s*\[(.*?)\](?=\s*,\s*"vsetky)', html, re.DOTALL)
@@ -1200,22 +1209,33 @@ def fetch_child_data(edupage, child, days_to_fetch):
     # MESSAGES
     print("DEBUG: Fetching Messages...", file=sys.stderr)
     messages = []
+    
+    # German indicator words
+    non_german_indicators = ['prosím', 'ďakujem', 'dobrý', 'žiak', 'škola', 'oznámenie', 'pozor', 'upozornenie']
+    
     try:
-        # Try both notifications and timeline
+        # Try notifications
         found_msgs = []
         if hasattr(edupage, "get_notifications"):
             found_msgs = edupage.get_notifications()
         
-        # Also try "timeline" which might contain Bulletin Board info
-        if not found_msgs and hasattr(edupage, "get_timeline"):
-             # Need to implement get_timeline if it exists or verify library support
-             pass
-             
-        # Fallback to whatever found_msgs has
+        # Process notifications with filtering
         for n in found_msgs: 
+            body = getattr(n, "body", "") or getattr(n, "text", "")
+            title = getattr(n, "title", "Info")
+            
+            # Skip empty messages
+            if not body or not body.strip() or len(body.strip()) < 5:
+                continue
+            
+            # Skip non-German content
+            body_lower = body.lower()
+            if any(word in body_lower for word in non_german_indicators):
+                continue
+                
             messages.append({
-                "title": getattr(n, "title", "Info"),
-                "body": getattr(n, "body", "") or getattr(n, "text", ""), # some might use 'text'
+                "title": title,
+                "body": body,
                 "type": getattr(n, "type", "notice"),
                 "date": getattr(n, "timestamp", "")
             })
