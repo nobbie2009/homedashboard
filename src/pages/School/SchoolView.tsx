@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useEdupage } from '../../hooks/useEdupage';
-import { GraduationCap, BookOpen, Clock, AlertCircle, MessageSquare, Trophy, RefreshCw, ChevronRight } from 'lucide-react';
+import { GraduationCap, Clock, AlertCircle, MessageSquare, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 
@@ -113,9 +113,6 @@ export const SchoolView: React.FC = () => {
                             <div className="flex bg-slate-900/40 p-1 border-b border-slate-800">
                                 {[
                                     { id: 'timetable', label: 'Plan', icon: Clock },
-                                    // Temporarily disabled - uncomment when ready:
-                                    // { id: 'homework', label: 'Hausaufgaben', icon: BookOpen },
-                                    // { id: 'grades', label: 'Noten', icon: Trophy },
                                     { id: 'messages', label: 'Infos', icon: MessageSquare },
                                 ].map(tab => (
                                     <button
@@ -281,118 +278,6 @@ export const SchoolView: React.FC = () => {
                                     </div>
                                 )}
 
-
-
-                                {/* HOMEWORK */}
-                                {currentTab === 'homework' && (
-                                    <div className="space-y-3">
-                                        {student.homework.length === 0 ? (
-                                            <div className="flex flex-col items-center justify-center h-40 text-slate-500">
-                                                <BookOpen className="w-8 h-8 opacity-20 mb-2" />
-                                                <p className="italic">Keine Hausaufgaben offen.</p>
-                                            </div>
-                                        ) : (
-                                            student.homework.map((hw) => (
-                                                <div key={hw.id} className="bg-slate-700/40 p-3 rounded-lg border border-slate-600/30 flex flex-col group hover:border-slate-500/50 transition">
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <span className="font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded text-sm">{hw.subject}</span>
-                                                        <span className="text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded flex items-center">
-                                                            <Clock className="w-3 h-3 mr-1 opacity-50" />
-                                                            {hw.date ? format(new Date(hw.date), 'dd.MM', { locale: de }) : 'N/A'}
-                                                        </span>
-                                                    </div>
-                                                    <div className="text-sm text-slate-200 leading-relaxed font-medium">{hw.title}</div>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* GRADES - Grouped by Subject */}
-                                {currentTab === 'grades' && (
-                                    <div className="space-y-3">
-                                        {(!student.grades || student.grades.length === 0) ? (
-                                            <div className="flex flex-col items-center justify-center h-40 text-slate-500">
-                                                <Trophy className="w-8 h-8 opacity-20 mb-2" />
-                                                <p className="italic">Keine Noten gefunden.</p>
-                                            </div>
-                                        ) : (
-                                            <>
-                                                {/* Overall Average - if exists */}
-                                                {student.grades.find(g => g.subject === '__OVERALL__') && (
-                                                    <div className="bg-gradient-to-r from-blue-600/30 to-purple-600/30 p-4 rounded-xl border border-blue-500/50 mb-4">
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="flex items-center gap-3">
-                                                                <Trophy className="w-6 h-6 text-yellow-400" />
-                                                                <span className="font-bold text-lg text-white">Gesamtdurchschnitt</span>
-                                                            </div>
-                                                            <span className="text-3xl font-black text-white">
-                                                                {student.grades.find(g => g.subject === '__OVERALL__')?.average?.toFixed(2)}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {/* Per-Subject Grades */}
-                                                {student.grades
-                                                    .filter(g => g.subject !== '__OVERALL__')
-                                                    .map((subjectGrade, gIdx) => {
-                                                        const getGradeColor = (avg: number | null) => {
-                                                            if (avg === null) return 'bg-slate-600';
-                                                            if (avg <= 1.5) return 'bg-green-600';
-                                                            if (avg <= 2.5) return 'bg-green-500';
-                                                            if (avg <= 3.5) return 'bg-yellow-500';
-                                                            if (avg <= 4.5) return 'bg-orange-500';
-                                                            return 'bg-red-500';
-                                                        };
-
-                                                        return (
-                                                            <details key={gIdx} className="group bg-slate-700/40 rounded-lg border border-slate-600/30 overflow-hidden">
-                                                                <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-700/60 transition list-none">
-                                                                    <div className="flex items-center gap-3">
-                                                                        <span className="text-slate-200 font-medium">{subjectGrade.subject}</span>
-                                                                        <span className="text-xs text-slate-500">({subjectGrade.gradeCount} Noten)</span>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-2">
-                                                                        {subjectGrade.average !== null && (
-                                                                            <span className={`text-lg font-bold text-white px-3 py-1 rounded-lg ${getGradeColor(subjectGrade.average)}`}>
-                                                                                ⌀ {subjectGrade.average.toFixed(2)}
-                                                                            </span>
-                                                                        )}
-                                                                        <ChevronRight className="w-4 h-4 text-slate-400 group-open:rotate-90 transition-transform" />
-                                                                    </div>
-                                                                </summary>
-                                                                <div className="px-3 pb-3 pt-1 border-t border-slate-600/30 bg-slate-800/30">
-                                                                    <div className="grid grid-cols-4 gap-2">
-                                                                        {subjectGrade.grades.map((g, i) => {
-                                                                            const isGrade = g.type === 'grade';
-                                                                            return (
-                                                                                <div key={i} className="flex flex-col items-center bg-slate-700/50 p-2 rounded-lg">
-                                                                                    <span className={`text-lg font-bold ${isGrade ? 'text-white' : 'text-slate-300'}`}>
-                                                                                        {isGrade ? g.grade : g.value}
-                                                                                    </span>
-                                                                                    {!isGrade && <span className="text-xs ml-1 text-slate-400">P</span>}
-                                                                                    <span className="text-[10px] text-slate-500">
-                                                                                        {g.date ? format(new Date(g.date), 'dd.MM') : ''}
-                                                                                    </span>
-                                                                                </div>
-                                                                            );
-                                                                        })}
-                                                                    </div>
-                                                                    {subjectGrade.hasPoints && (
-                                                                        <p className="text-xs text-slate-500 mt-2 italic">
-                                                                            P = Punkte (nicht im Durchschnitt)
-                                                                        </p>
-                                                                    )}
-                                                                </div>
-                                                            </details>
-                                                        );
-                                                    })
-                                                }
-                                            </>
-                                        )}
-                                    </div>
-                                )}
 
                                 {/* MESSAGES */}
                                 {currentTab === 'messages' && (
