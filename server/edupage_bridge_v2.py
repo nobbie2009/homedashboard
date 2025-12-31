@@ -1008,6 +1008,10 @@ def fetch_child_data(edupage, child, days_to_fetch):
                                                         'nazov': nazov
                                                     }
                                         print(f"DEBUG: Found {len(events_map)} events with max points", file=sys.stderr)
+                                        # Show sample event
+                                        if events_map:
+                                            sample_id = list(events_map.keys())[0]
+                                            print(f"DEBUG: Sample event {sample_id}: {events_map[sample_id]}", file=sys.stderr)
                                     except json.JSONDecodeError as e:
                                         print(f"DEBUG: Failed to parse vsetkyUdalosti: {e}", file=sys.stderr)
                                     break
@@ -1099,6 +1103,10 @@ def fetch_child_data(edupage, child, days_to_fetch):
                             if 1 <= points_value <= 6:
                                 grade_value = points_value
                                 points_value = None  # It's not points, it's a grade
+                        
+                        # Debug: Show first few grade calculations
+                        if len(grades_by_subject) == 0:
+                            print(f"DEBUG: First grade calc - data:{value_str}, udalost:{udalost_id}, points:{points_value}, max:{max_points}, pct:{percentage}, grade:{grade_value}", file=sys.stderr)
                         
                         if subject_name not in grades_by_subject:
                             grades_by_subject[subject_name] = {
@@ -1232,10 +1240,30 @@ def fetch_child_data(edupage, child, days_to_fetch):
                 
                 typ = item.get("typ")
                 if typ in ["sprava", "nastenka", "text", "event"]:
+                    body_text = item.get("text", "") or item.get("body", "")
+                    title_text = item.get("user_meno", "Info")
+                    
+                    # Skip empty messages
+                    if not body_text or not body_text.strip():
+                        continue
+                    
+                    # Skip very short messages (likely placeholders)
+                    if len(body_text.strip()) < 5:
+                        continue
+                    
+                    # Basic check for non-German content (skip if looks like Slovak/Czech)
+                    # Common Slovak/Czech words that indicate non-German
+                    non_german_indicators = ['prosím', 'ďakujem', 'dobrý', 'žiak', 'škola', 'oznámenie', 'pozor', 'upozornenie']
+                    body_lower = body_text.lower()
+                    is_non_german = any(word in body_lower for word in non_german_indicators)
+                    
+                    if is_non_german:
+                        continue
+                    
                     # Create message object
                     msg = {
-                        "title": item.get("user_meno", "Info"), # Use sender as title?
-                        "body": item.get("text", "") or item.get("body", ""),
+                        "title": title_text,
+                        "body": body_text,
                         "type": typ,
                         "date": item.get("timestamp", "")
                     }
