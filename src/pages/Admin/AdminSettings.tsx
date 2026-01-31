@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useKiosk } from '../../contexts/KioskContext';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useSecurity } from '../../contexts/SecurityContext';
-import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download, Smartphone, Trash2, Shield, ShieldAlert, ClipboardCheck, Plus, Cake, RefreshCw, Server, GitBranch, Database } from 'lucide-react';
+import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download, Smartphone, Trash2, Shield, ShieldAlert, ClipboardCheck, Plus, Cake, RefreshCw, Server, GitBranch, Database, Keyboard } from 'lucide-react';
 import { IconMap, ChoreIcon } from '../../components/ChoreIcon';
 // import clsx from 'clsx';
 
@@ -91,6 +91,32 @@ const AdminSettings: React.FC = () => {
     const [isGoogleAuth, setIsGoogleAuth] = useState(false);
     const [activeTab, setActiveTab] = useState('kalender');
     const [newTaskIcon, setNewTaskIcon] = useState('clean');
+    const [isKeyboardActive, setKeyboardActive] = useState(false);
+
+    // Auto-disable keyboard on lock
+    useEffect(() => {
+        if (isLocked && isKeyboardActive) {
+            fetch(`${getApiUrl()}/api/system/keyboard`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-device-id': deviceId },
+                body: JSON.stringify({ active: false })
+            }).then(() => setKeyboardActive(false));
+        }
+    }, [isLocked, isKeyboardActive, deviceId]);
+
+    const toggleKeyboard = async () => {
+        const newState = !isKeyboardActive;
+        try {
+            await fetch(`${getApiUrl()}/api/system/keyboard`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-device-id': deviceId },
+                body: JSON.stringify({ active: newState })
+            });
+            setKeyboardActive(newState);
+        } catch (e) {
+            console.error("Failed to toggle keyboard");
+        }
+    };
 
     const tabs = [
         { id: 'kalender', label: 'Kalender', icon: CalendarIcon },
@@ -606,8 +632,8 @@ const AdminSettings: React.FC = () => {
                                                     updateConfig({ weatherAlertExclusions: newExclusions });
                                                 }}
                                                 className={`px-3 py-1.5 rounded-lg text-sm font-bold transition flex items-center gap-2 ${isExcluded
-                                                        ? 'bg-red-500/20 text-red-400 border border-red-500/50'
-                                                        : 'bg-slate-800 text-slate-400 border border-slate-700 hover:border-slate-500'
+                                                    ? 'bg-red-500/20 text-red-400 border border-red-500/50'
+                                                    : 'bg-slate-800 text-slate-400 border border-slate-700 hover:border-slate-500'
                                                     }`}
                                             >
                                                 {isExcluded ? <ShieldAlert className="w-4 h-4" /> : <Shield className="w-4 h-4 text-slate-600" />}
@@ -800,6 +826,23 @@ const AdminSettings: React.FC = () => {
                                     </button>
                                 </div>
 
+                                {/* 1b. Keyboard Toggle */}
+                                <div className={`p-6 rounded-xl border flex flex-col items-start transition ${isKeyboardActive ? 'bg-blue-900/40 border-blue-500/50' : 'bg-slate-900/40 border-slate-700/50 hover:border-blue-500/50'}`}>
+                                    <div className={`p-3 rounded-lg mb-4 ${isKeyboardActive ? 'bg-blue-500 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                                        <Keyboard className="w-8 h-8" />
+                                    </div>
+                                    <h4 className="text-lg font-bold text-white mb-2">Bildschirmtastatur</h4>
+                                    <p className="text-sm text-slate-400 mb-6 flex-grow">
+                                        Aktiviert eine virtuelle Tastatur auf allen Dashboards. Wird beim Sperren automatisch deaktiviert.
+                                    </p>
+                                    <button
+                                        onClick={toggleKeyboard}
+                                        className={`w-full py-2 rounded-lg font-bold transition ${isKeyboardActive ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-600'}`}
+                                    >
+                                        {isKeyboardActive ? 'Deaktivieren' : 'Aktivieren'}
+                                    </button>
+                                </div>
+
                                 {/* 2. Reload Content */}
                                 <div className="bg-slate-900/40 p-6 rounded-xl border border-slate-700/50 flex flex-col items-start hover:border-yellow-500/50 transition">
                                     <div className="bg-yellow-500/20 p-3 rounded-lg text-yellow-400 mb-4">
@@ -836,219 +879,224 @@ const AdminSettings: React.FC = () => {
                             </div>
                         </section>
                     </div>
-                )}
+                )
+                }
 
                 {/* 7. AUFGABEN TAB */}
-                {activeTab === 'aufgaben' && (
-                    <div className="space-y-8">
-                        {/* KIDS MANAGEMENT */}
-                        <section>
-                            <h3 className="text-xl font-semibold text-slate-300 mb-4">Kinder verwalten</h3>
-                            <div className="bg-slate-900/40 rounded-xl border border-slate-700/50 p-4 space-y-4">
-                                <div className="space-y-2">
-                                    {(config.chores?.kids || []).map((kid) => (
-                                        <div key={kid.id} className="flex items-center justify-between bg-slate-800 p-3 rounded-lg border border-slate-700">
-                                            <div className="flex items-center space-x-3">
-                                                <div className="w-8 h-8 rounded-full border-2 border-slate-600" style={{ backgroundColor: kid.color }}></div>
-                                                <span className="font-bold text-white">{kid.name}</span>
+                {
+                    activeTab === 'aufgaben' && (
+                        <div className="space-y-8">
+                            {/* KIDS MANAGEMENT */}
+                            <section>
+                                <h3 className="text-xl font-semibold text-slate-300 mb-4">Kinder verwalten</h3>
+                                <div className="bg-slate-900/40 rounded-xl border border-slate-700/50 p-4 space-y-4">
+                                    <div className="space-y-2">
+                                        {(config.chores?.kids || []).map((kid) => (
+                                            <div key={kid.id} className="flex items-center justify-between bg-slate-800 p-3 rounded-lg border border-slate-700">
+                                                <div className="flex items-center space-x-3">
+                                                    <div className="w-8 h-8 rounded-full border-2 border-slate-600" style={{ backgroundColor: kid.color }}></div>
+                                                    <span className="font-bold text-white">{kid.name}</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        const newKids = config.chores?.kids.filter(k => k.id !== kid.id) || [];
+                                                        updateConfig({ chores: { ...config.chores!, kids: newKids } });
+                                                    }}
+                                                    className="p-2 text-slate-500 hover:text-red-400 transition"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
                                             </div>
-                                            <button
-                                                onClick={() => {
-                                                    const newKids = config.chores?.kids.filter(k => k.id !== kid.id) || [];
-                                                    updateConfig({ chores: { ...config.chores!, kids: newKids } });
-                                                }}
-                                                className="p-2 text-slate-500 hover:text-red-400 transition"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    ))}
-                                    {(!config.chores?.kids || config.chores.kids.length === 0) && (
-                                        <p className="text-slate-500 italic text-sm">Keine Kinder angelegt.</p>
-                                    )}
-                                </div>
+                                        ))}
+                                        {(!config.chores?.kids || config.chores.kids.length === 0) && (
+                                            <p className="text-slate-500 italic text-sm">Keine Kinder angelegt.</p>
+                                        )}
+                                    </div>
 
-                                <div className="border-t border-slate-700 pt-4 mt-4">
-                                    <h4 className="text-sm font-bold text-slate-400 mb-2">Kind hinzufügen</h4>
-                                    <form
-                                        className="flex gap-2"
-                                        onSubmit={(e) => {
-                                            e.preventDefault();
-                                            const form = e.target as HTMLFormElement;
-                                            const name = (form.elements.namedItem('name') as HTMLInputElement).value;
-                                            const color = (form.elements.namedItem('color') as HTMLInputElement).value;
-                                            if (!name) return;
+                                    <div className="border-t border-slate-700 pt-4 mt-4">
+                                        <h4 className="text-sm font-bold text-slate-400 mb-2">Kind hinzufügen</h4>
+                                        <form
+                                            className="flex gap-2"
+                                            onSubmit={(e) => {
+                                                e.preventDefault();
+                                                const form = e.target as HTMLFormElement;
+                                                const name = (form.elements.namedItem('name') as HTMLInputElement).value;
+                                                const color = (form.elements.namedItem('color') as HTMLInputElement).value;
+                                                if (!name) return;
 
-                                            const newKid = {
-                                                id: Date.now().toString(),
-                                                name,
-                                                color
-                                            };
-                                            const newKids = [...(config.chores?.kids || []), newKid];
-                                            updateConfig({ chores: { ...(config.chores || { tasks: [], settings: { interval: 'weekly' } }), kids: newKids } as any });
-                                            form.reset();
-                                        }}
-                                    >
-                                        <input
-                                            type="text"
-                                            name="name"
-                                            placeholder="Name"
-                                            className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500 flex-1"
-                                            required
-                                        />
-                                        <input
-                                            type="color"
-                                            name="color"
-                                            defaultValue="#3b82f6"
-                                            className="h-10 w-10 bg-transparent border-0 cursor-pointer rounded"
-                                        />
-                                        <button
-                                            type="submit"
-                                            className="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-500 flex items-center"
+                                                const newKid = {
+                                                    id: Date.now().toString(),
+                                                    name,
+                                                    color
+                                                };
+                                                const newKids = [...(config.chores?.kids || []), newKid];
+                                                updateConfig({ chores: { ...(config.chores || { tasks: [], settings: { interval: 'weekly' } }), kids: newKids } as any });
+                                                form.reset();
+                                            }}
                                         >
-                                            <Plus className="w-5 h-5" />
-                                        </button>
-                                    </form>
-                                </div>
-                            </div>
-                        </section>
-
-                        {/* TASKS MANAGEMENT */}
-                        <section>
-                            <h3 className="text-xl font-semibold text-slate-300 mb-4">Aufgaben (Chore Loop)</h3>
-                            <div className="bg-slate-900/40 rounded-xl border border-slate-700/50 p-4 space-y-4">
-                                <div className="space-y-2">
-                                    {(config.chores?.tasks || []).map((task) => (
-                                        <div key={task.id} className="flex items-center justify-between bg-slate-800 p-3 rounded-lg border border-slate-700">
-                                            <div className="flex items-center space-x-3">
-                                                <div className="bg-slate-700 p-2 rounded text-slate-300">
-                                                    <ChoreIcon icon={task.icon} className="w-5 h-5" />
-                                                </div>
-                                                <div>
-                                                    <div className="font-bold text-white">{task.label}</div>
-                                                    {task.description && <div className="text-xs text-slate-400 italic">{task.description}</div>}
-                                                    <div className="text-xs text-slate-500">Intervall: {task.rotation}</div>
-                                                </div>
-                                            </div>
-
-                                            <select
-                                                value={task.assignedTo || ''}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    const newTasks = config.chores?.tasks.map(t => t.id === task.id ? { ...t, assignedTo: val || undefined } : t) || [];
-                                                    updateConfig({ chores: { ...config.chores!, tasks: newTasks } });
-                                                }}
-                                                className="bg-slate-900 border border-slate-600 text-slate-200 text-sm rounded px-2 py-1 mx-4 focus:outline-none focus:border-blue-500"
-                                            >
-                                                <option value="">-- Nicht zugewiesen --</option>
-                                                {(config.chores?.kids || []).map(k => (
-                                                    <option key={k.id} value={k.id}>{k.name}</option>
-                                                ))}
-                                            </select>
-                                            <button
-                                                onClick={() => {
-                                                    const newTasks = config.chores?.tasks.filter(t => t.id !== task.id) || [];
-                                                    updateConfig({ chores: { ...config.chores!, tasks: newTasks } });
-                                                }}
-                                                className="p-2 text-slate-500 hover:text-red-400 transition"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    ))}
-                                    {(!config.chores?.tasks || config.chores.tasks.length === 0) && (
-                                        <p className="text-slate-500 italic text-sm">Keine Aufgaben angelegt.</p>
-                                    )}
-                                </div>
-
-                                <div className="border-t border-slate-700 pt-4 mt-4">
-                                    <h4 className="text-sm font-bold text-slate-400 mb-2">Aufgabe hinzufügen</h4>
-                                    <form
-                                        className="space-y-4"
-                                        onSubmit={(e) => {
-                                            e.preventDefault();
-                                            const form = e.target as HTMLFormElement;
-                                            const label = (form.elements.namedItem('label') as HTMLInputElement).value;
-                                            const description = (form.elements.namedItem('description') as HTMLInputElement).value;
-                                            const rotation = (form.elements.namedItem('rotation') as HTMLSelectElement).value;
-                                            if (!label) return;
-
-                                            const newTask = {
-                                                id: Date.now().toString(),
-                                                label,
-                                                description,
-                                                icon: newTaskIcon,
-                                                rotation: rotation as any,
-                                                assignedTo: undefined
-                                            };
-                                            const newTasks = [...(config.chores?.tasks || []), newTask];
-                                            updateConfig({ chores: { ...(config.chores || { kids: [], settings: { interval: 'weekly' } }), tasks: newTasks } as any });
-                                            form.reset();
-                                            setNewTaskIcon('clean'); // Reset icon
-                                        }}
-                                    >
-                                        <div className="grid grid-cols-[1fr_auto] gap-2">
                                             <input
                                                 type="text"
-                                                name="label"
-                                                placeholder="Bezeichnung (z.B. Müll rausbringen)"
-                                                className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500 w-full"
+                                                name="name"
+                                                placeholder="Name"
+                                                className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500 flex-1"
                                                 required
                                             />
                                             <input
-                                                type="text"
-                                                name="description"
-                                                placeholder="Beschreibung (optional)"
-                                                className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500 w-full col-span-2"
+                                                type="color"
+                                                name="color"
+                                                defaultValue="#3b82f6"
+                                                className="h-10 w-10 bg-transparent border-0 cursor-pointer rounded"
                                             />
-                                            <select
-                                                name="rotation"
-                                                className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                                            <button
+                                                type="submit"
+                                                className="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-500 flex items-center"
                                             >
-                                                <option value="weekly">Wöchentlich</option>
-                                                <option value="daily">Täglich</option>
-                                                <option value="none">Manuell</option>
-                                            </select>
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-sm text-slate-400 mb-2">Symbol wählen:</label>
-                                            <div className="flex flex-wrap gap-2">
-                                                {Object.keys(IconMap).map((iconKey) => (
-                                                    <button
-                                                        key={iconKey}
-                                                        type="button"
-                                                        onClick={() => setNewTaskIcon(iconKey)}
-                                                        className={`p-2 rounded-lg transition ${newTaskIcon === iconKey
-                                                            ? 'bg-blue-600 text-white shadow-lg scale-110'
-                                                            : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                                                            }`}
-                                                    >
-                                                        <ChoreIcon icon={iconKey} className="w-5 h-5" />
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <button
-                                            type="submit"
-                                            className="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-500 flex items-center w-full justify-center"
-                                        >
-                                            <Plus className="w-5 h-5 mr-2" />
-                                            Aufgabe hinzufügen
-                                        </button>
-                                    </form>
+                                                <Plus className="w-5 h-5" />
+                                            </button>
+                                        </form>
+                                    </div>
                                 </div>
-                            </div>
-                        </section>
-                    </div>
-                )}
+                            </section>
+
+                            {/* TASKS MANAGEMENT */}
+                            <section>
+                                <h3 className="text-xl font-semibold text-slate-300 mb-4">Aufgaben (Chore Loop)</h3>
+                                <div className="bg-slate-900/40 rounded-xl border border-slate-700/50 p-4 space-y-4">
+                                    <div className="space-y-2">
+                                        {(config.chores?.tasks || []).map((task) => (
+                                            <div key={task.id} className="flex items-center justify-between bg-slate-800 p-3 rounded-lg border border-slate-700">
+                                                <div className="flex items-center space-x-3">
+                                                    <div className="bg-slate-700 p-2 rounded text-slate-300">
+                                                        <ChoreIcon icon={task.icon} className="w-5 h-5" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-bold text-white">{task.label}</div>
+                                                        {task.description && <div className="text-xs text-slate-400 italic">{task.description}</div>}
+                                                        <div className="text-xs text-slate-500">Intervall: {task.rotation}</div>
+                                                    </div>
+                                                </div>
+
+                                                <select
+                                                    value={task.assignedTo || ''}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        const newTasks = config.chores?.tasks.map(t => t.id === task.id ? { ...t, assignedTo: val || undefined } : t) || [];
+                                                        updateConfig({ chores: { ...config.chores!, tasks: newTasks } });
+                                                    }}
+                                                    className="bg-slate-900 border border-slate-600 text-slate-200 text-sm rounded px-2 py-1 mx-4 focus:outline-none focus:border-blue-500"
+                                                >
+                                                    <option value="">-- Nicht zugewiesen --</option>
+                                                    {(config.chores?.kids || []).map(k => (
+                                                        <option key={k.id} value={k.id}>{k.name}</option>
+                                                    ))}
+                                                </select>
+                                                <button
+                                                    onClick={() => {
+                                                        const newTasks = config.chores?.tasks.filter(t => t.id !== task.id) || [];
+                                                        updateConfig({ chores: { ...config.chores!, tasks: newTasks } });
+                                                    }}
+                                                    className="p-2 text-slate-500 hover:text-red-400 transition"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        {(!config.chores?.tasks || config.chores.tasks.length === 0) && (
+                                            <p className="text-slate-500 italic text-sm">Keine Aufgaben angelegt.</p>
+                                        )}
+                                    </div>
+
+                                    <div className="border-t border-slate-700 pt-4 mt-4">
+                                        <h4 className="text-sm font-bold text-slate-400 mb-2">Aufgabe hinzufügen</h4>
+                                        <form
+                                            className="space-y-4"
+                                            onSubmit={(e) => {
+                                                e.preventDefault();
+                                                const form = e.target as HTMLFormElement;
+                                                const label = (form.elements.namedItem('label') as HTMLInputElement).value;
+                                                const description = (form.elements.namedItem('description') as HTMLInputElement).value;
+                                                const rotation = (form.elements.namedItem('rotation') as HTMLSelectElement).value;
+                                                if (!label) return;
+
+                                                const newTask = {
+                                                    id: Date.now().toString(),
+                                                    label,
+                                                    description,
+                                                    icon: newTaskIcon,
+                                                    rotation: rotation as any,
+                                                    assignedTo: undefined
+                                                };
+                                                const newTasks = [...(config.chores?.tasks || []), newTask];
+                                                updateConfig({ chores: { ...(config.chores || { kids: [], settings: { interval: 'weekly' } }), tasks: newTasks } as any });
+                                                form.reset();
+                                                setNewTaskIcon('clean'); // Reset icon
+                                            }}
+                                        >
+                                            <div className="grid grid-cols-[1fr_auto] gap-2">
+                                                <input
+                                                    type="text"
+                                                    name="label"
+                                                    placeholder="Bezeichnung (z.B. Müll rausbringen)"
+                                                    className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500 w-full"
+                                                    required
+                                                />
+                                                <input
+                                                    type="text"
+                                                    name="description"
+                                                    placeholder="Beschreibung (optional)"
+                                                    className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500 w-full col-span-2"
+                                                />
+                                                <select
+                                                    name="rotation"
+                                                    className="bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                                                >
+                                                    <option value="weekly">Wöchentlich</option>
+                                                    <option value="daily">Täglich</option>
+                                                    <option value="none">Manuell</option>
+                                                </select>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm text-slate-400 mb-2">Symbol wählen:</label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {Object.keys(IconMap).map((iconKey) => (
+                                                        <button
+                                                            key={iconKey}
+                                                            type="button"
+                                                            onClick={() => setNewTaskIcon(iconKey)}
+                                                            className={`p-2 rounded-lg transition ${newTaskIcon === iconKey
+                                                                ? 'bg-blue-600 text-white shadow-lg scale-110'
+                                                                : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                                                }`}
+                                                        >
+                                                            <ChoreIcon icon={iconKey} className="w-5 h-5" />
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                type="submit"
+                                                className="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-500 flex items-center w-full justify-center"
+                                            >
+                                                <Plus className="w-5 h-5 mr-2" />
+                                                Aufgabe hinzufügen
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                    )
+                }
 
                 {/* 6. GERÄTE TAB (Security) */}
-                {activeTab === 'geraete' && (
-                    <DeviceList />
-                )}
-            </div>
+                {
+                    activeTab === 'geraete' && (
+                        <DeviceList />
+                    )
+                }
+            </div >
 
             <div className="mt-auto pt-8 flex justify-end">
                 <div className="flex items-center space-x-2 text-green-400">

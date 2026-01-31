@@ -9,6 +9,7 @@ import { useIdleRedirect } from '../../hooks/useIdleRedirect';
 import pkg from '../../../package.json';
 import { DoorbellOverlay } from '../overlays/DoorbellOverlay';
 import { Screensaver } from '../overlays/Screensaver';
+import { OnScreenKeyboard } from '../overlays/OnScreenKeyboard';
 import { useConfig } from '../../contexts/ConfigContext';
 
 export const MainLayout: React.FC = () => {
@@ -107,8 +108,9 @@ export const MainLayout: React.FC = () => {
         { path: '/smarthome', icon: Home, label: 'SmartHome' },
     ];
 
-    // Doorbell Logic
+    // Doorbell & Keyboard Logic
     const [doorbellActive, setDoorbellActive] = React.useState(false);
+    const [keyboardActive, setKeyboardActive] = React.useState(false);
 
     React.useEffect(() => {
         const url = `${getApiUrl()}/api/stream/events`;
@@ -122,6 +124,18 @@ export const MainLayout: React.FC = () => {
         eventSource.addEventListener('doorbell', () => {
             console.log("DOORBELL RINGING!");
             setDoorbellActive(true);
+        });
+
+        eventSource.addEventListener('keyboard', (e: MessageEvent) => {
+            try {
+                const data = JSON.parse(e.data);
+                console.log("Remote Keyboard Event:", data);
+                if (typeof data.active === 'boolean') {
+                    setKeyboardActive(data.active);
+                }
+            } catch (err) {
+                console.error("Failed to parse keyboard event", err);
+            }
         });
 
         eventSource.onerror = () => {
@@ -139,6 +153,10 @@ export const MainLayout: React.FC = () => {
         <div className="flex flex-col h-screen w-full bg-slate-950 text-slate-100 overflow-hidden relative">
             <DoorbellOverlay active={doorbellActive} onClose={() => setDoorbellActive(false)} />
             <Screensaver active={showScreensaver} onDismiss={() => setShowScreensaver(false)} />
+
+            {/* On-Screen Keyboard Overlay */}
+            {keyboardActive && <OnScreenKeyboard onClose={() => setKeyboardActive(false)} />}
+
 
             {/* Header / Status Bar */}
             <header className="flex-none h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6">

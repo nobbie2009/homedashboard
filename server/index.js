@@ -788,6 +788,29 @@ app.post('/api/webhook/doorbell', (req, res) => {
     res.json({ success: true, clients: sseClients.size });
 });
 
+// --- KEYBOARD REMOTE CONTROL ---
+let isKeyboardActive = false;
+
+app.post('/api/system/keyboard', (req, res) => {
+    const { active } = req.body;
+    if (typeof active !== 'boolean') {
+        return res.status(400).json({ error: "Invalid payload" });
+    }
+
+    isKeyboardActive = active;
+    console.log(`Keyboard ${active ? 'ACTIVATED' : 'DEACTIVATED'} remotely.`);
+
+    // Broadcast to all clients
+    broadcastEvent('keyboard', { active });
+
+    res.json({ success: true, active: isKeyboardActive });
+});
+
+// Send current state on connection
+// We need to modify the SSE setup slightly to send initial state, 
+// or clients can fetch it. Ideally SSE sends it on connect.
+
+
 // --- EXECUTE ---
 app.listen(PORT, '0.0.0.0', () => { // Bind to 0.0.0.0 for external access
     console.log(`Server running on http://0.0.0.0:${PORT}`);
