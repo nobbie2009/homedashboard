@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { ClipboardList, Lock, Unlock, Settings as SettingsIcon, Calendar, LayoutDashboard, GraduationCap, ClipboardCheck, Home } from 'lucide-react';
+import { ClipboardList, Lock, Unlock, Settings as SettingsIcon, Calendar, LayoutDashboard, GraduationCap, ClipboardCheck, Home, RefreshCw } from 'lucide-react';
 import { useKiosk } from '../../contexts/KioskContext';
 import { getApiUrl } from '../../utils/api';
 import { useSecurity } from '../../contexts/SecurityContext';
@@ -175,6 +175,14 @@ export const MainLayout: React.FC = () => {
                     <div className="text-[10px] text-slate-500 font-mono opacity-60">
                         v{pkg.version}-{import.meta.env.VITE_GIT_COMMIT_HASH}
                     </div>
+
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="p-2 rounded-full hover:bg-slate-800 transition-colors"
+                        title="Seite aktualisieren"
+                    >
+                        <RefreshCw className="w-5 h-5 text-slate-400" />
+                    </button>
 
                     <button
                         onClick={isLocked ? undefined : lock}
