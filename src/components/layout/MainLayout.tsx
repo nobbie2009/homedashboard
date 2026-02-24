@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { ClipboardList, Lock, Unlock, Settings as SettingsIcon, Calendar, LayoutDashboard, GraduationCap, ClipboardCheck, Home } from 'lucide-react';
+import { ClipboardList, Lock, Unlock, Settings as SettingsIcon, Calendar, LayoutDashboard, GraduationCap, ClipboardCheck, Home, RefreshCw, WifiOff } from 'lucide-react';
 import { useKiosk } from '../../contexts/KioskContext';
 import { getApiUrl } from '../../utils/api';
 import { useSecurity } from '../../contexts/SecurityContext';
@@ -18,7 +18,19 @@ export const MainLayout: React.FC = () => {
     const { config } = useConfig();
     const [serverIp, setServerIp] = React.useState<string>('');
     const [showScreensaver, setShowScreensaver] = React.useState(false);
+    const [isOnline, setIsOnline] = React.useState(navigator.onLine);
     const lastActivity = React.useRef(Date.now());
+
+    React.useEffect(() => {
+        const handleOnline = () => setIsOnline(true);
+        const handleOffline = () => setIsOnline(false);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
 
     React.useEffect(() => {
         const fetchIp = async () => {
@@ -175,6 +187,23 @@ export const MainLayout: React.FC = () => {
                     <div className="text-[10px] text-slate-500 font-mono opacity-60">
                         v{pkg.version}-{import.meta.env.VITE_GIT_COMMIT_HASH}
                     </div>
+
+                    {/* Offline-Anzeige */}
+                    {!isOnline && (
+                        <div className="flex items-center space-x-1 text-red-400 text-xs font-medium bg-red-900/30 px-2 py-1 rounded-full border border-red-800/50">
+                            <WifiOff className="w-4 h-4" />
+                            <span>Kein Internet</span>
+                        </div>
+                    )}
+
+                    {/* Seite aktualisieren */}
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="p-2 rounded-full hover:bg-slate-800 transition-colors"
+                        title="Seite aktualisieren"
+                    >
+                        <RefreshCw className="w-5 h-5 text-slate-400 hover:text-slate-200" />
+                    </button>
 
                     <button
                         onClick={isLocked ? undefined : lock}
