@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { Cloud, CloudRain, Sun, CloudSnow, Sunrise, Sunset } from 'lucide-react';
@@ -40,6 +40,8 @@ const getWeatherDescription = (code: number) => {
     if (code >= 1) return 'Teils Wolkig';
     return 'Klar';
 };
+
+const WEATHER_POLL_INTERVAL = 30 * 60 * 1000; // 30 minutes
 
 export const UnifiedHeaderWidget: React.FC = () => {
     const { config } = useConfig();
@@ -119,34 +121,29 @@ export const UnifiedHeaderWidget: React.FC = () => {
         };
 
         fetchWeather();
-        // Refresh weather every 30 mins
-        const interval = setInterval(fetchWeather, 30 * 60 * 1000);
+        const interval = setInterval(fetchWeather, WEATHER_POLL_INTERVAL);
         return () => clearInterval(interval);
     }, [config.weatherLocation]);
 
-    // Filter Alerts
-    const filteredAlerts = alerts.filter(a => {
-        // Event code can be checked, or event_de name
-        // DWD event codes are rough, let's use broad category matching if possible, or just exact string match from exclusions
-        // Exclusions list contains strings like 'FROST', 'THUNDERSTORM', etc.
-        // We need to map DWD event to these categories or just check if event_de contains string? 
-        // Let's assume exclusions are mapped to: 'fog', 'frost', 'rain', 'snow', 'thunderstorm', 'wind', 'heat', 'uv', 'ice'
-
+    // Filter Alerts (memoized)
+    const filteredAlerts = useMemo(() => {
         const exclusions = (config.weatherAlertExclusions || []).map(e => e.toLowerCase());
-        const eventName = (a.event_en || '').toLowerCase(); // Use English for better mapping if available, otherwise just rely on code? Brightsky gives `event_en`.
+        return alerts.filter(a => {
+            const eventName = (a.event_en || '').toLowerCase();
 
-        if (exclusions.includes('frost') && eventName.includes('frost')) return false;
-        if (exclusions.includes('fog') && eventName.includes('fog')) return false;
-        if (exclusions.includes('wind') && (eventName.includes('wind') || eventName.includes('storm') || eventName.includes('gust'))) return false;
-        if (exclusions.includes('thunderstorm') && eventName.includes('thunderstorm')) return false;
-        if (exclusions.includes('rain') && eventName.includes('rain')) return false;
-        if (exclusions.includes('snow') && eventName.includes('snow')) return false;
-        if (exclusions.includes('heat') && eventName.includes('heat')) return false;
-        if (exclusions.includes('uv') && eventName.includes('uv')) return false;
-        if (exclusions.includes('ice') && (eventName.includes('ice') || eventName.includes('glaze'))) return false;
+            if (exclusions.includes('frost') && eventName.includes('frost')) return false;
+            if (exclusions.includes('fog') && eventName.includes('fog')) return false;
+            if (exclusions.includes('wind') && (eventName.includes('wind') || eventName.includes('storm') || eventName.includes('gust'))) return false;
+            if (exclusions.includes('thunderstorm') && eventName.includes('thunderstorm')) return false;
+            if (exclusions.includes('rain') && eventName.includes('rain')) return false;
+            if (exclusions.includes('snow') && eventName.includes('snow')) return false;
+            if (exclusions.includes('heat') && eventName.includes('heat')) return false;
+            if (exclusions.includes('uv') && eventName.includes('uv')) return false;
+            if (exclusions.includes('ice') && (eventName.includes('ice') || eventName.includes('glaze'))) return false;
 
-        return true;
-    });
+            return true;
+        });
+    }, [alerts, config.weatherAlertExclusions]);
 
     // Grid config: 3 columns normally, 4 if alerts exist (Clock | Weather | Alerts | Date)
     // Or adjust the middle section to split. Let's try flexible grid.
@@ -221,7 +218,6 @@ export const UnifiedHeaderWidget: React.FC = () => {
                         </div>
                         {/* Scroll through alerts if multiple, or show first */}
                         <div className="text-white text-lg leading-tight font-medium overflow-y-auto max-h-[70%] custom-scrollbar">
-                            {/* Deduplicate and join by comma */}
                             {Array.from(new Set(filteredAlerts.map(a => a.event_de || a.headline_de))).join(', ')}
                         </div>
                         <div className="text-yellow-500/60 text-[10px] mt-2 font-mono absolute bottom-1 right-2">

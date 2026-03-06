@@ -57,6 +57,7 @@ export interface AppConfig {
         end: string; // HH:mm
     };
     weatherAlertExclusions?: string[]; // List of event codes/names to ignore (e.g., 'FROST', 'FOG')
+    adminPin?: string;
 }
 
 export type CalendarScope = 'today' | 'weekWidget' | 'nextEvent' | 'weekView';
@@ -99,10 +100,11 @@ const defaultConfig: AppConfig = {
         start: '22:00',
         end: '06:00'
     },
-    weatherAlertExclusions: []
+    weatherAlertExclusions: [],
+    adminPin: '1234'
 };
 
-import { getApiUrl } from '../utils/api';
+import { getApiUrl, fetchWithTimeout } from '../utils/api';
 
 import { useSecurity } from './SecurityContext';
 
@@ -118,7 +120,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (!deviceId) return;
 
-        fetch(`${API_URL}/api/config`, {
+        fetchWithTimeout(`${API_URL}/api/config`, {
             headers: { 'x-device-id': deviceId }
         })
             .then(res => {

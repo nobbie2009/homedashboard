@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useConfig } from '../contexts/ConfigContext';
 import { useSecurity } from '../contexts/SecurityContext';
-import { getApiUrl } from '../utils/api';
+import { getApiUrl, fetchWithTimeout } from '../utils/api';
 
 export interface Lesson {
     id: string;
@@ -85,14 +85,14 @@ export const useEdupage = (date?: Date) => {
                 ? `${API_URL}/api/edupage?date=${dateStr}`
                 : `${API_URL}/api/edupage`;
 
-            const res = await fetch(url, {
+            const res = await fetchWithTimeout(url, {
                 headers: {
                     'username': config.edupage?.username || '',
                     'password': config.edupage?.password || '',
                     'subdomain': config.edupage?.subdomain || 'login1',
                     'x-device-id': deviceId
                 }
-            });
+            }, 15000);
 
             if (res.ok) {
                 const json = await res.json();
@@ -113,9 +113,21 @@ export const useEdupage = (date?: Date) => {
 
     useEffect(() => {
         fetchEdupage();
-        // Refresh every 30 minutes
-        const interval = setInterval(fetchEdupage, 30 * 60 * 1000);
-        return () => clearInterval(interval);
+        const EDUPAGE_POLL_INTERVAL = 30 * 60 * 1000;
+
+        const interval = setInterval(() => {
+            if (!document.hidden) fetchEdupage();
+        }, EDUPAGE_POLL_INTERVAL);
+
+        const handleVisibility = () => {
+            if (!document.hidden) fetchEdupage();
+        };
+        document.addEventListener('visibilitychange', handleVisibility);
+
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibility);
+        };
     }, [fetchEdupage]);
 
     return { students: data, loading, error, refresh: fetchEdupage };

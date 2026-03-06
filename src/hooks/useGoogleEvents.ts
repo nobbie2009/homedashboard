@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useConfig, CalendarScope } from '../contexts/ConfigContext';
 import { useSecurity } from '../contexts/SecurityContext'; // Import useSecurity
-import { getApiUrl } from '../utils/api';
+import { getApiUrl, fetchWithTimeout } from '../utils/api';
 
 // Define types
 export interface CalendarEvent {
@@ -82,11 +82,11 @@ export const useGoogleEvents = (options: UseGoogleEventsOptions = {}) => {
                     ...(options.timeMax && { timeMax: options.timeMax })
                 };
 
-                const res = await fetch(`${API_URL}/api/google/events`, {
+                const res = await fetchWithTimeout(`${API_URL}/api/google/events`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'x-device-id': deviceId // Add header
+                        'x-device-id': deviceId
                     },
                     body: JSON.stringify(body)
                 });
@@ -169,18 +169,28 @@ export const useGoogleEvents = (options: UseGoogleEventsOptions = {}) => {
         }
     }, [deviceId, config.google?.selectedCalendars, fetchEvents]);
 
-    // Polling Effect
+    // Polling Effect with visibility check
     useEffect(() => {
-        if (options.enabled === false) return; // Don't poll if disabled
+        if (options.enabled === false) return;
 
-        const intervalMs = config.google?.pollInterval || 600000; // Default 10 mins if not set
+        const intervalMs = config.google?.pollInterval || 600000;
 
         const intervalId = setInterval(() => {
-            // console.debug("Polling Google Events...");
-            fetchEvents(true); // Force fetch to ensure fresh data from API
+            if (!document.hidden) {
+                fetchEvents(true);
+            }
         }, intervalMs);
 
-        return () => clearInterval(intervalId);
+        // Re-fetch when tab becomes visible after being hidden
+        const handleVisibility = () => {
+            if (!document.hidden) fetchEvents(true);
+        };
+        document.addEventListener('visibilitychange', handleVisibility);
+
+        return () => {
+            clearInterval(intervalId);
+            document.removeEventListener('visibilitychange', handleVisibility);
+        };
     }, [config.google?.pollInterval, fetchEvents, options.enabled]);
 
     const refresh = useCallback(() => fetchEvents(true), [fetchEvents]);

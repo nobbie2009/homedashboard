@@ -1,81 +1,60 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useConfig } from './ConfigContext';
+import { useActivityTracker } from '../hooks/useActivityTracker';
 
 interface KioskContextType {
     isLocked: boolean;
     unlock: (pin: string) => boolean;
     lock: () => void;
-    resetIdleTimer: () => void;
+    lastActivity: React.MutableRefObject<number>;
 }
 
 const KioskContext = createContext<KioskContextType | undefined>(undefined);
 
-// TODO: Move PIN to configuration service later
-// For now, hardcoded: '1234'
-const ADMIN_PIN = '1234';
-const IDLE_TIMEOUT_MS = 60000; // 1 minute for testing, can be increased
+const IDLE_TIMEOUT_MS = 60000;
+const IDLE_CHECK_INTERVAL = 5000;
 
 export function KioskProvider({ children }: { children: React.ReactNode }) {
+    const { config } = useConfig();
     const [isLocked, setIsLocked] = useState(() => {
         const stored = localStorage.getItem('kiosk_is_locked');
         return stored !== null ? JSON.parse(stored) : true;
-    }); // Default to locked, or load from storage
-    const [lastInteraction, setLastInteraction] = useState(Date.now());
-
-    const unlock = useCallback((pin: string) => {
-        if (pin === ADMIN_PIN) {
-            setIsLocked(false);
-            localStorage.setItem('kiosk_is_locked', 'false');
-            resetIdleTimer();
-            return true;
-        }
-        return false;
-    }, []);
+    });
 
     const lock = useCallback(() => {
         setIsLocked(true);
         localStorage.setItem('kiosk_is_locked', 'true');
     }, []);
 
-    const resetIdleTimer = useCallback(() => {
-        setLastInteraction(Date.now());
-    }, []);
+    // Single shared activity tracker — replaces all manual event listeners
+    const lastActivity = useActivityTracker();
 
-    // Idle check effect
+    const unlock = useCallback((pin: string) => {
+        const adminPin = config.adminPin || '1234';
+        if (pin === adminPin) {
+            setIsLocked(false);
+            localStorage.setItem('kiosk_is_locked', 'false');
+            lastActivity.current = Date.now();
+            return true;
+        }
+        return false;
+    }, [config.adminPin, lastActivity]);
+
+    // Idle check: lock after IDLE_TIMEOUT_MS of inactivity
     useEffect(() => {
         if (isLocked) return;
 
         const interval = setInterval(() => {
-            if (Date.now() - lastInteraction > IDLE_TIMEOUT_MS) {
-                lock(); // lock() handles persistence now
+            if (Date.now() - lastActivity.current > IDLE_TIMEOUT_MS) {
+                lock();
             }
-        }, 5000); // Check every 5 seconds
+        }, IDLE_CHECK_INTERVAL);
 
         return () => clearInterval(interval);
-    }, [isLocked, lastInteraction, lock]);
-
-    // Global event listeners for activity
-    useEffect(() => {
-        const handleActivity = () => {
-            if (!isLocked) {
-                resetIdleTimer();
-            }
-        };
-
-        window.addEventListener('touchstart', handleActivity);
-        window.addEventListener('click', handleActivity);
-        window.addEventListener('scroll', handleActivity);
-        window.addEventListener('mousemove', handleActivity);
-
-        return () => {
-            window.removeEventListener('touchstart', handleActivity);
-            window.removeEventListener('click', handleActivity);
-            window.removeEventListener('scroll', handleActivity);
-            window.removeEventListener('mousemove', handleActivity);
-        };
-    }, [isLocked, resetIdleTimer]);
+    }, [isLocked, lock, lastActivity]);
 
     return (
-        <KioskContext.Provider value={{ isLocked, unlock, lock, resetIdleTimer }}>
+        <KioskContext.Provider value={{ isLocked, unlock, lock, lastActivity }}>
             {children}
         </KioskContext.Provider>
     );

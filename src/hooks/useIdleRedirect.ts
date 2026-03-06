@@ -1,38 +1,22 @@
 import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useKiosk } from '../contexts/KioskContext';
 
 export function useIdleRedirect(timeoutMs: number, redirectPath: string) {
     const navigate = useNavigate();
     const location = useLocation();
-
+    const { lastActivity } = useKiosk();
 
     useEffect(() => {
-        let timer: NodeJS.Timeout;
+        if (location.pathname === redirectPath) return;
 
-        const resetTimer = () => {
-
-            clearTimeout(timer);
-            // Only set redirect timer if NOT already on home
-            if (location.pathname !== redirectPath) {
-                timer = setTimeout(() => {
-                    console.log("Idle timeout reached. Redirecting to home.");
-                    navigate(redirectPath);
-                }, timeoutMs);
+        const check = setInterval(() => {
+            if (Date.now() - lastActivity.current > timeoutMs) {
+                console.log("Idle timeout reached. Redirecting to home.");
+                navigate(redirectPath);
             }
-        };
+        }, 5000);
 
-        // Events to listen for
-        const events = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll', 'click'];
-
-        // Bind listeners
-        events.forEach(event => window.addEventListener(event, resetTimer));
-
-        // Initial set
-        resetTimer();
-
-        return () => {
-            events.forEach(event => window.removeEventListener(event, resetTimer));
-            clearTimeout(timer);
-        };
-    }, [location.pathname, navigate, redirectPath, timeoutMs]);
+        return () => clearInterval(check);
+    }, [location.pathname, navigate, redirectPath, timeoutMs, lastActivity]);
 }

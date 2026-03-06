@@ -1,9 +1,116 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useEdupage } from '../../hooks/useEdupage';
 import { GraduationCap, Clock, AlertCircle, MessageSquare, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
+
+const getSubjectColor = (subjectName: string, subjectShort: string): string => {
+    const name = subjectName.toLowerCase();
+    const short = subjectShort.toLowerCase();
+
+    if (name.includes('deutsch') || short === 'de') return 'bg-purple-500/70 border-purple-400/50 text-white';
+    if (name.includes('mathe') || short === 'ma') return 'bg-blue-500/70 border-blue-400/50 text-white';
+    if (name.includes('heimat') || name.includes('sachkunde') || short === 'hsk' || short === 'hus') return 'bg-green-500/70 border-green-400/50 text-white';
+    if (name.includes('sport') || short === 'sp') return 'bg-lime-500/70 border-lime-400/50 text-white';
+    if (name.includes('musik') || short === 'mu') return 'bg-orange-400/70 border-orange-300/50 text-white';
+    if (name.includes('kunst') || name.includes('werken') || short === 'ku' || short === 'wk') return 'bg-pink-500/70 border-pink-400/50 text-white';
+    if (name.includes('religion') || name.includes('ethik') || short === 'rel' || short === 'eth') return 'bg-amber-500/70 border-amber-400/50 text-white';
+    if (name.includes('ergänz') || short === 'erg') return 'bg-cyan-500/70 border-cyan-400/50 text-white';
+    if (name.includes('garten') || short === 'sg') return 'bg-teal-500/70 border-teal-400/50 text-white';
+    return 'bg-slate-500/70 border-slate-400/50 text-white';
+};
+
+interface TimetableLesson {
+    date: string;
+    startTime: string;
+    endTime: string;
+    subject: { name: string; short: string };
+    teacher?: { name?: string };
+}
+
+const TimetableGrid: React.FC<{ timetable: TimetableLesson[] }> = ({ timetable }) => {
+    const { sortedDates, sortedPeriods, lessonMap } = useMemo(() => {
+        const groupedByDate: Record<string, TimetableLesson[]> = {};
+        const allPeriods = new Set<string>();
+        const lessonMap = new Map<string, TimetableLesson>();
+
+        timetable.forEach(lesson => {
+            const dateKey = lesson.date.split('T')[0];
+            if (!groupedByDate[dateKey]) groupedByDate[dateKey] = [];
+            groupedByDate[dateKey].push(lesson);
+            allPeriods.add(`${lesson.startTime}-${lesson.endTime}`);
+            lessonMap.set(`${dateKey}_${lesson.startTime}-${lesson.endTime}`, lesson);
+        });
+
+        const sortedPeriods = Array.from(allPeriods).sort((a, b) =>
+            a.split('-')[0].localeCompare(b.split('-')[0])
+        );
+        const sortedDates = Object.keys(groupedByDate).sort();
+
+        return { sortedDates, sortedPeriods, lessonMap };
+    }, [timetable]);
+
+    if (timetable.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center h-40 text-slate-500">
+                <Clock className="w-8 h-8 opacity-20 mb-2" />
+                <p className="italic">Keine Stunden für diese Woche.</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-xs">
+                <thead>
+                    <tr>
+                        <th className="p-1 text-slate-400 text-[10px] font-normal w-12 border-b border-slate-700"></th>
+                        {sortedDates.map(dateKey => (
+                            <th key={dateKey} className="p-1 text-center border-b border-slate-700 min-w-[60px]">
+                                <div className="text-slate-300 font-bold text-sm">{format(new Date(dateKey), 'EEE', { locale: de })}</div>
+                                <div className="text-slate-500 text-[10px]">{format(new Date(dateKey), 'dd.MM.', { locale: de })}</div>
+                            </th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {sortedPeriods.map((period, pIdx) => {
+                        const [startTime, endTime] = period.split('-');
+                        return (
+                            <tr key={period} className={pIdx % 2 === 0 ? 'bg-slate-800/20' : ''}>
+                                <td className="p-1 text-center border-r border-slate-700 text-[10px] text-slate-400 align-top">
+                                    <div className="font-bold text-slate-300">{pIdx + 1}</div>
+                                    <div>{startTime}</div>
+                                    <div className="opacity-60">{endTime}</div>
+                                </td>
+                                {sortedDates.map(dateKey => {
+                                    const lesson = lessonMap.get(`${dateKey}_${period}`);
+                                    if (lesson) {
+                                        const subjectColor = getSubjectColor(lesson.subject.name, lesson.subject.short);
+                                        return (
+                                            <td key={dateKey} className="p-0.5 align-top">
+                                                <div className={`p-1.5 rounded border h-full min-h-[50px] ${subjectColor}`}>
+                                                    <div className="font-bold text-sm text-center">{lesson.subject.short || lesson.subject.name.substring(0, 3)}</div>
+                                                    <div className="text-[9px] opacity-80 text-center mt-0.5 truncate">{lesson.teacher?.name?.split(' ').pop()}</div>
+                                                </div>
+                                            </td>
+                                        );
+                                    }
+                                    return (
+                                        <td key={dateKey} className="p-0.5 align-top">
+                                            <div className="min-h-[50px]"></div>
+                                        </td>
+                                    );
+                                })}
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
+        </div>
+    );
+};
 
 export const SchoolView: React.FC = () => {
     const { config } = useConfig();
@@ -134,148 +241,7 @@ export const SchoolView: React.FC = () => {
 
                                 {/* TIMETABLE - Grid Layout like Edupage */}
                                 {currentTab === 'timetable' && (
-                                    <div className="overflow-x-auto">
-                                        {(() => {
-                                            // Subject color mapping - similar to Edupage
-                                            const getSubjectColor = (subjectName: string, subjectShort: string): string => {
-                                                const name = subjectName.toLowerCase();
-                                                const short = subjectShort.toLowerCase();
-
-                                                if (name.includes('deutsch') || short === 'de') {
-                                                    return 'bg-purple-500/70 border-purple-400/50 text-white';
-                                                }
-                                                if (name.includes('mathe') || short === 'ma') {
-                                                    return 'bg-blue-500/70 border-blue-400/50 text-white';
-                                                }
-                                                if (name.includes('heimat') || name.includes('sachkunde') || short === 'hsk' || short === 'hus') {
-                                                    return 'bg-green-500/70 border-green-400/50 text-white';
-                                                }
-                                                if (name.includes('sport') || short === 'sp') {
-                                                    return 'bg-lime-500/70 border-lime-400/50 text-white';
-                                                }
-                                                if (name.includes('musik') || short === 'mu') {
-                                                    return 'bg-orange-400/70 border-orange-300/50 text-white';
-                                                }
-                                                if (name.includes('kunst') || name.includes('werken') || short === 'ku' || short === 'wk') {
-                                                    return 'bg-pink-500/70 border-pink-400/50 text-white';
-                                                }
-                                                if (name.includes('religion') || name.includes('ethik') || short === 'rel' || short === 'eth') {
-                                                    return 'bg-amber-500/70 border-amber-400/50 text-white';
-                                                }
-                                                if (name.includes('ergänz') || short === 'erg') {
-                                                    return 'bg-cyan-500/70 border-cyan-400/50 text-white';
-                                                }
-                                                if (name.includes('garten') || short === 'sg') {
-                                                    return 'bg-teal-500/70 border-teal-400/50 text-white';
-                                                }
-                                                return 'bg-slate-500/70 border-slate-400/50 text-white';
-                                            };
-
-                                            if (student.timetable.length === 0) {
-                                                return (
-                                                    <div className="flex flex-col items-center justify-center h-40 text-slate-500">
-                                                        <Clock className="w-8 h-8 opacity-20 mb-2" />
-                                                        <p className="italic">Keine Stunden für diese Woche.</p>
-                                                    </div>
-                                                );
-                                            }
-
-                                            // Group lessons by date
-                                            const groupedByDate: Record<string, typeof student.timetable> = {};
-                                            student.timetable.forEach(lesson => {
-                                                const dateKey = lesson.date.split('T')[0];
-                                                if (!groupedByDate[dateKey]) groupedByDate[dateKey] = [];
-                                                groupedByDate[dateKey].push(lesson);
-                                            });
-
-                                            // Get all unique periods (time slots) across all days
-                                            const allPeriods = new Set<string>();
-                                            student.timetable.forEach(lesson => {
-                                                allPeriods.add(`${lesson.startTime}-${lesson.endTime}`);
-                                            });
-                                            const sortedPeriods = Array.from(allPeriods).sort((a, b) => {
-                                                const timeA = a.split('-')[0];
-                                                const timeB = b.split('-')[0];
-                                                return timeA.localeCompare(timeB);
-                                            });
-
-                                            // Sort dates (columns)
-                                            const sortedDates = Object.keys(groupedByDate).sort();
-
-                                            // Create lookup: date + period -> lesson
-                                            const lessonMap = new Map<string, typeof student.timetable[0]>();
-                                            student.timetable.forEach(lesson => {
-                                                const key = `${lesson.date.split('T')[0]}_${lesson.startTime}-${lesson.endTime}`;
-                                                lessonMap.set(key, lesson);
-                                            });
-
-                                            // Day name abbreviations
-                                            const getDayAbbr = (dateStr: string) => {
-                                                const date = new Date(dateStr);
-                                                return format(date, 'EEE', { locale: de });
-                                            };
-                                            const getDateStr = (dateStr: string) => {
-                                                const date = new Date(dateStr);
-                                                return format(date, 'dd.MM.', { locale: de });
-                                            };
-
-                                            return (
-                                                <table className="w-full border-collapse text-xs">
-                                                    {/* Header row - Days */}
-                                                    <thead>
-                                                        <tr>
-                                                            <th className="p-1 text-slate-400 text-[10px] font-normal w-12 border-b border-slate-700"></th>
-                                                            {sortedDates.map(dateKey => (
-                                                                <th key={dateKey} className="p-1 text-center border-b border-slate-700 min-w-[60px]">
-                                                                    <div className="text-slate-300 font-bold text-sm">{getDayAbbr(dateKey)}</div>
-                                                                    <div className="text-slate-500 text-[10px]">{getDateStr(dateKey)}</div>
-                                                                </th>
-                                                            ))}
-                                                        </tr>
-                                                    </thead>
-                                                    {/* Body - Periods as rows */}
-                                                    <tbody>
-                                                        {sortedPeriods.map((period, pIdx) => {
-                                                            const [startTime, endTime] = period.split('-');
-                                                            return (
-                                                                <tr key={period} className={pIdx % 2 === 0 ? 'bg-slate-800/20' : ''}>
-                                                                    {/* Period time column */}
-                                                                    <td className="p-1 text-center border-r border-slate-700 text-[10px] text-slate-400 align-top">
-                                                                        <div className="font-bold text-slate-300">{pIdx + 1}</div>
-                                                                        <div>{startTime}</div>
-                                                                        <div className="opacity-60">{endTime}</div>
-                                                                    </td>
-                                                                    {/* Lesson cells for each day */}
-                                                                    {sortedDates.map(dateKey => {
-                                                                        const key = `${dateKey}_${period}`;
-                                                                        const lesson = lessonMap.get(key);
-
-                                                                        if (lesson) {
-                                                                            const subjectColor = getSubjectColor(lesson.subject.name, lesson.subject.short);
-                                                                            return (
-                                                                                <td key={dateKey} className="p-0.5 align-top">
-                                                                                    <div className={`p-1.5 rounded border h-full min-h-[50px] ${subjectColor}`}>
-                                                                                        <div className="font-bold text-sm text-center">{lesson.subject.short || lesson.subject.name.substring(0, 3)}</div>
-                                                                                        <div className="text-[9px] opacity-80 text-center mt-0.5 truncate">{lesson.teacher?.name?.split(' ').pop()}</div>
-                                                                                    </div>
-                                                                                </td>
-                                                                            );
-                                                                        } else {
-                                                                            return (
-                                                                                <td key={dateKey} className="p-0.5 align-top">
-                                                                                    <div className="min-h-[50px]"></div>
-                                                                                </td>
-                                                                            );
-                                                                        }
-                                                                    })}
-                                                                </tr>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            );
-                                        })()}
-                                    </div>
+                                    <TimetableGrid timetable={student.timetable} />
                                 )}
 
 

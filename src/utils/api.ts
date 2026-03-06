@@ -14,3 +14,21 @@ export const getApiUrl = () => {
 
     return envUrl || '';
 };
+
+const DEFAULT_TIMEOUT = 10000;
+
+/**
+ * Fetch wrapper with automatic timeout via AbortController.
+ */
+export const fetchWithTimeout = (
+    input: RequestInfo | URL,
+    init?: RequestInit,
+    timeoutMs = DEFAULT_TIMEOUT
+): Promise<Response> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    return fetch(input, { ...init, signal: controller.signal }).finally(() =>
+        clearTimeout(timeout)
+    );
+};

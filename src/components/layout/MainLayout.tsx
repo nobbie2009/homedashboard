@@ -11,15 +11,19 @@ import { DoorbellOverlay } from '../overlays/DoorbellOverlay';
 import { Screensaver } from '../overlays/Screensaver';
 import { OnScreenKeyboard } from '../overlays/OnScreenKeyboard';
 import { useConfig } from '../../contexts/ConfigContext';
+import { ErrorBoundary } from '../ErrorBoundary';
+
+const SCREENSAVER_IDLE_MS = 180000; // 3 minutes
+const SCREENSAVER_CHECK_INTERVAL = 10000; // 10 seconds
+const IDLE_REDIRECT_MS = 180000; // 3 minutes
 
 export const MainLayout: React.FC = () => {
-    const { isLocked, lock } = useKiosk();
+    const { isLocked, lock, lastActivity } = useKiosk();
     const { deviceId } = useSecurity();
     const { config } = useConfig();
     const [serverIp, setServerIp] = React.useState<string>('');
     const [showScreensaver, setShowScreensaver] = React.useState(false);
     const [isOnline, setIsOnline] = React.useState(navigator.onLine);
-    const lastActivity = React.useRef(Date.now());
 
     React.useEffect(() => {
         const handleOnline = () => setIsOnline(true);
@@ -47,25 +51,12 @@ export const MainLayout: React.FC = () => {
         fetchIp();
     }, [deviceId]);
 
-    // Activity Listener for Screensaver & Kiosk
+    // Dismiss screensaver on any activity
     React.useEffect(() => {
-        const resetActivity = () => {
-            lastActivity.current = Date.now();
-            // If screensaver is active, dismiss it
-            setShowScreensaver(false);
-        };
-
-        window.addEventListener('mousemove', resetActivity);
-        window.addEventListener('mousedown', resetActivity);
-        window.addEventListener('touchstart', resetActivity);
-        window.addEventListener('keydown', resetActivity);
-
-        return () => {
-            window.removeEventListener('mousemove', resetActivity);
-            window.removeEventListener('mousedown', resetActivity);
-            window.removeEventListener('touchstart', resetActivity);
-            window.removeEventListener('keydown', resetActivity);
-        };
+        const dismiss = () => setShowScreensaver(false);
+        const events = ['mousedown', 'touchstart', 'keydown'] as const;
+        events.forEach(e => window.addEventListener(e, dismiss, { passive: true }));
+        return () => { events.forEach(e => window.removeEventListener(e, dismiss)); };
     }, []);
 
     // Screensaver Logic Check
@@ -92,8 +83,7 @@ export const MainLayout: React.FC = () => {
             }
 
             if (inWindow) {
-                // If in window, check idle time (3 mins = 180000 ms)
-                if (Date.now() - lastActivity.current > 180000) {
+                if (Date.now() - lastActivity.current > SCREENSAVER_IDLE_MS) {
                     setShowScreensaver(true);
                 }
             } else {
@@ -101,15 +91,14 @@ export const MainLayout: React.FC = () => {
             }
         };
 
-        const interval = setInterval(checkScreensaver, 10000); // Check every 10s
+        const interval = setInterval(checkScreensaver, SCREENSAVER_CHECK_INTERVAL);
         checkScreensaver(); // Check immediately on mount/update
 
         return () => clearInterval(interval);
     }, [config.screensaver]);
 
 
-    // Auto-redirect to home after 3 minutes (180000ms) of inactivity
-    useIdleRedirect(180000, '/');
+    useIdleRedirect(IDLE_REDIRECT_MS, '/');
 
     const navItems = [
         { path: '/', icon: LayoutDashboard, label: 'Heute' },
@@ -216,7 +205,9 @@ export const MainLayout: React.FC = () => {
 
             {/* Main Content Area */}
             <main className="flex-1 overflow-auto p-4 relative">
-                <Outlet />
+                <ErrorBoundary>
+                    <Outlet />
+                </ErrorBoundary>
             </main>
 
             {/* Bottom Navigation (Large Tabs) */}

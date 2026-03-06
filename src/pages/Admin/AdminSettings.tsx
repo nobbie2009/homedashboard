@@ -276,7 +276,7 @@ const AdminSettings: React.FC = () => {
                         onChange={(e) => setPin(e.target.value)}
                         placeholder="PIN eingeben"
                         className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-2xl text-center w-48 focus:outline-none focus:border-blue-500"
-                        maxLength={4}
+                        maxLength={6}
                     />
                     {error && <div className="text-red-400">{error}</div>}
                     <div className="grid grid-cols-3 gap-2">
@@ -1093,7 +1093,31 @@ const AdminSettings: React.FC = () => {
                 {/* 6. GERÄTE TAB (Security) */}
                 {
                     activeTab === 'geraete' && (
-                        <DeviceList />
+                        <div className="space-y-6">
+                            <section className="bg-slate-800/30 p-6 rounded-xl border border-slate-700">
+                                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                                    <Shield className="w-5 h-5 text-blue-400" />
+                                    Admin-PIN
+                                </h3>
+                                <div className="flex items-center gap-4">
+                                    <input
+                                        type="password"
+                                        value={config.adminPin || '1234'}
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                                            updateConfig({ adminPin: val });
+                                        }}
+                                        placeholder="PIN (4-6 Ziffern)"
+                                        className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-xl text-center w-48 font-mono tracking-widest focus:outline-none focus:border-blue-500"
+                                        maxLength={6}
+                                    />
+                                    <span className="text-sm text-slate-400">
+                                        4-6 Ziffern zum Entsperren des Adminbereichs
+                                    </span>
+                                </div>
+                            </section>
+                            <DeviceList />
+                        </div>
                     )
                 }
             </div >
