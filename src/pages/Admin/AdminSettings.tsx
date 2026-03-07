@@ -252,12 +252,14 @@ const AdminSettings: React.FC = () => {
     const handleSystemUpdate = async () => {
         if (!confirm("System aktualisieren (Git Pull)?")) return;
         try {
-            // Show some loading state via alert or just blocking (simple)
             const res = await fetch(`${API_URL}/api/system/update`, { method: 'POST', headers: { 'x-device-id': deviceId } });
             const data = await res.json();
 
             if (data.success) {
-                alert(`Update erfolgreich!\nOutput:\n${data.output}`);
+                const msg = data.note
+                    ? `Update erfolgreich!\n${data.output}\n\nHinweis: ${data.note}`
+                    : `Update erfolgreich!\n${data.output}`;
+                alert(msg);
                 window.location.reload();
             } else {
                 alert(`Update fehlgeschlagen:\n${data.details}\n\nOutput:\n${data.output}`);

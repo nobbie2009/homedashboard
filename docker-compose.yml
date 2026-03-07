@@ -26,3 +26,4 @@ services:
     volumes:
       - ./data:/app/server/data
       - ./server:/app/server
+      - ./.git:/app/.git

@@ -78,36 +78,68 @@ app.get('/api/system/ip', (req, res) => {
     res.json({ ip: results[0] || 'localhost' });
 });
 
-// Maintenance: Git Pull
+// Maintenance: Git Pull / Update
 app.post('/api/system/update', (req, res) => {
-    console.log("System Update triggered: git pull");
+    console.log("System Update triggered");
     const repoRoot = path.join(__dirname, '..');
     const gitDir = path.join(repoRoot, '.git');
 
-    // Check if .git exists (won't exist inside Docker containers)
     if (!fs.existsSync(gitDir)) {
         return res.status(400).json({
             error: "Kein Git-Repository gefunden",
-            details: "Das System läuft in einem Docker-Container. Bitte aktualisiere auf dem Host mit:\n\ncd homedashboard && git pull && docker-compose up --build -d",
-            output: "Docker-Umgebung erkannt. Git Pull ist nur auf dem Host möglich."
+            details: "Kein .git-Verzeichnis vorhanden. Falls Docker: .git muss als Volume gemountet sein.",
+            output: "Kein .git-Verzeichnis unter " + gitDir
         });
     }
 
-    exec('git pull', { cwd: repoRoot }, (error, stdout, stderr) => {
-        if (error) {
-            console.error(`Exec error: ${error}`);
-            return res.status(500).json({
-                error: "Git Pull Failed",
-                details: error.message,
+    // Detect Docker environment
+    const isDocker = fs.existsSync('/.dockerenv');
+
+    if (isDocker) {
+        // In Docker: fetch + checkout only server/ files (bind-mounted from host)
+        const gitCmd = `git --git-dir="${gitDir}" --work-tree="${repoRoot}" fetch origin && git --git-dir="${gitDir}" --work-tree="${repoRoot}" checkout origin/main -- server/`;
+
+        exec(gitCmd, { cwd: repoRoot }, (error, stdout, stderr) => {
+            if (error) {
+                console.error(`Git update error: ${error}`);
+                return res.status(500).json({
+                    error: "Update fehlgeschlagen",
+                    details: error.message,
+                    output: `${stdout}\n${stderr}`
+                });
+            }
+
+            console.log("Server files updated from origin/main");
+            res.json({
+                success: true,
+                output: `Server-Dateien aktualisiert.\n${stdout}`,
+                note: "Für Frontend-Änderungen: docker-compose up --build -d"
+            });
+
+            // Restart after response is sent (Docker restart policy restarts the container)
+            setTimeout(() => {
+                console.log("Restarting server after update...");
+                process.exit(0);
+            }, 1000);
+        });
+    } else {
+        // Not in Docker: regular git pull
+        exec('git pull', { cwd: repoRoot }, (error, stdout, stderr) => {
+            if (error) {
+                console.error(`Exec error: ${error}`);
+                return res.status(500).json({
+                    error: "Git Pull fehlgeschlagen",
+                    details: error.message,
+                    output: `${stdout}\n${stderr}`
+                });
+            }
+            console.log(`Git Pull Output: ${stdout}`);
+            res.json({
+                success: true,
                 output: `${stdout}\n${stderr}`
             });
-        }
-        console.log(`Git Pull Output: ${stdout}`);
-        res.json({
-            success: true,
-            output: `${stdout}\n${stderr}`
         });
-    });
+    }
 });
 
 // Edupage Cache (declared early so clearcache can reference it)
