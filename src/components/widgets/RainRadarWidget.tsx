@@ -80,8 +80,8 @@ export const RainRadarWidget: React.FC = () => {
     }
 
     return (
-        <div className="h-full w-full bg-slate-900 rounded-xl shadow-lg border border-slate-700 overflow-hidden relative flex flex-col">
-            <div className="flex-1 relative overflow-hidden bg-slate-800">
+        <div className="h-full w-full bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-300 dark:border-slate-700 overflow-hidden relative flex flex-col">
+            <div className="flex-1 relative overflow-hidden bg-slate-200 dark:bg-slate-800">
                 {/* DWD Gif & Marker - Wrapped for Zoom */}
                 <div
                     className="w-full h-full relative transition-transform duration-700"
@@ -107,8 +107,8 @@ export const RainRadarWidget: React.FC = () => {
             </div>
 
             {/* Title Overlay */}
-            <div className="absolute top-0 left-0 bg-slate-900/60 px-2 py-1 rounded-br-lg pointer-events-none z-10 backdrop-blur-sm border-r border-b border-slate-700">
-                <span className="text-white text-xs font-semibold">
+            <div className="absolute top-0 left-0 bg-white/60 dark:bg-slate-900/60 px-2 py-1 rounded-br-lg pointer-events-none z-10 backdrop-blur-sm border-r border-b border-slate-300 dark:border-slate-700">
+                <span className="text-slate-900 dark:text-white text-xs font-semibold">
                     {config.weatherLocation ? config.weatherLocation : 'Regenradar (DWD)'}
                 </span>
             </div>

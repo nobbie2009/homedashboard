@@ -6,6 +6,7 @@ import { useSecurity } from '../../contexts/SecurityContext';
 
 const SNAPSHOT_INTERVAL = 250;
 const ERROR_RETRY_DELAY = 2000;
+const STREAM_TIMEOUT = 5000; // 5s timeout for MJPEG stream to produce a frame
 
 export const CameraWidget: React.FC = () => {
     const { config } = useConfig();
@@ -14,7 +15,9 @@ export const CameraWidget: React.FC = () => {
     const [useStream, setUseStream] = useState(true);
     const [errorCount, setErrorCount] = useState(0);
     const [snapshotTimestamp, setSnapshotTimestamp] = useState(Date.now());
+    const [streamLoaded, setStreamLoaded] = useState(false);
     const imgRef = useRef<HTMLImageElement>(null);
+    const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
     const streamUrl = `${API_URL}/api/camera/stream?deviceId=${deviceId}`;
     const snapshotUrl = `${API_URL}/api/camera/snapshot?deviceId=${deviceId}&t=${snapshotTimestamp}`;
@@ -22,8 +25,23 @@ export const CameraWidget: React.FC = () => {
     // Reset on config change
     useEffect(() => {
         setUseStream(true);
+        setStreamLoaded(false);
         setErrorCount(0);
     }, [config.cameraUrl, deviceId]);
+
+    // Timeout: if MJPEG stream doesn't load within STREAM_TIMEOUT, fall back to snapshots
+    useEffect(() => {
+        if (useStream && !streamLoaded) {
+            timeoutRef.current = setTimeout(() => {
+                console.warn("MJPEG stream timeout, falling back to snapshot polling");
+                setUseStream(false);
+                setSnapshotTimestamp(Date.now());
+            }, STREAM_TIMEOUT);
+        }
+        return () => {
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        };
+    }, [useStream, streamLoaded]);
 
     // Snapshot polling fallback handlers
     const handleSnapshotLoad = () => {
@@ -36,15 +54,21 @@ export const CameraWidget: React.FC = () => {
         setTimeout(() => setSnapshotTimestamp(Date.now()), ERROR_RETRY_DELAY);
     };
 
+    const handleStreamLoad = () => {
+        setStreamLoaded(true);
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+
     const handleStreamError = () => {
         console.warn("MJPEG stream failed, falling back to snapshot polling");
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
         setUseStream(false);
         setSnapshotTimestamp(Date.now());
     };
 
     if (!config.cameraUrl) {
         return (
-            <div className="h-full bg-slate-800/20 rounded-xl border border-slate-700/30 flex flex-col items-center justify-center text-slate-600">
+            <div className="h-full bg-slate-200/20 dark:bg-slate-800/20 rounded-xl border border-slate-300/30 dark:border-slate-700/30 flex flex-col items-center justify-center text-slate-400 dark:text-slate-600">
                 <VideoOff className="w-8 h-8 mb-2 opacity-50" />
                 <span className="text-sm italic">Keine Kamera konfiguriert</span>
             </div>
@@ -52,13 +76,14 @@ export const CameraWidget: React.FC = () => {
     }
 
     return (
-        <div className="h-full w-full bg-black rounded-xl overflow-hidden relative group border border-slate-800">
+        <div className="h-full w-full bg-black rounded-xl overflow-hidden relative group border border-slate-200 dark:border-slate-800">
             {useStream ? (
                 <img
                     ref={imgRef}
                     src={streamUrl}
                     alt="Camera Live Stream"
                     className="w-full h-full object-cover"
+                    onLoad={handleStreamLoad}
                     onError={handleStreamError}
                 />
             ) : (

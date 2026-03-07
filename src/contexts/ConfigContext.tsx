@@ -16,6 +16,26 @@ export interface Chore {
     icon: string; // lucide icon name
     assignedTo?: string; // kidId
     rotation: 'daily' | 'weekly' | 'none';
+    difficulty?: 1 | 2 | 3; // 1=Leicht, 2=Mittel, 3=Schwer (Sterne pro Erledigung)
+}
+
+export interface RewardConfig {
+    mode: 'individual' | 'shared';
+    targetStars: number;
+    currentReward: string;
+    rewardImage?: string;
+    kidStars?: Record<string, number>;
+    sharedStars?: number;
+}
+
+export interface CompletionEntry {
+    id: string;
+    taskId: string;
+    taskLabel: string;
+    kidId: string;
+    kidName: string;
+    stars: number;
+    timestamp: number;
 }
 
 export interface RotationSettings {
@@ -58,6 +78,8 @@ export interface AppConfig {
     };
     weatherAlertExclusions?: string[]; // List of event codes/names to ignore (e.g., 'FROST', 'FOG')
     adminPin?: string;
+    rewards?: RewardConfig;
+    theme?: 'dark' | 'light' | 'auto';
 }
 
 export type CalendarScope = 'today' | 'weekWidget' | 'nextEvent' | 'weekView';
@@ -101,7 +123,15 @@ const defaultConfig: AppConfig = {
         end: '06:00'
     },
     weatherAlertExclusions: [],
-    adminPin: '1234'
+    adminPin: '1234',
+    rewards: {
+        mode: 'individual',
+        targetStars: 20,
+        currentReward: '',
+        kidStars: {},
+        sharedStars: 0
+    },
+    theme: 'dark'
 };
 
 import { getApiUrl, fetchWithTimeout } from '../utils/api';
@@ -145,7 +175,16 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
                             start: data.screensaver?.start || prev.screensaver?.start || '22:00',
                             end: data.screensaver?.end || prev.screensaver?.end || '06:00'
                         },
-                        weatherAlertExclusions: data.weatherAlertExclusions || prev.weatherAlertExclusions || []
+                        weatherAlertExclusions: data.weatherAlertExclusions || prev.weatherAlertExclusions || [],
+                        rewards: {
+                            mode: data.rewards?.mode || prev.rewards?.mode || 'individual',
+                            targetStars: data.rewards?.targetStars ?? prev.rewards?.targetStars ?? 20,
+                            currentReward: data.rewards?.currentReward ?? prev.rewards?.currentReward ?? '',
+                            rewardImage: data.rewards?.rewardImage ?? prev.rewards?.rewardImage,
+                            kidStars: data.rewards?.kidStars || prev.rewards?.kidStars || {},
+                            sharedStars: data.rewards?.sharedStars ?? prev.rewards?.sharedStars ?? 0,
+                        },
+                        theme: data.theme || prev.theme || 'dark'
                     };
 
                     // Check for Chore Rotation - MOVED TO SERVER

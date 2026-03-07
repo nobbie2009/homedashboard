@@ -33,16 +33,16 @@ const NoteCard = ({ note }: { note: Note }) => {
             note.color
         )}>
             <div>
-                <div className="text-lg font-medium leading-relaxed whitespace-pre-wrap font-sans text-slate-800">
+                <div className="text-lg font-medium leading-relaxed whitespace-pre-wrap font-sans text-slate-700 dark:text-slate-800">
                     {note.content}
                 </div>
                 {truncatedDescription && (
-                    <div className="mt-2 text-sm italic text-slate-600 font-serif leading-snug">
+                    <div className="mt-2 text-sm italic text-slate-500 dark:text-slate-600 font-serif leading-snug">
                         {truncatedDescription}
                     </div>
                 )}
             </div>
-            <div className="flex justify-between items-end mt-4 text-sm opacity-75 font-semibold text-slate-700">
+            <div className="flex justify-between items-end mt-4 text-sm opacity-75 font-semibold text-slate-600 dark:text-slate-700">
                 <span>{note.author}</span>
                 <span>{displayDate ? format(new Date(displayDate), 'dd.MM.') : ''}</span>
             </div>
@@ -116,18 +116,18 @@ const NotesBoard: React.FC = () => {
 
             <div className="flex-1 overflow-y-auto pb-20 custom-scrollbar">
                 {loading && notes.length === 0 ? (
-                    <div className="flex items-center justify-center h-40 text-slate-400">
+                    <div className="flex items-center justify-center h-40 text-slate-500 dark:text-slate-400">
                         Lade Notizen aus Notion...
                     </div>
                 ) : error ? (
                     <div className="flex flex-col items-center justify-center h-40 text-red-400 space-y-2">
                         <span>{error}</span>
-                        <button onClick={fetchNotes} className="bg-slate-800 px-4 py-2 rounded hover:bg-slate-700 text-white">
+                        <button onClick={fetchNotes} className="bg-slate-200 dark:bg-slate-800 px-4 py-2 rounded hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-900 dark:text-white">
                             Erneut versuchen
                         </button>
                     </div>
                 ) : notes.length === 0 ? (
-                    <div className="flex items-center justify-center h-40 text-slate-500">
+                    <div className="flex items-center justify-center h-40 text-slate-400 dark:text-slate-500">
                         Keine Notizen gefunden (Filter: Private?)
                     </div>
                 ) : (

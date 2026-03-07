@@ -19,7 +19,7 @@ export const CountdownWidget: React.FC = () => {
 
     if (loading && !nextEvent) {
         return (
-            <div className="flex flex-col items-center justify-center p-4 bg-slate-800/50 rounded-xl border border-slate-700 h-full text-slate-500 animate-pulse">
+            <div className="flex flex-col items-center justify-center p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full text-slate-400 dark:text-slate-500 animate-pulse">
                 <span className="text-lg">Lade Termine...</span>
             </div>
         );
@@ -27,7 +27,7 @@ export const CountdownWidget: React.FC = () => {
 
     if (!nextEvent) {
         return (
-            <div className="flex flex-col items-center justify-center p-4 bg-slate-800/50 rounded-xl border border-slate-700 h-full text-slate-500">
+            <div className="flex flex-col items-center justify-center p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full text-slate-400 dark:text-slate-500">
                 <span className="text-lg">Keine weiteren Termine</span>
             </div>
         );
@@ -42,34 +42,34 @@ export const CountdownWidget: React.FC = () => {
     if (diffSeconds < 0) return null;
 
     return (
-        <div className="flex flex-col p-4 bg-slate-800/50 rounded-xl border border-slate-700 h-full items-center justify-center relative overflow-hidden group">
+        <div className="flex flex-col p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full items-center justify-center relative overflow-hidden group">
             {/* Background progress or glow could go here */}
 
-            <h3 className="text-sm font-bold text-slate-400 mb-2 uppercase tracking-widest">Nächstes Event</h3>
+            <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-widest">Nächstes Event</h3>
 
             <div className="flex items-baseline space-x-2">
                 <div className="flex flex-col items-center">
-                    <span className="text-5xl font-black text-white tabular-nums leading-none">{String(hours).padStart(2, '0')}</span>
-                    <span className="text-xs text-slate-500 uppercase mt-1">Std</span>
+                    <span className="text-5xl font-black text-slate-900 dark:text-white tabular-nums leading-none">{String(hours).padStart(2, '0')}</span>
+                    <span className="text-xs text-slate-400 dark:text-slate-500 uppercase mt-1">Std</span>
                 </div>
-                <span className="text-3xl text-slate-600 font-light -mt-4">:</span>
+                <span className="text-3xl text-slate-400 dark:text-slate-600 font-light -mt-4">:</span>
                 <div className="flex flex-col items-center">
-                    <span className="text-5xl font-black text-white tabular-nums leading-none">{String(minutes).padStart(2, '0')}</span>
-                    <span className="text-xs text-slate-500 uppercase mt-1">Min</span>
+                    <span className="text-5xl font-black text-slate-900 dark:text-white tabular-nums leading-none">{String(minutes).padStart(2, '0')}</span>
+                    <span className="text-xs text-slate-400 dark:text-slate-500 uppercase mt-1">Min</span>
                 </div>
-                <span className="text-3xl text-slate-600 font-light -mt-4">:</span>
+                <span className="text-3xl text-slate-400 dark:text-slate-600 font-light -mt-4">:</span>
                 <div className="flex flex-col items-center">
                     <span className="text-5xl font-black text-blue-400 tabular-nums leading-none">{String(seconds).padStart(2, '0')}</span>
-                    <span className="text-xs text-slate-500 uppercase mt-1">Sek</span>
+                    <span className="text-xs text-slate-400 dark:text-slate-500 uppercase mt-1">Sek</span>
                 </div>
             </div>
 
             <div className="mt-4 text-center max-w-full px-4">
-                <div className="text-xl font-bold text-white truncate leading-tight" style={{ color: nextEvent.color || 'white' }}>
+                <div className="text-xl font-bold text-slate-900 dark:text-white truncate leading-tight" style={{ color: nextEvent.color || undefined }}>
                     {nextEvent.title}
                 </div>
                 {nextEvent.location && (
-                    <div className="text-xs text-slate-400 mt-1 truncate max-w-[200px] mx-auto">
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate max-w-[200px] mx-auto">
                         📍 {nextEvent.location}
                     </div>
                 )}

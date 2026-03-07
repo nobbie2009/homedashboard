@@ -13,15 +13,15 @@ export const WeekWidget: React.FC = () => {
     const nextDays = Array.from({ length: 5 }, (_, i) => addDays(new Date(), i)); // Today + 4 days
 
     return (
-        <div className="flex flex-col p-4 bg-slate-800/50 rounded-xl backdrop-blur-sm shadow-lg w-full h-full border border-slate-700 overflow-hidden">
-            <h3 className="text-xl font-semibold text-slate-300 mb-3 uppercase tracking-wider">Wochenübersicht</h3>
+        <div className="flex flex-col p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl backdrop-blur-sm shadow-lg w-full h-full border border-slate-300 dark:border-slate-700 overflow-hidden">
+            <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-3 uppercase tracking-wider">Wochenübersicht</h3>
             <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4">
                 {nextDays.map(day => {
                     const dayEvents = events.filter(e => isSameDay(e.start, day));
                     if (dayEvents.length === 0) return null; // Skip empty days or show placeholder? Let's skip for compactness
 
                     return (
-                        <div key={day.toISOString()} className="border-l-2 border-slate-600 pl-3">
+                        <div key={day.toISOString()} className="border-l-2 border-slate-300 dark:border-slate-600 pl-3">
                             <div className="text-lg font-bold text-blue-400 mb-1 capitalize">
                                 {format(day, 'EEEE, d. MMM', { locale: de })}
                             </div>
@@ -29,13 +29,13 @@ export const WeekWidget: React.FC = () => {
                                 {dayEvents.map(e => {
                                     const color = config.google?.calendarColors?.[e.calendarId] || '#60a5fa';
                                     return (
-                                        <div key={e.id} className="text-base text-slate-300 truncate flex items-center">
+                                        <div key={e.id} className="text-base text-slate-600 dark:text-slate-300 truncate flex items-center">
                                             {e.isBirthday ? (
                                                 <Cake className="w-3.5 h-3.5 mr-2 text-pink-400" />
                                             ) : (
                                                 <div className="w-2.5 h-2.5 rounded-full mr-2" style={{ backgroundColor: color }}></div>
                                             )}
-                                            <span className="text-slate-500 mr-2 w-12">{format(e.start, 'HH:mm')}</span>
+                                            <span className="text-slate-400 dark:text-slate-500 mr-2 w-12">{format(e.start, 'HH:mm')}</span>
                                             <span className="truncate">{e.title}</span>
                                         </div>
                                     );
@@ -50,11 +50,11 @@ export const WeekWidget: React.FC = () => {
                         Fehler: {error}
                     </div>
                 ) : loading && events.length === 0 && (
-                    <div className="text-slate-500 text-center text-sm animate-pulse">Lade...</div>
+                    <div className="text-slate-400 dark:text-slate-500 text-center text-sm animate-pulse">Lade...</div>
                 )}
 
                 {!loading && events.length === 0 && (
-                    <div className="text-slate-500 text-center text-sm pt-4">Keine Termine</div>
+                    <div className="text-slate-400 dark:text-slate-500 text-center text-sm pt-4">Keine Termine</div>
                 )}
             </div>
         </div>

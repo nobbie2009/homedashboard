@@ -154,29 +154,29 @@ export const UnifiedHeaderWidget: React.FC = () => {
         : "grid grid-cols-[auto_1fr_auto]";
 
     return (
-        <div className={`${gridClass} items-center bg-slate-800/60 rounded-xl backdrop-blur-md shadow-lg w-full h-full border border-slate-700 text-white relative transition-all duration-500`}>
+        <div className={`${gridClass} items-center bg-slate-200/60 dark:bg-slate-800/60 rounded-xl backdrop-blur-md shadow-lg w-full h-full border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white relative transition-all duration-500`}>
 
             {/* LEFT: Clock */}
             <div className="flex flex-row items-center justify-start pl-8 h-full">
-                <div className="text-[9rem] font-black tracking-tighter tabular-nums leading-none bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">
+                <div className="text-[9rem] font-black tracking-tighter tabular-nums leading-none bg-gradient-to-br from-slate-800 to-slate-500 dark:from-white dark:to-slate-400 bg-clip-text text-transparent">
                     {format(time, 'HH:mm')}
                 </div>
                 {config.showSeconds && (
-                    <div className="text-5xl text-slate-500 font-mono ml-3 font-medium">
+                    <div className="text-5xl text-slate-400 dark:text-slate-500 font-mono ml-3 font-medium">
                         {format(time, ':ss')}
                     </div>
                 )}
             </div>
 
             {/* CENTER LEFT: Weather */}
-            <div className={`flex flex-row items-center justify-center border-l ${hasAlerts ? 'border-r' : 'border-r'} border-slate-700/50 h-full w-full gap-8`}>
+            <div className={`flex flex-row items-center justify-center border-l ${hasAlerts ? 'border-r' : 'border-r'} border-slate-300/50 dark:border-slate-700/50 h-full w-full gap-8`}>
                 {weather ? (
                     <>
                         <div className="flex items-center space-x-4">
                             {getWeatherIcon(weather.current.code, "w-16 h-16 text-yellow-400 drop-shadow-lg")}
                             <div className="flex flex-col">
                                 <span className="text-6xl font-bold leading-none">{weather.current.temp}°</span>
-                                <span className="text-slate-400 text-sm font-medium uppercase tracking-wide mt-1">
+                                <span className="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wide mt-1">
                                     {getWeatherDescription(weather.current.code)}
                                 </span>
                             </div>
@@ -184,13 +184,13 @@ export const UnifiedHeaderWidget: React.FC = () => {
                         {/* Hide forecast on small split if needed, but space should be fine */}
                         {!hasAlerts && (
                             <>
-                                <div className="h-12 w-px bg-slate-700/50"></div>
+                                <div className="h-12 w-px bg-slate-300/50 dark:bg-slate-700/50"></div>
                                 <div className="flex space-x-6">
                                     {weather.forecast.map((day, idx) => (
                                         <div key={idx} className="flex flex-col items-center">
-                                            <span className="text-slate-500 text-xs mb-1 uppercase font-bold">{day.day}</span>
-                                            {getWeatherIcon(day.code, "w-6 h-6 text-slate-300 mb-1")}
-                                            <span className="text-base font-semibold">{day.tempMax}° <span className="text-slate-600 text-sm">{day.tempMin}°</span></span>
+                                            <span className="text-slate-400 dark:text-slate-500 text-xs mb-1 uppercase font-bold">{day.day}</span>
+                                            {getWeatherIcon(day.code, "w-6 h-6 text-slate-600 dark:text-slate-300 mb-1")}
+                                            <span className="text-base font-semibold">{day.tempMax}° <span className="text-slate-400 dark:text-slate-600 text-sm">{day.tempMin}°</span></span>
                                         </div>
                                     ))}
                                 </div>
@@ -201,7 +201,7 @@ export const UnifiedHeaderWidget: React.FC = () => {
                         */}
                     </>
                 ) : (
-                    <div className="text-slate-500 animate-pulse text-lg">
+                    <div className="text-slate-400 dark:text-slate-500 animate-pulse text-lg">
                         {loadingWeather ? 'Lade Wetter...' : 'Wetter nicht verfügbar'}
                     </div>
                 )}
@@ -209,7 +209,7 @@ export const UnifiedHeaderWidget: React.FC = () => {
 
             {/* CENTER RIGHT: Alerts (Visible only if hasAlerts) */}
             {hasAlerts && (
-                <div className="h-full w-full py-4 px-2 flex items-center justify-center border-r border-slate-700/50">
+                <div className="h-full w-full py-4 px-2 flex items-center justify-center border-r border-slate-300/50 dark:border-slate-700/50">
                     <div className="w-full h-full max-h-[90%] border-2 border-yellow-500/80 bg-yellow-500/10 rounded-lg shadow-[0_0_15px_rgba(234,179,8,0.3)] flex flex-col justify-center px-4 relative overflow-hidden animate-pulse-slow">
                         {/* Header */}
                         <div className="flex items-center text-yellow-500 mb-2">
@@ -217,7 +217,7 @@ export const UnifiedHeaderWidget: React.FC = () => {
                             <span className="font-bold text-lg uppercase tracking-wider">Unwetterwarnung</span>
                         </div>
                         {/* Scroll through alerts if multiple, or show first */}
-                        <div className="text-white text-lg leading-tight font-medium overflow-y-auto max-h-[70%] custom-scrollbar">
+                        <div className="text-slate-900 dark:text-white text-lg leading-tight font-medium overflow-y-auto max-h-[70%] custom-scrollbar">
                             {Array.from(new Set(filteredAlerts.map(a => a.event_de || a.headline_de))).join(', ')}
                         </div>
                         <div className="text-yellow-500/60 text-[10px] mt-2 font-mono absolute bottom-1 right-2">
@@ -232,11 +232,11 @@ export const UnifiedHeaderWidget: React.FC = () => {
                 <div className="text-5xl font-bold text-blue-400 uppercase tracking-wide">
                     {format(time, 'EEEE', { locale: de })}
                 </div>
-                <div className="text-4xl text-slate-200 font-light mt-1">
+                <div className="text-4xl text-slate-700 dark:text-slate-200 font-light mt-1">
                     {format(time, 'd. MMMM', { locale: de })}
                 </div>
                 <div className="flex items-center gap-4 mt-2">
-                    <span className="text-slate-500 font-medium text-lg">
+                    <span className="text-slate-400 dark:text-slate-500 font-medium text-lg">
                         KW {format(time, 'w', { locale: de })}
                     </span>
                     {weather?.sunrise && weather?.sunset && (

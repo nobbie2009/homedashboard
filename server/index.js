@@ -81,10 +81,21 @@ app.get('/api/system/ip', (req, res) => {
 // Maintenance: Git Pull
 app.post('/api/system/update', (req, res) => {
     console.log("System Update triggered: git pull");
-    exec('git pull', { cwd: path.join(__dirname, '..') }, (error, stdout, stderr) => {
+    const repoRoot = path.join(__dirname, '..');
+    const gitDir = path.join(repoRoot, '.git');
+
+    // Check if .git exists (won't exist inside Docker containers)
+    if (!fs.existsSync(gitDir)) {
+        return res.status(400).json({
+            error: "Kein Git-Repository gefunden",
+            details: "Das System läuft in einem Docker-Container. Bitte aktualisiere auf dem Host mit:\n\ncd homedashboard && git pull && docker-compose up --build -d",
+            output: "Docker-Umgebung erkannt. Git Pull ist nur auf dem Host möglich."
+        });
+    }
+
+    exec('git pull', { cwd: repoRoot }, (error, stdout, stderr) => {
         if (error) {
             console.error(`Exec error: ${error}`);
-            // Report both stdout and stderr for better debugging
             return res.status(500).json({
                 error: "Git Pull Failed",
                 details: error.message,
@@ -99,12 +110,15 @@ app.post('/api/system/update', (req, res) => {
     });
 });
 
+// Edupage Cache (declared early so clearcache can reference it)
+const edupageCache = new Map();
+const EDUPAGE_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+
 // Maintenance: Clear Cache (Force Reload Content)
 app.post('/api/system/clearcache', (req, res) => {
     console.log("System Cache cleared manually.");
     eventCache.clear();
-    // Invalidate Notion? Notion not currently cached in memory significantly, requests go direct.
-    // If we add Notion cache later, clear it here.
+    edupageCache.clear();
     res.json({ success: true });
 });
 
@@ -190,9 +204,25 @@ if (!fs.existsSync(DATA_DIR)) {
 
 const TOKEN_PATH = path.join(DATA_DIR, 'tokens.json');
 const CONFIG_PATH = path.join(DATA_DIR, 'config.json');
+const REWARDS_PATH = path.join(DATA_DIR, 'rewards_history.json');
 
 let userTokens = null;
 let appConfig = {};
+let rewardsData = { completions: [], rewardHistory: [] };
+
+// Load rewards history
+if (fs.existsSync(REWARDS_PATH)) {
+    try {
+        rewardsData = JSON.parse(fs.readFileSync(REWARDS_PATH, 'utf8'));
+        console.log("Loaded rewards history from file.");
+    } catch (err) {
+        console.error("Failed to load rewards history:", err);
+    }
+}
+
+const saveRewardsData = () => {
+    fs.writeFileSync(REWARDS_PATH, JSON.stringify(rewardsData, null, 2));
+};
 
 // Load tokens on startup
 if (fs.existsSync(TOKEN_PATH)) {
@@ -579,7 +609,7 @@ app.get('/api/notion/notes', async (req, res) => {
 
             // Extract Target Date (Ziel)
             // Fallback to created_time if Ziel is not set
-            const targetDate = props.Ziel?.date?.start || createdTime;
+            const targetDate = props.Ziel?.date?.start || page.created_time;
 
             // Map Notion colors to Tailwind classes
             const p = props.P;
@@ -626,6 +656,114 @@ app.get('/api/notion/notes', async (req, res) => {
         console.error("Notion Fetch Error:", error);
         res.status(500).json({ error: `Notion Error: ${error.message}` });
     }
+});
+
+// --- REWARDS ROUTES ---
+
+// Complete a task (with PIN verification)
+app.post('/api/rewards/complete', (req, res) => {
+    const { taskId, kidId, pin } = req.body;
+
+    const adminPin = appConfig.adminPin || '1234';
+    if (pin !== adminPin) {
+        return res.status(401).json({ error: 'Falsche PIN' });
+    }
+
+    const task = appConfig.chores?.tasks?.find(t => t.id === taskId);
+    const kid = appConfig.chores?.kids?.find(k => k.id === kidId);
+    if (!task || !kid) {
+        return res.status(404).json({ error: 'Aufgabe oder Kind nicht gefunden' });
+    }
+
+    const stars = task.difficulty || 1;
+
+    const entry = {
+        id: Date.now().toString(),
+        taskId: task.id,
+        taskLabel: task.label,
+        kidId: kid.id,
+        kidName: kid.name,
+        stars,
+        timestamp: Date.now()
+    };
+    rewardsData.completions.push(entry);
+
+    if (!appConfig.rewards) {
+        appConfig.rewards = { mode: 'individual', targetStars: 20, currentReward: '', kidStars: {}, sharedStars: 0 };
+    }
+
+    if (appConfig.rewards.mode === 'shared') {
+        appConfig.rewards.sharedStars = (appConfig.rewards.sharedStars || 0) + stars;
+    } else {
+        if (!appConfig.rewards.kidStars) appConfig.rewards.kidStars = {};
+        appConfig.rewards.kidStars[kid.id] = (appConfig.rewards.kidStars[kid.id] || 0) + stars;
+    }
+
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(appConfig, null, 2));
+    saveRewardsData();
+
+    res.json({ success: true, entry, rewards: appConfig.rewards });
+});
+
+// Get completion history
+app.get('/api/rewards/history', (req, res) => {
+    const { kidId, limit } = req.query;
+    let results = [...rewardsData.completions];
+
+    if (kidId) {
+        results = results.filter(c => c.kidId === kidId);
+    }
+
+    results.sort((a, b) => b.timestamp - a.timestamp);
+
+    if (limit) {
+        results = results.slice(0, parseInt(limit));
+    }
+
+    res.json({
+        completions: results,
+        rewardHistory: rewardsData.rewardHistory || []
+    });
+});
+
+// Claim a reward (reset stars, set new reward)
+app.post('/api/rewards/claim', (req, res) => {
+    const { pin, kidId, newReward, newTarget } = req.body;
+
+    const adminPin = appConfig.adminPin || '1234';
+    if (pin !== adminPin) {
+        return res.status(401).json({ error: 'Falsche PIN' });
+    }
+
+    const archived = {
+        reward: appConfig.rewards?.currentReward || 'Unbekannt',
+        claimedAt: Date.now(),
+        claimedBy: kidId || (appConfig.rewards?.mode === 'shared' ? 'all' : 'individual'),
+        totalStars: appConfig.rewards?.mode === 'shared'
+            ? appConfig.rewards.sharedStars
+            : appConfig.rewards?.kidStars
+    };
+    rewardsData.rewardHistory.push(archived);
+
+    if (appConfig.rewards.mode === 'shared') {
+        appConfig.rewards.sharedStars = 0;
+    } else if (kidId) {
+        // Reset only specific kid
+        if (appConfig.rewards.kidStars) {
+            appConfig.rewards.kidStars[kidId] = 0;
+        }
+    } else {
+        // Reset all kids
+        appConfig.rewards.kidStars = {};
+    }
+
+    if (newReward !== undefined) appConfig.rewards.currentReward = newReward;
+    if (newTarget) appConfig.rewards.targetStars = newTarget;
+
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(appConfig, null, 2));
+    saveRewardsData();
+
+    res.json({ success: true, rewards: appConfig.rewards });
 });
 
 import { spawn } from 'child_process';
@@ -696,7 +834,7 @@ app.get('/api/camera/snapshot', (req, res) => {
     ffmpeg.stdout.pipe(res);
 });
 
-// --- Edupage Proxy ---
+// --- Edupage Proxy (with cache) ---
 app.get('/api/edupage', (req, res) => {
     const username = req.headers['username'];
     const password = req.headers['password'];
@@ -707,6 +845,14 @@ app.get('/api/edupage', (req, res) => {
     // Validate credentials presence
     if (!username || !password) {
         return res.status(400).send("Missing credentials");
+    }
+
+    // Check cache
+    const cacheKey = `${username}:${subdomain}:${date || 'today'}`;
+    const cached = edupageCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < EDUPAGE_CACHE_TTL)) {
+        console.log(`Serving Edupage data from cache (key: ${cacheKey})`);
+        return res.json(cached.data);
     }
 
     const scriptPath = path.join(__dirname, 'edupage_bridge_v2.py');
@@ -745,6 +891,8 @@ app.get('/api/edupage', (req, res) => {
         }
 
         if (data) {
+            // Store in cache
+            edupageCache.set(cacheKey, { timestamp: Date.now(), data });
             res.json(data);
         } else {
             res.status(500).send("No data returned from Edupage script");

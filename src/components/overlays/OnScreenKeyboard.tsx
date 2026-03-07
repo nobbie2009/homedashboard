@@ -117,7 +117,7 @@ export const OnScreenKeyboard: React.FC<KeyboardProps> = ({ onClose }) => {
     };
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 h-1/3 bg-slate-900 border-t border-slate-700 p-2 z-50 shadow-2xl flex flex-col gap-1 transition-transform animate-in slide-in-from-bottom duration-300 safe-area-bottom">
+        <div className="fixed bottom-0 left-0 right-0 h-1/3 bg-white dark:bg-slate-900 border-t border-slate-300 dark:border-slate-700 p-2 z-50 shadow-2xl flex flex-col gap-1 transition-transform animate-in slide-in-from-bottom duration-300 safe-area-bottom">
             {keys.map((row, i) => (
                 <div key={i} className="flex gap-1 flex-1">
                     {row.map(char => (
@@ -125,7 +125,7 @@ export const OnScreenKeyboard: React.FC<KeyboardProps> = ({ onClose }) => {
                             key={char}
                             onMouseDown={handleMouseDown}
                             onClick={() => handleKeyPress(char)}
-                            className="flex-1 bg-slate-800 hover:bg-slate-700 active:bg-blue-600 rounded text-xl font-bold text-white transition-colors"
+                            className="flex-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 active:bg-blue-600 rounded text-xl font-bold text-slate-900 dark:text-white transition-colors"
                         >
                             {shift ? char.toUpperCase() : char}
                         </button>
@@ -138,14 +138,14 @@ export const OnScreenKeyboard: React.FC<KeyboardProps> = ({ onClose }) => {
                 <button
                     onMouseDown={handleMouseDown}
                     onClick={() => setShift(!shift)}
-                    className={`flex-[1.5] rounded font-bold transition-colors flex items-center justify-center ${shift ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300'}`}
+                    className={`flex-[1.5] rounded font-bold transition-colors flex items-center justify-center ${shift ? 'bg-blue-600 text-white' : 'bg-slate-300 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
                 >
                     <ArrowBigUp className={`w-8 h-8 ${shift ? 'fill-current' : ''}`} />
                 </button>
                 <button
                     onMouseDown={handleMouseDown}
                     onClick={() => handleKeyPress(' ')}
-                    className="flex-[4] bg-slate-800 hover:bg-slate-700 active:bg-blue-600 rounded text-xl font-bold text-white transition-colors"
+                    className="flex-[4] bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 active:bg-blue-600 rounded text-xl font-bold text-slate-900 dark:text-white transition-colors"
                 >
                     Space
                 </button>
@@ -168,7 +168,7 @@ export const OnScreenKeyboard: React.FC<KeyboardProps> = ({ onClose }) => {
             {/* Close Hint for Admin (or hidden close button) */}
             <button
                 onClick={onClose}
-                className="absolute top-[-30px] right-4 bg-slate-800 text-white px-4 py-1 rounded-t-lg font-bold shadow-lg border-t border-x border-slate-700 hover:bg-red-600 transition-colors text-xs"
+                className="absolute top-[-30px] right-4 bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white px-4 py-1 rounded-t-lg font-bold shadow-lg border-t border-x border-slate-300 dark:border-slate-700 hover:bg-red-600 hover:text-white transition-colors text-xs"
             >
                 Tastatur schließen
             </button>

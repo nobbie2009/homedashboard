@@ -7,7 +7,7 @@ export const SmartHomeView: React.FC = () => {
 
     if (!config.haUrl) {
         return (
-            <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-4">
+            <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 space-y-4">
                 <Home className="w-16 h-16 opacity-50" />
                 <h2 className="text-2xl font-semibold">Home Assistant nicht konfiguriert</h2>
                 <p>Bitte hinterlege die Dashboard-URL in den Admin-Einstellungen.</p>
@@ -16,7 +16,7 @@ export const SmartHomeView: React.FC = () => {
     }
 
     return (
-        <div className="h-full w-full bg-black rounded-2xl overflow-hidden border border-slate-800 relative bg-slate-900/50">
+        <div className="h-full w-full bg-black rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 relative bg-white/50 dark:bg-slate-900/50">
             <iframe
                 src={config.haUrl}
                 className="w-full h-full border-0"

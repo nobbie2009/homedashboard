@@ -9,6 +9,7 @@ import {
     StatusView,
     SchoolView,
     ChoresView,
+    RewardBoard,
     SmartHomeView,
     AdminSettings
 } from './pages';
@@ -48,6 +49,7 @@ function App() {
                                     <Route path="status" element={<StatusView />} />
                                     <Route path="school" element={<SchoolView />} />
                                     <Route path="chores" element={<ChoresView />} />
+                                    <Route path="rewards" element={<RewardBoard />} />
                                     <Route path="smarthome" element={<SmartHomeView />} />
                                     <Route path="admin" element={<AdminSettings />} />
                                     <Route path="*" element={<Navigate to="/" replace />} />

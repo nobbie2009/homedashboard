@@ -117,27 +117,27 @@ const WeekView: React.FC = () => {
     };
 
     return (
-        <div className="h-full flex flex-col bg-slate-900/50 text-slate-200">
+        <div className="h-full flex flex-col bg-white/50 dark:bg-slate-900/50 text-slate-700 dark:text-slate-200">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-900/80 backdrop-blur">
+            <div className="flex items-center justify-between p-4 border-b border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur">
                 <div className="flex items-center space-x-4">
                     <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
                         {format(weekStart, 'MMMM yyyy', { locale: de })}
                     </h2>
-                    <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700">
-                        <button onClick={subWeek} className="p-1 hover:bg-slate-700 rounded transition-colors">
+                    <div className="flex bg-slate-200 dark:bg-slate-800 rounded-lg p-1 border border-slate-300 dark:border-slate-700">
+                        <button onClick={subWeek} className="p-1 hover:bg-slate-300 dark:hover:bg-slate-700 rounded transition-colors">
                             <ChevronLeft className="w-5 h-5" />
                         </button>
-                        <button onClick={goToToday} className="px-3 text-sm font-medium hover:bg-slate-700 rounded transition-colors mx-1">
+                        <button onClick={goToToday} className="px-3 text-sm font-medium hover:bg-slate-300 dark:hover:bg-slate-700 rounded transition-colors mx-1">
                             Heute
                         </button>
-                        <button onClick={addWeek} className="p-1 hover:bg-slate-700 rounded transition-colors">
+                        <button onClick={addWeek} className="p-1 hover:bg-slate-300 dark:hover:bg-slate-700 rounded transition-colors">
                             <ChevronRight className="w-5 h-5" />
                         </button>
                     </div>
-                    {loading && <span className="text-sm text-slate-500 animate-pulse">Lade...</span>}
+                    {loading && <span className="text-sm text-slate-400 dark:text-slate-500 animate-pulse">Lade...</span>}
                 </div>
-                <div className="flex items-center space-x-2 text-sm text-slate-400">
+                <div className="flex items-center space-x-2 text-sm text-slate-500 dark:text-slate-400">
                     <CalendarIcon className="w-4 h-4" />
                     <span>KW {format(weekStart, 'w', { locale: de })}</span>
                 </div>
@@ -146,9 +146,9 @@ const WeekView: React.FC = () => {
             {/* Calendar Grid */}
             <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Day Headers */}
-                <div className="grid grid-cols-[60px_1fr] border-b border-slate-700 bg-slate-900/80 shrink-0">
-                    <div className="border-r border-slate-700"></div> {/* Time column header placeholder */}
-                    <div className="grid grid-cols-7 divide-x divide-slate-700">
+                <div className="grid grid-cols-[60px_1fr] border-b border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 shrink-0">
+                    <div className="border-r border-slate-300 dark:border-slate-700"></div> {/* Time column header placeholder */}
+                    <div className="grid grid-cols-7 divide-x divide-slate-300 dark:divide-slate-700">
                         {weekDays.map(day => (
                             <div
                                 key={day.toString()}
@@ -159,13 +159,13 @@ const WeekView: React.FC = () => {
                             >
                                 <div className={clsx(
                                     "text-xs font-medium uppercase mb-1",
-                                    isToday(day) ? "text-blue-400" : "text-slate-500"
+                                    isToday(day) ? "text-blue-400" : "text-slate-400 dark:text-slate-500"
                                 )}>
                                     {format(day, 'EEE', { locale: de })}
                                 </div>
                                 <div className={clsx(
                                     "text-xl font-bold inline-flex items-center justify-center w-8 h-8 rounded-full",
-                                    isToday(day) ? "bg-blue-500 text-white shadow-lg shadow-blue-500/50" : "text-slate-300"
+                                    isToday(day) ? "bg-blue-500 text-white shadow-lg shadow-blue-500/50" : "text-slate-600 dark:text-slate-300"
                                 )}>
                                     {format(day, 'd')}
                                 </div>
@@ -179,11 +179,11 @@ const WeekView: React.FC = () => {
                     <div className="grid grid-cols-[60px_1fr] min-h-[1440px]"> {/* 24 * 60px */}
 
                         {/* Time Column */}
-                        <div className="border-r border-slate-700 bg-slate-900/30">
+                        <div className="border-r border-slate-300 dark:border-slate-700 bg-white/30 dark:bg-slate-900/30">
                             {Array.from({ length: 24 }).map((_, i) => (
                                 <div
                                     key={i}
-                                    className="relative border-b border-transparent text-xs text-slate-500 text-right pr-2 pt-1"
+                                    className="relative border-b border-transparent text-xs text-slate-400 dark:text-slate-500 text-right pr-2 pt-1"
                                     style={{ height: `${HOUR_HEIGHT}px` }}
                                 >
                                     <span className="-translate-y-1/2 block">{i}:00</span>
@@ -192,7 +192,7 @@ const WeekView: React.FC = () => {
                         </div>
 
                         {/* Events Grid */}
-                        <div className="grid grid-cols-7 relative divide-x divide-slate-700/50 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSI2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMCA2MEwxMDAwMCA2MCIgc3Ryb2tlPSJyZ2JhKDc1LDg1LDEwMSwwLjEpIiBmaWxsPSJub25lIi8+PC9zdmc+')]" style={{ backgroundSize: `100% ${HOUR_HEIGHT}px` }}>
+                        <div className="grid grid-cols-7 relative divide-x divide-slate-300/50 dark:divide-slate-700/50 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSI2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMCA2MEwxMDAwMCA2MCIgc3Ryb2tlPSJyZ2JhKDc1LDg1LDEwMSwwLjEpIiBmaWxsPSJub25lIi8+PC9zdmc+')]" style={{ backgroundSize: `100% ${HOUR_HEIGHT}px` }}>
                             {weekDays.map((day) => {
                                 // Filter events for this day
                                 const dayEventsRaw = events.filter(e => isSameDay(e.start, day));
