@@ -31,7 +31,7 @@ interface RainViewerData {
 const MapUpdater: React.FC<{ center: [number, number] }> = ({ center }) => {
     const map = useMap();
     useEffect(() => {
-        map.setView(center, map.getZoom());
+        map.setView(center, 6);
     }, [center, map]);
     return null;
 };
@@ -142,7 +142,9 @@ export const RainRadarWidget: React.FC = () => {
             {/* Leaflet Map */}
             <MapContainer
                 center={coords}
-                zoom={8}
+                zoom={6}
+                minZoom={3}
+                maxZoom={6}
                 zoomControl={false}
                 attributionControl={false}
                 className="w-full h-full z-0"
@@ -152,6 +154,7 @@ export const RainRadarWidget: React.FC = () => {
                 {/* Dark map tiles */}
                 <TileLayer
                     url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                    maxZoom={6}
                 />
                 <MapUpdater center={coords} />
                 <Marker position={coords} icon={locationIcon} />
