@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { ClipboardList, Lock, Unlock, Settings as SettingsIcon, Calendar, LayoutDashboard, GraduationCap, ClipboardCheck, Home, RefreshCw, WifiOff, Trophy, Sun, Moon } from 'lucide-react';
+import { ClipboardList, Lock, Unlock, Settings as SettingsIcon, Calendar, LayoutDashboard, GraduationCap, ClipboardCheck, Home, RefreshCw, WifiOff, Trophy, Sun, Moon, Clock } from 'lucide-react';
 import { useKiosk } from '../../contexts/KioskContext';
 import { getApiUrl } from '../../utils/api';
 import { useSecurity } from '../../contexts/SecurityContext';
@@ -25,8 +25,39 @@ export const MainLayout: React.FC = () => {
     const [showScreensaver, setShowScreensaver] = React.useState(false);
     const [isOnline, setIsOnline] = React.useState(navigator.onLine);
 
-    // Theme management
-    const isDark = config.theme !== 'light';
+    // Theme management with auto/schedule support
+    const [resolvedDark, setResolvedDark] = React.useState(config.theme !== 'light');
+
+    const checkAutoTheme = React.useCallback(() => {
+        if (config.theme !== 'auto') {
+            setResolvedDark(config.theme !== 'light');
+            return;
+        }
+        const schedule = config.themeSchedule || { darkStart: '20:00', darkEnd: '07:00' };
+        const now = new Date();
+        const nowMinutes = now.getHours() * 60 + now.getMinutes();
+        const [startH, startM] = schedule.darkStart.split(':').map(Number);
+        const [endH, endM] = schedule.darkEnd.split(':').map(Number);
+        const startTotal = startH * 60 + startM;
+        const endTotal = endH * 60 + endM;
+
+        let inDarkWindow: boolean;
+        if (startTotal > endTotal) {
+            // Overnight: e.g. 20:00 - 07:00
+            inDarkWindow = nowMinutes >= startTotal || nowMinutes < endTotal;
+        } else {
+            inDarkWindow = nowMinutes >= startTotal && nowMinutes < endTotal;
+        }
+        setResolvedDark(inDarkWindow);
+    }, [config.theme, config.themeSchedule]);
+
+    React.useEffect(() => {
+        checkAutoTheme();
+        const interval = setInterval(checkAutoTheme, 60000); // Check every minute
+        return () => clearInterval(interval);
+    }, [checkAutoTheme]);
+
+    const isDark = resolvedDark;
 
     React.useEffect(() => {
         const root = document.documentElement;
@@ -38,7 +69,9 @@ export const MainLayout: React.FC = () => {
     }, [isDark]);
 
     const toggleTheme = () => {
-        updateConfig({ theme: isDark ? 'light' : 'dark' });
+        // Cycle: dark -> light -> auto -> dark
+        const next = config.theme === 'dark' ? 'light' : config.theme === 'light' ? 'auto' : 'dark';
+        updateConfig({ theme: next });
     };
 
     React.useEffect(() => {
@@ -193,13 +226,15 @@ export const MainLayout: React.FC = () => {
                         </div>
                     )}
 
-                    {/* Theme Toggle */}
+                    {/* Theme Toggle: dark -> light -> auto -> dark */}
                     <button
                         onClick={toggleTheme}
                         className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
-                        title={isDark ? 'Helles Design' : 'Dunkles Design'}
+                        title={config.theme === 'auto' ? `Automatisch (${config.themeSchedule?.darkStart || '20:00'}–${config.themeSchedule?.darkEnd || '07:00'})` : isDark ? 'Dunkel (Klick: Hell)' : 'Hell (Klick: Auto)'}
                     >
-                        {isDark ? (
+                        {config.theme === 'auto' ? (
+                            <Clock className="w-5 h-5 text-sky-400" />
+                        ) : isDark ? (
                             <Sun className="w-5 h-5 text-yellow-400" />
                         ) : (
                             <Moon className="w-5 h-5 text-slate-500" />

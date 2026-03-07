@@ -81,7 +81,7 @@ const RewardBoard: React.FC = () => {
 
     useEffect(() => {
         fetchHistory();
-        const interval = setInterval(fetchHistory, 60000);
+        const interval = setInterval(fetchHistory, 30000);
         return () => clearInterval(interval);
     }, [fetchHistory]);
 
@@ -97,6 +97,12 @@ const RewardBoard: React.FC = () => {
             })
             .catch(console.error);
     }, [API_URL, deviceId]);
+
+    // Periodically refresh config to pick up star count changes from other pages
+    useEffect(() => {
+        const interval = setInterval(refreshConfig, 30000);
+        return () => clearInterval(interval);
+    }, [refreshConfig]);
 
     const isGoalReached = (kidId?: string): boolean => {
         if (rewards?.mode === 'shared') {

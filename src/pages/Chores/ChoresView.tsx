@@ -8,7 +8,7 @@ import { PinConfirmOverlay } from '../../components/overlays/PinConfirmOverlay';
 import { getApiUrl } from '../../utils/api';
 
 const ChoresView: React.FC = () => {
-    const { config } = useConfig();
+    const { config, updateConfig } = useConfig();
     const { deviceId } = useSecurity();
     const { kids, tasks } = config.chores || { kids: [], tasks: [] };
 
@@ -37,6 +37,10 @@ const ChoresView: React.FC = () => {
             if (!res.ok) {
                 setPinError(data.error || 'Fehler');
                 return;
+            }
+            // Update rewards in config context so star counts are reflected everywhere
+            if (data.rewards) {
+                updateConfig({ rewards: data.rewards });
             }
             // Success animation
             const taskId = completingTask.task.id;

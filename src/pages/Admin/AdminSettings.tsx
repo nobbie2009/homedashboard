@@ -92,6 +92,7 @@ const AdminSettings: React.FC = () => {
     const [activeTab, setActiveTab] = useState('kalender');
     const [newTaskIcon, setNewTaskIcon] = useState('clean');
     const [newTaskDifficulty, setNewTaskDifficulty] = useState<1 | 2 | 3>(1);
+    const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
     const [isKeyboardActive, setKeyboardActive] = useState(false);
 
     // Auto-disable keyboard on lock
@@ -880,6 +881,71 @@ const AdminSettings: React.FC = () => {
                                 </div>
                             </div>
                         </section>
+
+                        {/* Design / Theme Section */}
+                        <section>
+                            <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4 flex items-center gap-2">
+                                Design
+                            </h3>
+                            <div className="bg-white/40 dark:bg-slate-900/40 rounded-xl border border-slate-300/50 dark:border-slate-700/50 p-5 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-600 dark:text-slate-400 mb-2">Farbmodus</label>
+                                    <div className="flex gap-2">
+                                        {(['dark', 'light', 'auto'] as const).map(mode => (
+                                            <button
+                                                key={mode}
+                                                onClick={() => updateConfig({ theme: mode })}
+                                                className={`flex-1 py-2.5 rounded-lg font-bold text-sm transition ${
+                                                    config.theme === mode
+                                                        ? 'bg-blue-600 text-white shadow-lg'
+                                                        : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-600'
+                                                }`}
+                                            >
+                                                {mode === 'dark' ? 'Dunkel' : mode === 'light' ? 'Hell' : 'Automatisch'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {config.theme === 'auto' && (
+                                    <div className="bg-slate-100 dark:bg-slate-800/60 rounded-lg p-4 border border-slate-300 dark:border-slate-700 space-y-3">
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                                            Im Auto-Modus wechselt das Design nach Uhrzeit zwischen Hell und Dunkel.
+                                        </p>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Dunkel ab</label>
+                                                <input
+                                                    type="time"
+                                                    value={config.themeSchedule?.darkStart || '20:00'}
+                                                    onChange={(e) => updateConfig({
+                                                        themeSchedule: {
+                                                            ...config.themeSchedule || { darkStart: '20:00', darkEnd: '07:00' },
+                                                            darkStart: e.target.value
+                                                        }
+                                                    })}
+                                                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Hell ab</label>
+                                                <input
+                                                    type="time"
+                                                    value={config.themeSchedule?.darkEnd || '07:00'}
+                                                    onChange={(e) => updateConfig({
+                                                        themeSchedule: {
+                                                            ...config.themeSchedule || { darkStart: '20:00', darkEnd: '07:00' },
+                                                            darkEnd: e.target.value
+                                                        }
+                                                    })}
+                                                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </section>
                     </div>
                 )
                 }
@@ -965,47 +1031,120 @@ const AdminSettings: React.FC = () => {
                                 <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Aufgaben (Chore Loop)</h3>
                                 <div className="bg-white/40 dark:bg-slate-900/40 rounded-xl border border-slate-300/50 dark:border-slate-700/50 p-4 space-y-4">
                                     <div className="space-y-2">
-                                        {(config.chores?.tasks || []).map((task) => (
-                                            <div key={task.id} className="flex items-center justify-between bg-slate-200 dark:bg-slate-800 p-3 rounded-lg border border-slate-300 dark:border-slate-700">
-                                                <div className="flex items-center space-x-3">
-                                                    <div className="bg-slate-300 dark:bg-slate-700 p-2 rounded text-slate-600 dark:text-slate-300">
-                                                        <ChoreIcon icon={task.icon} className="w-5 h-5" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="font-bold text-slate-900 dark:text-white">{task.label}</div>
-                                                        {task.description && <div className="text-xs text-slate-500 dark:text-slate-400 italic">{task.description}</div>}
-                                                        <div className="text-xs text-slate-400 dark:text-slate-500">
-                                                            Intervall: {task.rotation}
-                                                            <span className="ml-2 text-yellow-400">{'★'.repeat(task.difficulty || 1)}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                        {(config.chores?.tasks || []).map((task) => {
+                                            const isEditing = editingTaskId === task.id;
+                                            const updateTask = (updates: Partial<typeof task>) => {
+                                                const newTasks = config.chores?.tasks.map(t => t.id === task.id ? { ...t, ...updates } : t) || [];
+                                                updateConfig({ chores: { ...config.chores!, tasks: newTasks } });
+                                            };
 
-                                                <select
-                                                    value={task.assignedTo || ''}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value;
-                                                        const newTasks = config.chores?.tasks.map(t => t.id === task.id ? { ...t, assignedTo: val || undefined } : t) || [];
-                                                        updateConfig({ chores: { ...config.chores!, tasks: newTasks } });
-                                                    }}
-                                                    className="bg-white dark:bg-slate-900 border border-slate-400 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-sm rounded px-2 py-1 mx-4 focus:outline-none focus:border-blue-500"
-                                                >
-                                                    <option value="">-- Nicht zugewiesen --</option>
-                                                    {(config.chores?.kids || []).map(k => (
-                                                        <option key={k.id} value={k.id}>{k.name}</option>
-                                                    ))}
-                                                </select>
-                                                <button
-                                                    onClick={() => {
-                                                        const newTasks = config.chores?.tasks.filter(t => t.id !== task.id) || [];
-                                                        updateConfig({ chores: { ...config.chores!, tasks: newTasks } });
-                                                    }}
-                                                    className="p-2 text-slate-400 dark:text-slate-500 hover:text-red-400 transition"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        ))}
+                                            return (
+                                                <div key={task.id} className={`bg-slate-200 dark:bg-slate-800 rounded-lg border transition-all ${isEditing ? 'border-blue-500 dark:border-blue-400 ring-1 ring-blue-500/20' : 'border-slate-300 dark:border-slate-700'}`}>
+                                                    {/* Compact row */}
+                                                    <div className="flex items-center justify-between p-3">
+                                                        <div
+                                                            className="flex items-center space-x-3 flex-1 cursor-pointer min-w-0"
+                                                            onClick={() => setEditingTaskId(isEditing ? null : task.id)}
+                                                        >
+                                                            <div className="bg-slate-300 dark:bg-slate-700 p-2 rounded text-slate-600 dark:text-slate-300 flex-shrink-0">
+                                                                <ChoreIcon icon={task.icon} className="w-5 h-5" />
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <div className="font-bold text-slate-900 dark:text-white truncate">{task.label}</div>
+                                                                {task.description && <div className="text-xs text-slate-500 dark:text-slate-400 italic truncate">{task.description}</div>}
+                                                                <div className="text-xs text-slate-400 dark:text-slate-500">
+                                                                    Intervall: {task.rotation}
+                                                                    <span className="ml-2 text-yellow-400">{'★'.repeat(task.difficulty || 1)}</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <select
+                                                            value={task.assignedTo || ''}
+                                                            onChange={(e) => updateTask({ assignedTo: e.target.value || undefined })}
+                                                            className="bg-white dark:bg-slate-900 border border-slate-400 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-sm rounded px-2 py-1 mx-4 focus:outline-none focus:border-blue-500"
+                                                        >
+                                                            <option value="">-- Nicht zugewiesen --</option>
+                                                            {(config.chores?.kids || []).map(k => (
+                                                                <option key={k.id} value={k.id}>{k.name}</option>
+                                                            ))}
+                                                        </select>
+                                                        <button
+                                                            onClick={() => {
+                                                                const newTasks = config.chores?.tasks.filter(t => t.id !== task.id) || [];
+                                                                updateConfig({ chores: { ...config.chores!, tasks: newTasks } });
+                                                                if (isEditing) setEditingTaskId(null);
+                                                            }}
+                                                            className="p-2 text-slate-400 dark:text-slate-500 hover:text-red-400 transition flex-shrink-0"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+
+                                                    {/* Expanded edit panel */}
+                                                    {isEditing && (
+                                                        <div className="border-t border-slate-300 dark:border-slate-700 p-4 space-y-3 bg-slate-100 dark:bg-slate-800/60 rounded-b-lg">
+                                                            <div>
+                                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Bezeichnung</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={task.label}
+                                                                    onChange={(e) => updateTask({ label: e.target.value })}
+                                                                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Beschreibung</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={task.description || ''}
+                                                                    onChange={(e) => updateTask({ description: e.target.value })}
+                                                                    placeholder="Optional"
+                                                                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Schwierigkeit (Sterne)</label>
+                                                                <div className="flex gap-2">
+                                                                    {([1, 2, 3] as const).map(d => (
+                                                                        <button
+                                                                            key={d}
+                                                                            type="button"
+                                                                            onClick={() => updateTask({ difficulty: d })}
+                                                                            className={`px-4 py-2 rounded-lg font-bold transition text-sm ${
+                                                                                (task.difficulty || 1) === d
+                                                                                    ? 'bg-yellow-500 text-slate-900'
+                                                                                    : 'bg-slate-300 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-400 dark:hover:bg-slate-600'
+                                                                            }`}
+                                                                        >
+                                                                            {'★'.repeat(d)} {d === 1 ? 'Leicht' : d === 2 ? 'Mittel' : 'Schwer'}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Intervall</label>
+                                                                <select
+                                                                    value={task.rotation}
+                                                                    onChange={(e) => updateTask({ rotation: e.target.value as 'daily' | 'weekly' | 'none' })}
+                                                                    className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                                                                >
+                                                                    <option value="weekly">Wöchentlich</option>
+                                                                    <option value="daily">Täglich</option>
+                                                                    <option value="none">Manuell</option>
+                                                                </select>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => setEditingTaskId(null)}
+                                                                className="text-sm text-blue-500 dark:text-blue-400 hover:text-blue-400 dark:hover:text-blue-300 font-bold"
+                                                            >
+                                                                Fertig
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
                                         {(!config.chores?.tasks || config.chores.tasks.length === 0) && (
                                             <p className="text-slate-400 dark:text-slate-500 italic text-sm">Keine Aufgaben angelegt.</p>
                                         )}

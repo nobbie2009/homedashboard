@@ -80,6 +80,10 @@ export interface AppConfig {
     adminPin?: string;
     rewards?: RewardConfig;
     theme?: 'dark' | 'light' | 'auto';
+    themeSchedule?: {
+        darkStart: string; // HH:mm, e.g. "20:00"
+        darkEnd: string;   // HH:mm, e.g. "07:00"
+    };
 }
 
 export type CalendarScope = 'today' | 'weekWidget' | 'nextEvent' | 'weekView';
@@ -131,7 +135,11 @@ const defaultConfig: AppConfig = {
         kidStars: {},
         sharedStars: 0
     },
-    theme: 'dark'
+    theme: 'dark',
+    themeSchedule: {
+        darkStart: '20:00',
+        darkEnd: '07:00'
+    }
 };
 
 import { getApiUrl, fetchWithTimeout } from '../utils/api';

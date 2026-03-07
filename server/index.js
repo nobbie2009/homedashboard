@@ -777,8 +777,10 @@ app.get('/api/camera/stream', (req, res) => {
 
     console.log("Starting Stream for:", streamUrl);
 
+    const BOUNDARY = 'frameboundary';
+
     res.writeHead(200, {
-        'Content-Type': 'multipart/x-mixed-replace; boundary=ffmpeg',
+        'Content-Type': `multipart/x-mixed-replace; boundary=${BOUNDARY}`,
         'Cache-Control': 'no-cache',
         'Connection': 'close',
         'Pragma': 'no-cache'
@@ -789,24 +791,69 @@ app.get('/api/camera/stream', (req, res) => {
         '-analyzeduration', '0',
         '-rtsp_transport', 'tcp',
         '-i', streamUrl,
-        '-vf', 'scale=800:-1', // Downscale to 800px width (maintains aspect ratio)
-        '-f', 'mjpeg',
-        '-q:v', '8', // Balanced quality (lower number = higher quality, 1-31)
-        '-r', '10', // Reduced to 10fps to save more bandwidth
+        '-vf', 'scale=800:-1',
+        '-f', 'image2pipe',
+        '-vcodec', 'mjpeg',
+        '-q:v', '8',
+        '-r', '10',
         '-'
     ]);
 
-    ffmpeg.stdout.pipe(res, { end: false });
+    // Parse raw JPEG frames from ffmpeg and wrap in multipart boundaries
+    let buffer = Buffer.alloc(0);
+    const JPEG_START = Buffer.from([0xFF, 0xD8]);
+    const JPEG_END = Buffer.from([0xFF, 0xD9]);
 
-    // Handle errors
-    ffmpeg.stderr.on('data', (data) => {
-        console.error(`FFMPEG Error: ${data}`); // Verbose
+    ffmpeg.stdout.on('data', (chunk) => {
+        buffer = Buffer.concat([buffer, chunk]);
+
+        // Find complete JPEG frames in the buffer
+        while (true) {
+            const startIdx = buffer.indexOf(JPEG_START);
+            if (startIdx === -1) break;
+
+            const endIdx = buffer.indexOf(JPEG_END, startIdx + 2);
+            if (endIdx === -1) break; // Incomplete frame, wait for more data
+
+            // Extract complete JPEG frame (including the 2-byte end marker)
+            const frame = buffer.subarray(startIdx, endIdx + 2);
+            buffer = buffer.subarray(endIdx + 2);
+
+            // Send as multipart chunk
+            try {
+                res.write(`\r\n--${BOUNDARY}\r\nContent-Type: image/jpeg\r\nContent-Length: ${frame.length}\r\n\r\n`);
+                res.write(frame);
+            } catch (e) {
+                // Client disconnected
+                break;
+            }
+        }
+
+        // Prevent buffer from growing too large (discard stale data before any JPEG start)
+        const lastStart = buffer.indexOf(JPEG_START);
+        if (lastStart > 0) {
+            buffer = buffer.subarray(lastStart);
+        } else if (lastStart === -1 && buffer.length > 200000) {
+            buffer = Buffer.alloc(0);
+        }
     });
 
-    // Cleanup on client disconnect
+    ffmpeg.stderr.on('data', (data) => {
+        const msg = data.toString();
+        // Only log actual errors, not progress info
+        if (msg.includes('Error') || msg.includes('error')) {
+            console.error(`FFMPEG Error: ${msg}`);
+        }
+    });
+
+    ffmpeg.on('close', (code) => {
+        console.log(`FFMPEG stream process exited with code ${code}`);
+        try { res.end(); } catch (e) { /* already closed */ }
+    });
+
     req.on('close', () => {
         console.log("Client disconnected, killing ffmpeg");
-        ffmpeg.kill();
+        ffmpeg.kill('SIGKILL');
     });
 });
 
