@@ -798,6 +798,47 @@ app.post('/api/rewards/claim', (req, res) => {
     res.json({ success: true, rewards: appConfig.rewards });
 });
 
+// Award bonus stars manually (from admin panel)
+app.post('/api/rewards/bonus', (req, res) => {
+    const { kidId, stars, reason } = req.body;
+
+    if (!kidId || !stars || stars < 1 || stars > 5) {
+        return res.status(400).json({ error: 'Ungültige Daten (kidId, stars 1-5 erforderlich)' });
+    }
+
+    const kid = appConfig.chores?.kids?.find(k => k.id === kidId);
+    if (!kid) {
+        return res.status(404).json({ error: 'Kind nicht gefunden' });
+    }
+
+    const entry = {
+        id: Date.now().toString(),
+        taskId: 'bonus',
+        taskLabel: reason || 'Bonus-Sterne',
+        kidId: kid.id,
+        kidName: kid.name,
+        stars: parseInt(stars),
+        timestamp: Date.now()
+    };
+    rewardsData.completions.push(entry);
+
+    if (!appConfig.rewards) {
+        appConfig.rewards = { mode: 'individual', targetStars: 20, currentReward: '', kidStars: {}, sharedStars: 0 };
+    }
+
+    if (appConfig.rewards.mode === 'shared') {
+        appConfig.rewards.sharedStars = (appConfig.rewards.sharedStars || 0) + parseInt(stars);
+    } else {
+        if (!appConfig.rewards.kidStars) appConfig.rewards.kidStars = {};
+        appConfig.rewards.kidStars[kid.id] = (appConfig.rewards.kidStars[kid.id] || 0) + parseInt(stars);
+    }
+
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(appConfig, null, 2));
+    saveRewardsData();
+
+    res.json({ success: true, entry, rewards: appConfig.rewards });
+});
+
 import { spawn } from 'child_process';
 
 app.get('/api/camera/stream', (req, res) => {

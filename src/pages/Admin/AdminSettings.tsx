@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useKiosk } from '../../contexts/KioskContext';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useSecurity } from '../../contexts/SecurityContext';
-import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download, Smartphone, Trash2, Shield, ShieldAlert, ClipboardCheck, Plus, Cake, RefreshCw, Server, GitBranch, Database, Keyboard, Trophy } from 'lucide-react';
+import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download, Smartphone, Trash2, Shield, ShieldAlert, ClipboardCheck, Plus, Cake, RefreshCw, Server, GitBranch, Database, Keyboard, Trophy, Star } from 'lucide-react';
 import { IconMap, ChoreIcon } from '../../components/ChoreIcon';
 // import clsx from 'clsx';
 
@@ -94,6 +94,11 @@ const AdminSettings: React.FC = () => {
     const [newTaskDifficulty, setNewTaskDifficulty] = useState<1 | 2 | 3>(1);
     const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
     const [isKeyboardActive, setKeyboardActive] = useState(false);
+    const [bonusKidId, setBonusKidId] = useState('');
+    const [bonusStars, setBonusStars] = useState(1);
+    const [bonusReason, setBonusReason] = useState('');
+    const [bonusSending, setBonusSending] = useState(false);
+    const [bonusSuccess, setBonusSuccess] = useState('');
 
     // Auto-disable keyboard on lock
     useEffect(() => {
@@ -1393,6 +1398,102 @@ const AdminSettings: React.FC = () => {
                                 >
                                     Sterne zurücksetzen
                                 </button>
+                            </div>
+                        </section>
+
+                        {/* Bonus Stars */}
+                        <section>
+                            <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4 flex items-center gap-2">
+                                <Star className="w-5 h-5 text-yellow-400" />
+                                Bonus-Sterne vergeben
+                            </h3>
+                            <div className="bg-white/40 dark:bg-slate-900/40 rounded-xl border border-slate-300/50 dark:border-slate-700/50 p-4 space-y-4">
+                                <p className="text-sm text-slate-500 dark:text-slate-400">
+                                    Vergib Sterne für außergewöhnliche Leistungen, die nicht als reguläre Aufgabe hinterlegt sind.
+                                </p>
+
+                                {/* Kid Selection */}
+                                <div>
+                                    <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">Kind</label>
+                                    <select
+                                        value={bonusKidId}
+                                        onChange={(e) => setBonusKidId(e.target.value)}
+                                        className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-3 py-2 text-slate-900 dark:text-white w-full focus:outline-none focus:border-blue-500"
+                                    >
+                                        <option value="">Kind auswählen...</option>
+                                        {(config.chores?.kids || []).map(kid => (
+                                            <option key={kid.id} value={kid.id}>{kid.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Stars Selection */}
+                                <div>
+                                    <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">Anzahl Sterne</label>
+                                    <div className="flex gap-2">
+                                        {[1, 2, 3, 4, 5].map(n => (
+                                            <button
+                                                key={n}
+                                                onClick={() => setBonusStars(n)}
+                                                className={`flex items-center gap-1 px-3 py-2 rounded-lg border-2 transition font-medium ${
+                                                    bonusStars === n
+                                                        ? 'border-yellow-400 bg-yellow-400/20 text-yellow-500 dark:text-yellow-300'
+                                                        : 'border-slate-300 dark:border-slate-700 bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                                                }`}
+                                            >
+                                                {n} <Star className="w-4 h-4 fill-current" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Reason */}
+                                <div>
+                                    <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">Grund (optional)</label>
+                                    <input
+                                        type="text"
+                                        value={bonusReason}
+                                        onChange={(e) => setBonusReason(e.target.value)}
+                                        placeholder="z.B. Zimmer freiwillig aufgeräumt, super Zeugnis..."
+                                        className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-3 py-2 text-slate-900 dark:text-white w-full focus:outline-none focus:border-blue-500"
+                                    />
+                                </div>
+
+                                {/* Submit */}
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        disabled={!bonusKidId || bonusSending}
+                                        onClick={async () => {
+                                            setBonusSending(true);
+                                            setBonusSuccess('');
+                                            try {
+                                                const res = await fetch(`${API_URL}/api/rewards/bonus`, {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ kidId: bonusKidId, stars: bonusStars, reason: bonusReason })
+                                                });
+                                                const data = await res.json();
+                                                if (data.success) {
+                                                    updateConfig({ rewards: data.rewards });
+                                                    const kidName = config.chores?.kids?.find(k => k.id === bonusKidId)?.name || '';
+                                                    setBonusSuccess(`${bonusStars} Stern${bonusStars > 1 ? 'e' : ''} an ${kidName} vergeben!`);
+                                                    setBonusReason('');
+                                                    setTimeout(() => setBonusSuccess(''), 3000);
+                                                }
+                                            } catch (e) {
+                                                console.error('Bonus award failed', e);
+                                            }
+                                            setBonusSending(false);
+                                        }}
+                                        className="px-5 py-2.5 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-900 font-bold rounded-lg transition flex items-center gap-2"
+                                    >
+                                        <Star className="w-4 h-4" />
+                                        {bonusSending ? 'Wird vergeben...' : 'Sterne vergeben'}
+                                    </button>
+                                    {bonusSuccess && (
+                                        <span className="text-green-400 font-medium animate-pulse">{bonusSuccess}</span>
+                                    )}
+                                </div>
                             </div>
                         </section>
                     </div>
