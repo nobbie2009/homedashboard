@@ -24,6 +24,5 @@ services:
       # - EDUPAGE_USER=your_user  # Can be set here or in .env
       # - EDUPAGE_PASSWORD=your_pass
     volumes:
-      - ./data:/app/server/data
       - ./server:/app/server
       - ./.git:/app/.git

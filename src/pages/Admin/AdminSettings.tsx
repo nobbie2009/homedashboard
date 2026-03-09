@@ -1469,7 +1469,7 @@ const AdminSettings: React.FC = () => {
                                             try {
                                                 const res = await fetch(`${API_URL}/api/rewards/bonus`, {
                                                     method: 'POST',
-                                                    headers: { 'Content-Type': 'application/json' },
+                                                    headers: { 'Content-Type': 'application/json', 'x-device-id': deviceId },
                                                     body: JSON.stringify({ kidId: bonusKidId, stars: bonusStars, reason: bonusReason })
                                                 });
                                                 const data = await res.json();
