@@ -4,6 +4,7 @@ import { useGoogleEvents } from '../../hooks/useGoogleEvents';
 
 export const CountdownWidget: React.FC = () => {
     const [now, setNow] = useState(new Date());
+    const [showKatWarn, setShowKatWarn] = useState(false);
     const { events, loading } = useGoogleEvents({ scope: 'nextEvent' });
 
     useEffect(() => {
@@ -17,9 +18,30 @@ export const CountdownWidget: React.FC = () => {
         return events.find(e => e.start > now);
     }, [events, now]);
 
+    const katWarnView = (
+        <div
+            className="flex flex-col p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full items-center justify-center relative overflow-hidden cursor-pointer select-none"
+            onClick={() => setShowKatWarn(false)}
+        >
+            <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-widest">KatWarn</h3>
+            <a href="https://warnungen.katwarn.de/" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                <img
+                    alt="Katwarn Warnungen"
+                    src="https://warnungen.katwarn.de/widget/ndh_plateau.png"
+                    className="max-w-full max-h-full object-contain rounded-lg"
+                />
+            </a>
+        </div>
+    );
+
+    if (showKatWarn) return katWarnView;
+
     if (loading && !nextEvent) {
         return (
-            <div className="flex flex-col items-center justify-center p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full text-slate-400 dark:text-slate-500 animate-pulse">
+            <div
+                className="flex flex-col items-center justify-center p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full text-slate-400 dark:text-slate-500 animate-pulse cursor-pointer select-none"
+                onClick={() => setShowKatWarn(true)}
+            >
                 <span className="text-lg">Lade Termine...</span>
             </div>
         );
@@ -27,7 +49,10 @@ export const CountdownWidget: React.FC = () => {
 
     if (!nextEvent) {
         return (
-            <div className="flex flex-col items-center justify-center p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full text-slate-400 dark:text-slate-500">
+            <div
+                className="flex flex-col items-center justify-center p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full text-slate-400 dark:text-slate-500 cursor-pointer select-none"
+                onClick={() => setShowKatWarn(true)}
+            >
                 <span className="text-lg">Keine weiteren Termine</span>
             </div>
         );
@@ -42,7 +67,10 @@ export const CountdownWidget: React.FC = () => {
     if (diffSeconds < 0) return null;
 
     return (
-        <div className="flex flex-col p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full items-center justify-center relative overflow-hidden group">
+        <div
+            className="flex flex-col p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full items-center justify-center relative overflow-hidden group cursor-pointer select-none"
+            onClick={() => setShowKatWarn(true)}
+        >
             {/* Background progress or glow could go here */}
 
             <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-widest">Nächstes Event</h3>
