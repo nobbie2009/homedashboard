@@ -75,37 +75,53 @@ const SonosView: React.FC = () => {
     const headers: Record<string, string> = { 'x-device-id': deviceId, 'Content-Type': 'application/json' };
     const apiUrl = getApiUrl();
 
-    // Discover speakers
-    const discoverSpeakers = useCallback(async (refresh = false) => {
-        if (refresh) setDiscovering(true);
+    // Fetch speakers with live state from server (no discovery, just cached list + fresh state)
+    const fetchSpeakers = useCallback(async () => {
         try {
-            const res = await fetch(`${apiUrl}/api/sonos/speakers?refresh=${refresh}`, { headers });
+            const res = await fetch(`${apiUrl}/api/sonos/speakers`, { headers });
             if (!res.ok) throw new Error();
             const data: SonosSpeaker[] = await res.json();
             setSpeakers(data);
-            if (!selectedSpeaker && data.length > 0) {
-                const playing = data.find(s => s.state === 'playing');
-                setSelectedSpeaker(playing || data[0]);
-            } else if (selectedSpeaker) {
-                const updated = data.find(s => s.ip === selectedSpeaker.ip);
-                if (updated) setSelectedSpeaker(updated);
+            if (data.length > 0) {
+                setSelectedSpeaker(prev => {
+                    // Keep current selection if still available, else pick playing or first
+                    if (prev) {
+                        const updated = data.find(s => s.ip === prev.ip);
+                        if (updated) return updated;
+                    }
+                    return data.find(s => s.state === 'playing') || data[0];
+                });
             }
         } catch { /* ignore */ }
         finally {
             setLoading(false);
+        }
+    }, [apiUrl, deviceId]);
+
+    // Trigger a new network discovery (admin action)
+    const triggerDiscovery = useCallback(async () => {
+        setDiscovering(true);
+        try {
+            await fetch(`${apiUrl}/api/sonos/discover`, { method: 'POST', headers });
+            // After discovery, fetch fresh speaker list
+            await fetchSpeakers();
+        } catch { /* ignore */ }
+        finally {
             setDiscovering(false);
         }
-    }, [apiUrl, deviceId, selectedSpeaker]);
+    }, [apiUrl, deviceId, fetchSpeakers]);
 
-    // Initial load
+    // Initial load: just get cached speakers with live state
     useEffect(() => {
-        discoverSpeakers();
+        fetchSpeakers();
     }, []);
 
-    // Poll state for selected speaker
+    // Poll state for selected speaker + refresh all speakers periodically
     useEffect(() => {
         if (!selectedSpeaker) return;
-        const poll = async () => {
+
+        // Immediately fetch fresh state for selected speaker
+        const pollState = async () => {
             try {
                 const res = await fetch(`${apiUrl}/api/sonos/state?ip=${selectedSpeaker.ip}`, { headers });
                 if (res.ok) {
@@ -114,7 +130,10 @@ const SonosView: React.FC = () => {
                 }
             } catch { /* ignore */ }
         };
-        const interval = setInterval(poll, STATE_POLL_MS);
+
+        // Run immediately, then on interval
+        pollState();
+        const interval = setInterval(pollState, STATE_POLL_MS);
         return () => clearInterval(interval);
     }, [selectedSpeaker?.ip]);
 
@@ -236,7 +255,7 @@ const SonosView: React.FC = () => {
                         Stelle sicher, dass deine Sonos-Speaker eingeschaltet und im selben Netzwerk sind.
                     </div>
                     <button
-                        onClick={() => discoverSpeakers(true)}
+                        onClick={() => triggerDiscovery()}
                         className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2 mx-auto"
                     >
                         <RefreshCw className={`w-4 h-4 ${discovering ? 'animate-spin' : ''}`} />
@@ -257,7 +276,7 @@ const SonosView: React.FC = () => {
     ];
 
     return (
-        <div className="h-full flex flex-col gap-4">
+        <div className="h-full flex flex-col gap-4 overflow-hidden">
             {/* Speaker selector + tabs */}
             <div className="flex items-center gap-4 flex-none">
                 {/* Speaker pills */}
@@ -280,7 +299,7 @@ const SonosView: React.FC = () => {
                     ))}
                 </div>
                 <button
-                    onClick={() => discoverSpeakers(true)}
+                    onClick={() => triggerDiscovery()}
                     className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors flex-none"
                     title="Speaker neu suchen"
                 >
@@ -289,9 +308,9 @@ const SonosView: React.FC = () => {
             </div>
 
             {/* Main content area */}
-            <div className="flex-1 grid grid-cols-[1fr_2fr] gap-4 overflow-hidden">
+            <div className="flex-1 grid grid-cols-[1fr_2fr] gap-4 min-h-0">
                 {/* Left: Now Playing + Controls */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 flex flex-col">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 flex flex-col overflow-y-auto">
                     {/* Album Art */}
                     <div className="flex-none mb-4">
                         {track?.albumArtURI ? (
@@ -392,7 +411,7 @@ const SonosView: React.FC = () => {
                 </div>
 
                 {/* Right: Tabbed content */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden min-h-0">
                     {/* Tab bar */}
                     <div className="flex border-b border-slate-200 dark:border-slate-800 flex-none">
                         {tabs.map(tab => (

@@ -1023,12 +1023,22 @@ app.get('/api/edupage', (req, res) => {
 
 // --- SONOS ROUTES ---
 
-// Discover speakers
+// Get speakers with live state (uses cached speaker list from boot discovery)
 app.get('/api/sonos/speakers', async (req, res) => {
     try {
-        const refresh = req.query.refresh === 'true';
-        const speakers = await sonos.discoverSpeakers(refresh);
+        const speakers = await sonos.getSpeakersWithState();
         res.json(speakers);
+    } catch (err) {
+        console.error('Sonos speakers error:', err);
+        res.status(500).json({ error: 'Speaker-Status fehlgeschlagen', details: err.message });
+    }
+});
+
+// Trigger new discovery (from admin panel)
+app.post('/api/sonos/discover', async (req, res) => {
+    try {
+        const speakers = await sonos.runDiscovery();
+        res.json({ success: true, count: speakers.length, speakers });
     } catch (err) {
         console.error('Sonos discovery error:', err);
         res.status(500).json({ error: 'Speaker-Erkennung fehlgeschlagen', details: err.message });
@@ -1337,5 +1347,10 @@ app.post('/api/system/keyboard', (req, res) => {
 // --- EXECUTE ---
 app.listen(PORT, '0.0.0.0', () => { // Bind to 0.0.0.0 for external access
     console.log(`Server running on http://0.0.0.0:${PORT}`);
+
+    // Run Sonos discovery at boot (non-blocking)
+    sonos.runDiscovery().catch(err => {
+        console.error('Initial Sonos discovery failed:', err.message);
+    });
 });
 

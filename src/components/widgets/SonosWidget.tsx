@@ -28,9 +28,10 @@ export const SonosWidget: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
 
-    const headers = { 'x-device-id': deviceId, 'Content-Type': 'application/json' };
+    const headers: Record<string, string> = { 'x-device-id': deviceId, 'Content-Type': 'application/json' };
     const apiUrl = getApiUrl();
 
+    // Fetch speakers with live state from cached server list
     const fetchSpeakers = useCallback(async () => {
         try {
             const res = await fetch(`${apiUrl}/api/sonos/speakers`, { headers });
@@ -39,10 +40,14 @@ export const SonosWidget: React.FC = () => {
             setSpeakers(data);
             setError(false);
 
-            // Pick active speaker: prefer one that's playing, else first
-            const playing = data.find(s => s.state === 'playing');
-            const current = playing || data[0] || null;
-            setActiveSpeaker(current);
+            // Pick active speaker: prefer one that's playing, else keep current, else first
+            setActiveSpeaker(prev => {
+                if (prev) {
+                    const updated = data.find(s => s.ip === prev.ip);
+                    if (updated) return updated;
+                }
+                return data.find(s => s.state === 'playing') || data[0] || null;
+            });
         } catch {
             setError(true);
         } finally {
@@ -50,11 +55,16 @@ export const SonosWidget: React.FC = () => {
         }
     }, [apiUrl, deviceId]);
 
-    // Poll for updates when active
+    // Initial load
     useEffect(() => {
         fetchSpeakers();
-        const interval = setInterval(async () => {
-            if (!activeSpeaker) return;
+    }, []);
+
+    // Poll state for active speaker
+    useEffect(() => {
+        if (!activeSpeaker) return;
+
+        const pollState = async () => {
             try {
                 const res = await fetch(`${apiUrl}/api/sonos/state?ip=${activeSpeaker.ip}`, { headers });
                 if (res.ok) {
@@ -62,7 +72,11 @@ export const SonosWidget: React.FC = () => {
                     setActiveSpeaker(prev => prev ? { ...prev, ...state } : null);
                 }
             } catch { /* ignore */ }
-        }, POLL_INTERVAL);
+        };
+
+        // Run immediately, then on interval
+        pollState();
+        const interval = setInterval(pollState, POLL_INTERVAL);
         return () => clearInterval(interval);
     }, [activeSpeaker?.ip]);
 
@@ -89,7 +103,7 @@ export const SonosWidget: React.FC = () => {
     if (loading) {
         return (
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-3 h-full flex items-center justify-center border border-slate-200 dark:border-slate-800">
-                <div className="animate-pulse text-slate-400 text-sm">Sonos wird gesucht...</div>
+                <div className="animate-pulse text-slate-400 text-sm">Sonos laden...</div>
             </div>
         );
     }

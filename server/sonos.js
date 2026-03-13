@@ -1,9 +1,8 @@
 import { DeviceDiscovery, Sonos } from 'sonos';
 
-// Cache for discovered speakers
-let speakerCache = [];
-let lastDiscovery = 0;
-const DISCOVERY_TTL = 30000; // 30 seconds
+// Persistent speaker list (IPs + names discovered)
+let knownSpeakers = []; // { ip, port, name, model, modelNumber }
+let discoveryRunning = false;
 
 // Active speaker instances keyed by IP
 const speakerInstances = new Map();
@@ -15,63 +14,64 @@ function getSpeaker(ip) {
     return speakerInstances.get(ip);
 }
 
-// Discover all Sonos speakers on the network
-async function discoverSpeakers(forceRefresh = false) {
-    if (!forceRefresh && speakerCache.length > 0 && Date.now() - lastDiscovery < DISCOVERY_TTL) {
-        return speakerCache;
+// Run discovery: finds speakers on the network and stores them persistently
+// This should be called at server boot and can be re-triggered from admin
+async function runDiscovery() {
+    if (discoveryRunning) {
+        console.log('Sonos discovery already running, skipping...');
+        return knownSpeakers;
     }
+    discoveryRunning = true;
+    console.log('Starting Sonos speaker discovery...');
 
-    return new Promise((resolve, reject) => {
-        const speakers = [];
-        const timeout = setTimeout(() => {
-            lastDiscovery = Date.now();
-            speakerCache = speakers;
-            resolve(speakers);
-        }, 5000); // 5 second discovery window
+    return new Promise((resolve) => {
+        const foundIps = new Set();
+        const devicePromises = [];
+
+        const finish = () => {
+            // Wait for all device info to be fetched before resolving
+            Promise.allSettled(devicePromises).then(() => {
+                discoveryRunning = false;
+                console.log(`Sonos discovery complete: ${knownSpeakers.length} speaker(s) found`);
+                resolve(knownSpeakers);
+            });
+        };
+
+        const timeout = setTimeout(finish, 8000); // 8 second discovery window
 
         try {
-            const discovery = DeviceDiscovery({ timeout: 5000 });
+            const discovery = DeviceDiscovery({ timeout: 8000 });
 
-            discovery.on('DeviceAvailable', async (device) => {
-                try {
-                    const sonos = new Sonos(device.host);
-                    const [desc, state, volume, muted] = await Promise.all([
-                        sonos.deviceDescription(),
-                        sonos.getCurrentState().catch(() => 'unknown'),
-                        sonos.getVolume().catch(() => 0),
-                        sonos.getMuted().catch(() => false),
-                    ]);
+            discovery.on('DeviceAvailable', (device) => {
+                if (foundIps.has(device.host)) return; // skip duplicates
+                foundIps.add(device.host);
 
-                    let currentTrack = null;
+                const promise = (async () => {
                     try {
-                        const track = await sonos.currentTrack();
-                        if (track && track.title) {
-                            currentTrack = {
-                                title: track.title || '',
-                                artist: track.artist || '',
-                                album: track.album || '',
-                                albumArtURI: track.albumArtURI || '',
-                                duration: track.duration || 0,
-                                position: track.position || 0,
-                                uri: track.uri || '',
-                            };
-                        }
-                    } catch (e) { /* no track playing */ }
+                        const sonos = getSpeaker(device.host);
+                        const desc = await sonos.deviceDescription();
 
-                    speakers.push({
-                        ip: device.host,
-                        port: device.port,
-                        name: desc.roomName || desc.friendlyName || device.host,
-                        model: desc.modelName || '',
-                        modelNumber: desc.modelNumber || '',
-                        state: state,
-                        volume: volume,
-                        muted: muted,
-                        currentTrack: currentTrack,
-                    });
-                } catch (err) {
-                    console.error(`Failed to get info for ${device.host}:`, err.message);
-                }
+                        const speakerInfo = {
+                            ip: device.host,
+                            port: device.port,
+                            name: desc.roomName || desc.friendlyName || device.host,
+                            model: desc.modelName || '',
+                            modelNumber: desc.modelNumber || '',
+                        };
+
+                        // Update or add to known speakers
+                        const existingIdx = knownSpeakers.findIndex(s => s.ip === device.host);
+                        if (existingIdx >= 0) {
+                            knownSpeakers[existingIdx] = speakerInfo;
+                        } else {
+                            knownSpeakers.push(speakerInfo);
+                        }
+                    } catch (err) {
+                        console.error(`Failed to get info for ${device.host}:`, err.message);
+                    }
+                })();
+
+                devicePromises.push(promise);
             });
 
             discovery.on('error', (err) => {
@@ -79,10 +79,34 @@ async function discoverSpeakers(forceRefresh = false) {
             });
         } catch (err) {
             clearTimeout(timeout);
-            // If discovery itself fails, return cached or empty
-            resolve(speakerCache.length > 0 ? speakerCache : []);
+            discoveryRunning = false;
+            resolve(knownSpeakers);
         }
     });
+}
+
+// Get speakers list with live state (uses cached speaker list, fetches fresh state)
+async function getSpeakersWithState() {
+    if (knownSpeakers.length === 0) {
+        // No speakers discovered yet, try once
+        await runDiscovery();
+    }
+
+    // Fetch live state for all known speakers in parallel
+    const results = await Promise.allSettled(
+        knownSpeakers.map(async (speaker) => {
+            try {
+                const state = await getSpeakerState(speaker.ip);
+                return { ...speaker, ...state };
+            } catch {
+                return { ...speaker, state: 'unreachable', volume: 0, muted: false, currentTrack: null };
+            }
+        })
+    );
+
+    return results
+        .filter(r => r.status === 'fulfilled')
+        .map(r => r.value);
 }
 
 // Get detailed state for a single speaker
@@ -179,7 +203,6 @@ async function getFavorites(ip) {
 async function getPlaylists(ip) {
     const sonos = getSpeaker(ip);
     try {
-        // getMusicLibrary('sonos_playlists') returns Sonos playlists
         const result = await sonos.getMusicLibrary('sonos_playlists', { start: 0, total: 100 });
         return (result.items || []).map(item => ({
             title: item.title || '',
@@ -209,8 +232,6 @@ async function playFavorite(ip, uri, metadata) {
 async function browseRadio(ip, category) {
     const sonos = getSpeaker(ip);
     try {
-        // R:0/0 = My Radio Stations, R:0/1 = My Radio Shows
-        // Default browse returns categories
         const radioId = category || 'R:0/0';
         const result = await sonos.getMusicLibrary('R:0', { start: 0, total: 100 });
         return (result.items || []).map(item => ({
@@ -325,7 +346,8 @@ async function leaveGroup(ip) {
 }
 
 export default {
-    discoverSpeakers,
+    runDiscovery,
+    getSpeakersWithState,
     getSpeakerState,
     play,
     pause,
