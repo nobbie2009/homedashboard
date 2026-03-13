@@ -413,7 +413,7 @@ const SonosView: React.FC = () => {
 
                     {/* Tab content */}
                     <div className="flex-1 overflow-y-auto p-4">
-                        {activeTab === 'player' && <PlayerTab speaker={selectedSpeaker} track={track} />}
+                        {activeTab === 'player' && <PlayerTab speaker={selectedSpeaker} track={track ?? null} />}
                         {activeTab === 'favorites' && (
                             <FavoritesTab
                                 favorites={favorites}
