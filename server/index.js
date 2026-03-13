@@ -15,6 +15,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 import { security } from './security.js';
+import sonos from './sonos.js';
 
 const app = express();
 app.use(cors());
@@ -1018,6 +1019,260 @@ app.get('/api/edupage', (req, res) => {
             res.status(500).send("No data returned from Edupage script");
         }
     });
+});
+
+// --- SONOS ROUTES ---
+
+// Discover speakers
+app.get('/api/sonos/speakers', async (req, res) => {
+    try {
+        const refresh = req.query.refresh === 'true';
+        const speakers = await sonos.discoverSpeakers(refresh);
+        res.json(speakers);
+    } catch (err) {
+        console.error('Sonos discovery error:', err);
+        res.status(500).json({ error: 'Speaker-Erkennung fehlgeschlagen', details: err.message });
+    }
+});
+
+// Get single speaker state
+app.get('/api/sonos/state', async (req, res) => {
+    const { ip } = req.query;
+    if (!ip) return res.status(400).json({ error: 'IP fehlt' });
+    try {
+        const state = await sonos.getSpeakerState(ip);
+        res.json(state);
+    } catch (err) {
+        res.status(500).json({ error: 'Status konnte nicht abgerufen werden', details: err.message });
+    }
+});
+
+// Transport controls
+app.post('/api/sonos/play', async (req, res) => {
+    const { ip, uri } = req.body;
+    if (!ip) return res.status(400).json({ error: 'IP fehlt' });
+    try {
+        await sonos.play(ip, uri);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Play fehlgeschlagen', details: err.message });
+    }
+});
+
+app.post('/api/sonos/pause', async (req, res) => {
+    const { ip } = req.body;
+    if (!ip) return res.status(400).json({ error: 'IP fehlt' });
+    try {
+        await sonos.pause(ip);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Pause fehlgeschlagen', details: err.message });
+    }
+});
+
+app.post('/api/sonos/stop', async (req, res) => {
+    const { ip } = req.body;
+    if (!ip) return res.status(400).json({ error: 'IP fehlt' });
+    try {
+        await sonos.stop(ip);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Stop fehlgeschlagen', details: err.message });
+    }
+});
+
+app.post('/api/sonos/next', async (req, res) => {
+    const { ip } = req.body;
+    if (!ip) return res.status(400).json({ error: 'IP fehlt' });
+    try {
+        await sonos.next(ip);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Next fehlgeschlagen', details: err.message });
+    }
+});
+
+app.post('/api/sonos/previous', async (req, res) => {
+    const { ip } = req.body;
+    if (!ip) return res.status(400).json({ error: 'IP fehlt' });
+    try {
+        await sonos.previous(ip);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Previous fehlgeschlagen', details: err.message });
+    }
+});
+
+app.post('/api/sonos/volume', async (req, res) => {
+    const { ip, volume } = req.body;
+    if (!ip || volume === undefined) return res.status(400).json({ error: 'IP oder Volume fehlt' });
+    try {
+        await sonos.setVolume(ip, Math.max(0, Math.min(100, volume)));
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Volume fehlgeschlagen', details: err.message });
+    }
+});
+
+app.post('/api/sonos/mute', async (req, res) => {
+    const { ip, muted } = req.body;
+    if (!ip || muted === undefined) return res.status(400).json({ error: 'IP oder Muted fehlt' });
+    try {
+        await sonos.setMuted(ip, muted);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Mute fehlgeschlagen', details: err.message });
+    }
+});
+
+app.post('/api/sonos/seek', async (req, res) => {
+    const { ip, seconds } = req.body;
+    if (!ip || seconds === undefined) return res.status(400).json({ error: 'IP oder Sekunden fehlt' });
+    try {
+        await sonos.seek(ip, seconds);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Seek fehlgeschlagen', details: err.message });
+    }
+});
+
+// Favorites & Playlists
+app.get('/api/sonos/favorites', async (req, res) => {
+    const { ip } = req.query;
+    if (!ip) return res.status(400).json({ error: 'IP fehlt' });
+    try {
+        const favorites = await sonos.getFavorites(ip);
+        res.json(favorites);
+    } catch (err) {
+        res.status(500).json({ error: 'Favoriten konnten nicht geladen werden', details: err.message });
+    }
+});
+
+app.get('/api/sonos/playlists', async (req, res) => {
+    const { ip } = req.query;
+    if (!ip) return res.status(400).json({ error: 'IP fehlt' });
+    try {
+        const playlists = await sonos.getPlaylists(ip);
+        res.json(playlists);
+    } catch (err) {
+        res.status(500).json({ error: 'Playlisten konnten nicht geladen werden', details: err.message });
+    }
+});
+
+app.post('/api/sonos/play-favorite', async (req, res) => {
+    const { ip, uri, metadata } = req.body;
+    if (!ip || !uri) return res.status(400).json({ error: 'IP oder URI fehlt' });
+    try {
+        await sonos.playFavorite(ip, uri, metadata);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Favorit konnte nicht abgespielt werden', details: err.message });
+    }
+});
+
+// Radio
+app.get('/api/sonos/radio', async (req, res) => {
+    const { ip, category } = req.query;
+    if (!ip) return res.status(400).json({ error: 'IP fehlt' });
+    try {
+        const stations = await sonos.browseRadio(ip, category);
+        res.json(stations);
+    } catch (err) {
+        res.status(500).json({ error: 'Radio konnte nicht geladen werden', details: err.message });
+    }
+});
+
+// Music Library Search
+app.get('/api/sonos/search', async (req, res) => {
+    const { ip, type, term } = req.query;
+    if (!ip || !term) return res.status(400).json({ error: 'IP oder Suchbegriff fehlt' });
+    try {
+        const searchType = type || 'tracks'; // tracks, albums, artists, playlists
+        const results = await sonos.searchMusicLibrary(ip, searchType, term);
+        res.json(results);
+    } catch (err) {
+        res.status(500).json({ error: 'Suche fehlgeschlagen', details: err.message });
+    }
+});
+
+// Queue
+app.get('/api/sonos/queue', async (req, res) => {
+    const { ip } = req.query;
+    if (!ip) return res.status(400).json({ error: 'IP fehlt' });
+    try {
+        const queue = await sonos.getQueue(ip);
+        res.json(queue);
+    } catch (err) {
+        res.status(500).json({ error: 'Queue konnte nicht geladen werden', details: err.message });
+    }
+});
+
+app.post('/api/sonos/queue/add', async (req, res) => {
+    const { ip, uri, metadata } = req.body;
+    if (!ip || !uri) return res.status(400).json({ error: 'IP oder URI fehlt' });
+    try {
+        await sonos.addToQueue(ip, uri, metadata);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Zur Queue hinzufuegen fehlgeschlagen', details: err.message });
+    }
+});
+
+app.post('/api/sonos/queue/clear', async (req, res) => {
+    const { ip } = req.body;
+    if (!ip) return res.status(400).json({ error: 'IP fehlt' });
+    try {
+        await sonos.clearQueue(ip);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Queue leeren fehlgeschlagen', details: err.message });
+    }
+});
+
+app.post('/api/sonos/queue/play', async (req, res) => {
+    const { ip, position } = req.body;
+    if (!ip || position === undefined) return res.status(400).json({ error: 'IP oder Position fehlt' });
+    try {
+        await sonos.playFromQueue(ip, position);
+        await sonos.play(ip);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Queue abspielen fehlgeschlagen', details: err.message });
+    }
+});
+
+// Groups
+app.get('/api/sonos/groups', async (req, res) => {
+    const { ip } = req.query;
+    if (!ip) return res.status(400).json({ error: 'IP fehlt' });
+    try {
+        const groups = await sonos.getGroups(ip);
+        res.json(groups);
+    } catch (err) {
+        res.status(500).json({ error: 'Gruppen konnten nicht geladen werden', details: err.message });
+    }
+});
+
+app.post('/api/sonos/group/join', async (req, res) => {
+    const { ip, coordinatorIp } = req.body;
+    if (!ip || !coordinatorIp) return res.status(400).json({ error: 'IPs fehlen' });
+    try {
+        await sonos.joinGroup(ip, coordinatorIp);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Gruppe beitreten fehlgeschlagen', details: err.message });
+    }
+});
+
+app.post('/api/sonos/group/leave', async (req, res) => {
+    const { ip } = req.body;
+    if (!ip) return res.status(400).json({ error: 'IP fehlt' });
+    try {
+        await sonos.leaveGroup(ip);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Gruppe verlassen fehlgeschlagen', details: err.message });
+    }
 });
 
 // --- SSE (Server-Sent Events) for Real-time Triggers (Doorbell) ---

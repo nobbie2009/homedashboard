@@ -11,6 +11,7 @@ import {
     ChoresView,
     RewardBoard,
     SmartHomeView,
+    SonosView,
     AdminSettings
 } from './pages';
 
@@ -51,6 +52,7 @@ function App() {
                                     <Route path="chores" element={<ChoresView />} />
                                     <Route path="rewards" element={<RewardBoard />} />
                                     <Route path="smarthome" element={<SmartHomeView />} />
+                                    <Route path="sonos" element={<SonosView />} />
                                     <Route path="admin" element={<AdminSettings />} />
                                     <Route path="*" element={<Navigate to="/" replace />} />
                                 </Route>

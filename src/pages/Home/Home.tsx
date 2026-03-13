@@ -8,6 +8,7 @@ import { ChoresWidget } from '../../components/widgets/ChoresWidget';
 import { CountdownWidget } from '../../components/widgets/CountdownWidget';
 import { MoonWidget } from '../../components/widgets/MoonWidget';
 import { WeekWidget } from '../../components/widgets/WeekWidget';
+import { SonosWidget } from '../../components/widgets/SonosWidget';
 
 export const Home: React.FC = () => {
     return (
@@ -47,7 +48,7 @@ export const Home: React.FC = () => {
                 Previous was Camera (Left) | Countdown (Right) in a 2-col grid.
             */}
             {/* Bottom Row: Camera | Countdown | Chores */}
-            <div className="col-span-2 h-48 grid grid-cols-[2fr_1fr_1fr_2fr] gap-4">
+            <div className="col-span-2 h-48 grid grid-cols-[2fr_1fr_1fr_2fr_2fr] gap-4">
                 <div className="overflow-hidden h-full">
                     <CameraWidget />
                 </div>
@@ -59,6 +60,9 @@ export const Home: React.FC = () => {
                 </div>
                 <div className="overflow-hidden h-full">
                     <ChoresWidget />
+                </div>
+                <div className="overflow-hidden h-full">
+                    <SonosWidget />
                 </div>
             </div>
         </div>
