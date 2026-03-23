@@ -215,12 +215,28 @@ async function getPlaylists(ip) {
     }
 }
 
-// Play a favorite by URI (with metadata for radio stations)
+// Check if a URI is a container type (playlist, album) that needs queue-based playback
+function isContainerUri(uri) {
+    return uri.startsWith('x-rincon-cpcontainer:') ||
+           uri.startsWith('x-rincon-playlist:') ||
+           uri.startsWith('S:') ||
+           uri.startsWith('SQ:');
+}
+
+// Play a favorite by URI – handles both single items/streams and containers (playlists, albums)
 async function playFavorite(ip, uri, metadata) {
     const sonos = getSpeaker(ip);
     try {
-        await sonos.setAVTransportURI({ uri, metadata: metadata || '' });
-        await sonos.play();
+        if (isContainerUri(uri)) {
+            // Container: clear queue, add container, switch to queue, play
+            await sonos.flush();
+            await sonos.queue({ uri, metadata: metadata || '' });
+            await sonos.selectQueue();
+            await sonos.play();
+        } else {
+            await sonos.setAVTransportURI({ uri, metadata: metadata || '' });
+            await sonos.play();
+        }
         return { success: true };
     } catch (err) {
         console.error('Failed to play favorite:', err.message);

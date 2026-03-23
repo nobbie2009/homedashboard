@@ -192,11 +192,18 @@ const SonosView: React.FC = () => {
 
     const playFavorite = async (item: FavoriteItem) => {
         if (!selectedSpeaker) return;
-        await fetch(`${apiUrl}/api/sonos/play-favorite`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ ip: selectedSpeaker.ip, uri: item.uri, metadata: item.metadata }),
-        });
+        try {
+            const res = await fetch(`${apiUrl}/api/sonos/play-favorite`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ ip: selectedSpeaker.ip, uri: item.uri, metadata: item.metadata }),
+            });
+            if (!res.ok) {
+                console.error('Failed to play favorite:', item.title, await res.text());
+            }
+        } catch (err) {
+            console.error('Failed to play favorite:', item.title, err);
+        }
         setTimeout(() => {
             fetch(`${apiUrl}/api/sonos/state?ip=${selectedSpeaker.ip}`, { headers })
                 .then(r => r.ok ? r.json() : null)
