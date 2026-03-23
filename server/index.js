@@ -360,17 +360,16 @@ app.post('/api/config', (req, res) => {
     }
 });
 
-// Backup & Restore - Complete backup includes ALL settings
+// Backup & Restore - Complete backup includes ALL settings and history
 app.get('/api/config/backup', (req, res) => {
-    // Create comprehensive backup with all settings
     const backup = {
-        version: 2,  // Backup format version for future compatibility
+        version: 3,  // v3: includes rewardsHistory
         timestamp: new Date().toISOString(),
-        config: appConfig,  // All app configuration (Notion, Edupage, Chores, etc.)
-        googleTokens: userTokens  // Google OAuth tokens for calendar integration
+        config: appConfig,
+        googleTokens: userTokens,
+        rewardsHistory: rewardsData
     };
 
-    // Set headers for file download
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', 'attachment; filename=homedashboard-backup.json');
     res.json(backup);
@@ -380,14 +379,13 @@ app.post('/api/config/restore', (req, res) => {
     try {
         const data = req.body;
 
-        // Basic validation
         if (typeof data !== 'object') {
             return res.status(400).send("Invalid backup format");
         }
 
-        // Handle v2 backup format (with version field)
-        if (data.version === 2) {
-            console.log("Restoring v2 backup from", data.timestamp || 'unknown date');
+        // Handle v2/v3 backup format (with version field)
+        if (data.version >= 2) {
+            console.log(`Restoring v${data.version} backup from`, data.timestamp || 'unknown date');
 
             // Restore config
             if (data.config) {
@@ -404,6 +402,13 @@ app.post('/api/config/restore', (req, res) => {
                     oauth2Client.setCredentials(userTokens);
                 }
                 console.log("Google tokens restored from backup.");
+            }
+
+            // Restore rewards history (v3+)
+            if (data.rewardsHistory) {
+                rewardsData = data.rewardsHistory;
+                saveRewardsData();
+                console.log("Rewards history restored from backup.");
             }
         } else {
             // Legacy v1 backup (only config, no version field)

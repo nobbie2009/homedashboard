@@ -220,27 +220,50 @@ function isContainerUri(uri) {
     return uri.startsWith('x-rincon-cpcontainer:') ||
            uri.startsWith('x-rincon-playlist:') ||
            uri.startsWith('S:') ||
-           uri.startsWith('SQ:');
+           uri.startsWith('SQ:') ||
+           uri.startsWith('A:');
+}
+
+// Play a favorite via queue-based approach (for containers: playlists, albums, etc.)
+async function playViaQueue(sonos, uri, metadata) {
+    await sonos.flush();
+    await sonos.queue({ uri, metadata: metadata || '' });
+    await sonos.selectQueue();
+    // selectQueue -> setAVTransportURI already triggers play(), no extra play() needed
 }
 
 // Play a favorite by URI – handles both single items/streams and containers (playlists, albums)
 async function playFavorite(ip, uri, metadata) {
     const sonos = getSpeaker(ip);
-    try {
-        if (isContainerUri(uri)) {
-            // Container: clear queue, add container, switch to queue, play
-            await sonos.flush();
-            await sonos.queue({ uri, metadata: metadata || '' });
-            await sonos.selectQueue();
-            await sonos.play();
-        } else {
-            await sonos.setAVTransportURI({ uri, metadata: metadata || '' });
-            await sonos.play();
+    console.log(`[Sonos] playFavorite: uri=${uri}, hasMetadata=${!!metadata}, isContainer=${isContainerUri(uri)}`);
+
+    if (isContainerUri(uri)) {
+        // Container URIs (playlists, albums) must be queued – SetAVTransportURI won't work
+        try {
+            await playViaQueue(sonos, uri, metadata);
+            return { success: true };
+        } catch (err) {
+            console.error(`[Sonos] Queue-based playback failed for container URI: ${err.message}`);
+            throw err;
         }
+    }
+
+    // Non-container: try SetAVTransportURI first (streams, single tracks)
+    // Note: setAVTransportURI already calls play() internally
+    try {
+        await sonos.setAVTransportURI({ uri, metadata: metadata || '', onlySetUri: true });
+        await sonos.play();
         return { success: true };
     } catch (err) {
-        console.error('Failed to play favorite:', err.message);
-        throw err;
+        console.log(`[Sonos] setAVTransportURI failed, trying queue-based fallback: ${err.message}`);
+        // Fallback: try queue-based approach for URIs not detected as container
+        try {
+            await playViaQueue(sonos, uri, metadata);
+            return { success: true };
+        } catch (err2) {
+            console.error(`[Sonos] Both playback methods failed. URI: ${uri}, Error: ${err2.message}`);
+            throw err2;
+        }
     }
 }
 
