@@ -743,6 +743,27 @@ app.get('/api/rewards/history', (req, res) => {
     const { kidId, limit } = req.query;
     let results = [...rewardsData.completions];
 
+    // Filter out completions from before the last reward claim
+    // so the history matches the current star count
+    const rewardHistory = rewardsData.rewardHistory || [];
+    if (rewardHistory.length > 0) {
+        // Build a map of the last reset time per kid (and a global reset time)
+        let globalResetTime = 0;
+        const kidResetTimes = {};
+        for (const claim of rewardHistory) {
+            const t = claim.claimedAt || 0;
+            if (claim.claimedBy === 'all' || claim.claimedBy === 'shared' || claim.claimedBy === 'individual') {
+                globalResetTime = Math.max(globalResetTime, t);
+            } else if (claim.claimedBy) {
+                kidResetTimes[claim.claimedBy] = Math.max(kidResetTimes[claim.claimedBy] || 0, t);
+            }
+        }
+        results = results.filter(c => {
+            const resetTime = Math.max(globalResetTime, kidResetTimes[c.kidId] || 0);
+            return c.timestamp > resetTime;
+        });
+    }
+
     if (kidId) {
         results = results.filter(c => c.kidId === kidId);
     }
