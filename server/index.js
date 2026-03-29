@@ -76,7 +76,7 @@ app.get('/api/system/ip', (req, res) => {
         }
     }
     // Return the first one found, or a fallback
-    res.json({ ip: results[0] || 'localhost' });
+    res.json({ ip: results[0] || 'localhost', user: os.userInfo().username });
 });
 
 // Maintenance: Git Pull / Update

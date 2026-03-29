@@ -46,8 +46,8 @@ else
 fi
 
 # Always ensure helpers are installed
-echo "--> Installing/Verifying 'unclutter' and 'sed'..."
-apt-get install -y unclutter sed
+echo "--> Installing/Verifying 'unclutter', 'sed' and emoji fonts..."
+apt-get install -y unclutter sed fonts-noto-color-emoji
 
 # 3. Configuration Prompts
 echo ""

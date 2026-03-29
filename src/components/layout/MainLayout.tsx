@@ -22,6 +22,7 @@ export const MainLayout: React.FC = () => {
     const { deviceId } = useSecurity();
     const { config, updateConfig } = useConfig();
     const [serverIp, setServerIp] = React.useState<string>('');
+    const [serverUser, setServerUser] = React.useState<string>('');
     const [showScreensaver, setShowScreensaver] = React.useState(false);
     const [isOnline, setIsOnline] = React.useState(navigator.onLine);
 
@@ -93,6 +94,7 @@ export const MainLayout: React.FC = () => {
                 });
                 const data = await res.json();
                 setServerIp(data.ip);
+                if (data.user) setServerUser(data.user);
             } catch (e) {
                 console.error("Failed to fetch server IP", e);
             }
@@ -212,7 +214,7 @@ export const MainLayout: React.FC = () => {
                 <div className="flex items-center space-x-4">
                     {!isLocked && (
                         <div className="text-xs text-slate-400 dark:text-slate-500 font-mono">
-                            IP: {serverIp}
+                            {serverUser && <>{serverUser}@</>}{serverIp}
                         </div>
                     )}
 
