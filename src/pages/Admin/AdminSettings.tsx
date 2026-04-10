@@ -695,6 +695,77 @@ const AdminSettings: React.FC = () => {
                                 )}
                             </div>
                         </section>
+
+                        <section className="bg-white/40 dark:bg-slate-900/40 rounded-lg border border-slate-300/50 dark:border-slate-700/50 p-4">
+                            <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Bildschirmschoner (Tagsüber – iCloud Album)</h3>
+                            <div className="space-y-4">
+                                <label className="flex items-center space-x-3">
+                                    <input
+                                        type="checkbox"
+                                        checked={!!config.screensaver?.photoEnabled}
+                                        onChange={(e) => updateConfig({
+                                            screensaver: {
+                                                ...(config.screensaver || { enabled: false, start: '22:00', end: '06:00' }),
+                                                photoEnabled: e.target.checked
+                                            } as any
+                                        })}
+                                        className="w-5 h-5 rounded border-slate-600 text-blue-600 focus:ring-blue-500 focus:ring-offset-slate-900"
+                                    />
+                                    <span>Foto-Diashow außerhalb des Nacht-Zeitraums aktivieren</span>
+                                </label>
+
+                                {config.screensaver?.photoEnabled && (
+                                    <div className="grid grid-cols-2 gap-4 pl-8">
+                                        <div className="col-span-2">
+                                            <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">
+                                                iCloud Freigabe-Link
+                                            </label>
+                                            <input
+                                                type="text"
+                                                placeholder="https://share.icloud.com/photos/0..."
+                                                value={config.screensaver?.photoAlbumUrl || ''}
+                                                onChange={(e) => updateConfig({
+                                                    screensaver: { ...config.screensaver!, photoAlbumUrl: e.target.value }
+                                                })}
+                                                className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 w-full"
+                                            />
+                                            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                                                Ein in der Fotos-App freigegebenes Album. Der Link beginnt mit <code>https://share.icloud.com/photos/</code>.
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">Inaktivität (Minuten)</label>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                max={120}
+                                                value={config.screensaver?.photoIdleMinutes ?? 5}
+                                                onChange={(e) => updateConfig({
+                                                    screensaver: { ...config.screensaver!, photoIdleMinutes: Math.max(1, parseInt(e.target.value || '5', 10)) }
+                                                })}
+                                                className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 w-full"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">Bildwechsel (Sekunden)</label>
+                                            <input
+                                                type="number"
+                                                min={3}
+                                                max={300}
+                                                value={config.screensaver?.photoIntervalSeconds ?? 10}
+                                                onChange={(e) => updateConfig({
+                                                    screensaver: { ...config.screensaver!, photoIntervalSeconds: Math.max(3, parseInt(e.target.value || '10', 10)) }
+                                                })}
+                                                className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 w-full"
+                                            />
+                                        </div>
+                                        <p className="col-span-2 text-xs text-slate-400 dark:text-slate-500">
+                                            Die Diashow startet außerhalb des Nacht-Zeitraums nach der oben angegebenen Inaktivität. Im Nacht-Zeitraum wird stattdessen der schwarze Uhr-Bildschirmschoner verwendet.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </section>
                     </div>
                 )}
 
