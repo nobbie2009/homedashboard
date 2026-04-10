@@ -8,12 +8,12 @@ import clsx from 'clsx';
 import { useIdleRedirect } from '../../hooks/useIdleRedirect';
 import pkg from '../../../package.json';
 import { DoorbellOverlay } from '../overlays/DoorbellOverlay';
-import { Screensaver } from '../overlays/Screensaver';
+import { Screensaver, ScreensaverMode } from '../overlays/Screensaver';
 import { OnScreenKeyboard } from '../overlays/OnScreenKeyboard';
 import { useConfig } from '../../contexts/ConfigContext';
 import { ErrorBoundary } from '../ErrorBoundary';
 
-const SCREENSAVER_IDLE_MS = 180000; // 3 minutes
+const SCREENSAVER_NIGHT_IDLE_MS = 180000; // 3 minutes (clock screensaver fallback)
 const SCREENSAVER_CHECK_INTERVAL = 10000; // 10 seconds
 const IDLE_REDIRECT_MS = 180000; // 3 minutes
 
@@ -24,6 +24,7 @@ export const MainLayout: React.FC = () => {
     const [serverIp, setServerIp] = React.useState<string>('');
     const [serverUser, setServerUser] = React.useState<string>('');
     const [showScreensaver, setShowScreensaver] = React.useState(false);
+    const [screensaverMode, setScreensaverMode] = React.useState<ScreensaverMode>('clock');
     const [isOnline, setIsOnline] = React.useState(navigator.onLine);
 
     // Theme management with auto/schedule support
@@ -111,40 +112,69 @@ export const MainLayout: React.FC = () => {
     }, []);
 
     // Screensaver Logic Check
+    //
+    // Two independent screensavers can be enabled:
+    //   • Night (clock):  active inside the configured start/end window
+    //   • Day  (photos):  active outside that window, when an iCloud album is set
+    // Each has its own idle threshold so the photo slideshow can kick in earlier
+    // during the day than the blackout clock at night.
     React.useEffect(() => {
         const checkScreensaver = () => {
-            if (!config.screensaver?.enabled) return;
+            const cfg = config.screensaver;
+            const nightEnabled = !!cfg?.enabled;
+            const photoEnabled = !!cfg?.photoEnabled && !!cfg?.photoAlbumUrl;
+
+            if (!nightEnabled && !photoEnabled) {
+                setShowScreensaver(false);
+                return;
+            }
 
             const now = new Date();
             const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
-            const [startH, startM] = (config.screensaver.start || "22:00").split(':').map(Number);
-            const [endH, endM] = (config.screensaver.end || "06:00").split(':').map(Number);
-
+            const [startH, startM] = (cfg?.start || "22:00").split(':').map(Number);
+            const [endH, endM] = (cfg?.end || "06:00").split(':').map(Number);
             const startTotal = startH * 60 + startM;
             const endTotal = endH * 60 + endM;
 
-            let inWindow = false;
+            let inNightWindow = false;
             if (startTotal > endTotal) {
-                inWindow = nowMinutes >= startTotal || nowMinutes < endTotal;
+                inNightWindow = nowMinutes >= startTotal || nowMinutes < endTotal;
             } else {
-                inWindow = nowMinutes >= startTotal && nowMinutes < endTotal;
+                inNightWindow = nowMinutes >= startTotal && nowMinutes < endTotal;
             }
 
-            if (inWindow) {
-                if (Date.now() - lastActivity.current > SCREENSAVER_IDLE_MS) {
+            const idleMs = Date.now() - lastActivity.current;
+
+            if (inNightWindow && nightEnabled) {
+                if (idleMs > SCREENSAVER_NIGHT_IDLE_MS) {
+                    setScreensaverMode('clock');
                     setShowScreensaver(true);
+                } else {
+                    setShowScreensaver(false);
                 }
-            } else {
-                setShowScreensaver(false);
+                return;
             }
+
+            if (!inNightWindow && photoEnabled) {
+                const photoIdleMs = Math.max(1, cfg?.photoIdleMinutes ?? 5) * 60 * 1000;
+                if (idleMs > photoIdleMs) {
+                    setScreensaverMode('photos');
+                    setShowScreensaver(true);
+                } else {
+                    setShowScreensaver(false);
+                }
+                return;
+            }
+
+            setShowScreensaver(false);
         };
 
         const interval = setInterval(checkScreensaver, SCREENSAVER_CHECK_INTERVAL);
         checkScreensaver();
 
         return () => clearInterval(interval);
-    }, [config.screensaver]);
+    }, [config.screensaver, lastActivity]);
 
 
     useIdleRedirect(IDLE_REDIRECT_MS, '/');
@@ -202,7 +232,7 @@ export const MainLayout: React.FC = () => {
     return (
         <div className="flex flex-col h-screen w-full bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 overflow-hidden relative transition-colors duration-200">
             <DoorbellOverlay active={doorbellActive} onClose={() => setDoorbellActive(false)} />
-            <Screensaver active={showScreensaver} onDismiss={() => setShowScreensaver(false)} />
+            <Screensaver active={showScreensaver} mode={screensaverMode} onDismiss={() => setShowScreensaver(false)} />
 
             {keyboardActive && <OnScreenKeyboard onClose={() => setKeyboardActive(false)} />}
 

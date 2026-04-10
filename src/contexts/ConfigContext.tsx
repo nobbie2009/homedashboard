@@ -72,9 +72,15 @@ export interface AppConfig {
     santaRouteEnabled?: boolean;
     santaRouteAddress?: string;
     screensaver?: {
+        // Night mode: blackout clock screensaver between start/end
         enabled: boolean;
         start: string; // HH:mm
         end: string; // HH:mm
+        // Day mode: iCloud shared album slideshow outside the night window
+        photoEnabled?: boolean;
+        photoAlbumUrl?: string;
+        photoIdleMinutes?: number;     // How long the dashboard must be idle
+        photoIntervalSeconds?: number; // How long each photo is shown
     };
     weatherAlertExclusions?: string[]; // List of event codes/names to ignore (e.g., 'FROST', 'FOG')
     adminPin?: string;
@@ -124,7 +130,11 @@ const defaultConfig: AppConfig = {
     screensaver: {
         enabled: false,
         start: '22:00',
-        end: '06:00'
+        end: '06:00',
+        photoEnabled: false,
+        photoAlbumUrl: '',
+        photoIdleMinutes: 5,
+        photoIntervalSeconds: 10
     },
     weatherAlertExclusions: [],
     adminPin: '1234',
@@ -181,7 +191,11 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
                         screensaver: {
                             enabled: data.screensaver?.enabled ?? prev.screensaver?.enabled ?? false,
                             start: data.screensaver?.start || prev.screensaver?.start || '22:00',
-                            end: data.screensaver?.end || prev.screensaver?.end || '06:00'
+                            end: data.screensaver?.end || prev.screensaver?.end || '06:00',
+                            photoEnabled: data.screensaver?.photoEnabled ?? prev.screensaver?.photoEnabled ?? false,
+                            photoAlbumUrl: data.screensaver?.photoAlbumUrl ?? prev.screensaver?.photoAlbumUrl ?? '',
+                            photoIdleMinutes: data.screensaver?.photoIdleMinutes ?? prev.screensaver?.photoIdleMinutes ?? 5,
+                            photoIntervalSeconds: data.screensaver?.photoIntervalSeconds ?? prev.screensaver?.photoIntervalSeconds ?? 10
                         },
                         weatherAlertExclusions: data.weatherAlertExclusions || prev.weatherAlertExclusions || [],
                         rewards: {

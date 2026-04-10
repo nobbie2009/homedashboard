@@ -16,6 +16,7 @@ const __dirname = path.dirname(__filename);
 
 import { security } from './security.js';
 import sonos from './sonos.js';
+import { getSharedAlbumPhotos, clearAlbumCache } from './icloud.js';
 
 const app = express();
 app.use(cors());
@@ -1309,6 +1310,29 @@ app.post('/api/sonos/group/leave', async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: 'Gruppe verlassen fehlgeschlagen', details: err.message });
     }
+});
+
+// --- iCloud Shared Album Proxy ---
+// Returns the photo list for a shared iCloud album. The album link must be
+// configured in the screensaver settings. Results are cached for ~30 minutes
+// inside icloud.js so the dashboard can poll cheaply.
+app.get('/api/icloud/album', async (req, res) => {
+    const url = req.query.url;
+    if (!url) {
+        return res.status(400).json({ error: 'url-Parameter fehlt' });
+    }
+    try {
+        const result = await getSharedAlbumPhotos(url);
+        res.json(result);
+    } catch (err) {
+        console.error('iCloud album fetch failed:', err.message);
+        res.status(502).json({ error: 'iCloud-Album konnte nicht geladen werden', details: err.message });
+    }
+});
+
+app.post('/api/icloud/album/refresh', (req, res) => {
+    clearAlbumCache();
+    res.json({ success: true });
 });
 
 // --- SSE (Server-Sent Events) for Real-time Triggers (Doorbell) ---

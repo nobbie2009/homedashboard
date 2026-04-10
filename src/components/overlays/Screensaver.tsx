@@ -1,14 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { Cloud, CloudRain, CloudSnow, Moon, CloudLightning } from 'lucide-react';
 import { useConfig } from '../../contexts/ConfigContext';
+import { useSecurity } from '../../contexts/SecurityContext';
+import { getApiUrl } from '../../utils/api';
 
 interface WeatherData {
     current: {
         temp: number;
         code: number;
     };
+}
+
+interface IcloudPhoto {
+    id: string;
+    url: string;
+    width: number;
+    height: number;
+    caption?: string;
 }
 
 const getWeatherIcon = (code: number, className?: string) => {
@@ -21,10 +31,25 @@ const getWeatherIcon = (code: number, className?: string) => {
     return <Moon className={className} />; // Night mode default
 };
 
-export const Screensaver: React.FC<{ active: boolean; onDismiss: () => void }> = ({ active, onDismiss }) => {
+export type ScreensaverMode = 'clock' | 'photos';
+
+interface Props {
+    active: boolean;
+    mode: ScreensaverMode;
+    onDismiss: () => void;
+}
+
+export const Screensaver: React.FC<Props> = ({ active, mode, onDismiss }) => {
     const { config } = useConfig();
+    const { deviceId } = useSecurity();
     const [time, setTime] = useState(new Date());
     const [weather, setWeather] = useState<WeatherData | null>(null);
+
+    // Photo slideshow state
+    const [photos, setPhotos] = useState<IcloudPhoto[]>([]);
+    const [photoIndex, setPhotoIndex] = useState(0);
+    const [photoError, setPhotoError] = useState<string | null>(null);
+    const photoOrderRef = useRef<number[]>([]);
 
     // Clock Tick
     useEffect(() => {
@@ -35,7 +60,7 @@ export const Screensaver: React.FC<{ active: boolean; onDismiss: () => void }> =
 
     // Simple Weather Fetch (Reusing logic lighter)
     useEffect(() => {
-        if (!active || !config.weatherLocation) return;
+        if (!active || mode !== 'clock' || !config.weatherLocation) return;
 
         const fetchWeather = async () => {
             try {
@@ -61,10 +86,123 @@ export const Screensaver: React.FC<{ active: boolean; onDismiss: () => void }> =
 
         fetchWeather();
         // No auto-refresh for screensaver to save resources, just on mount/show
-    }, [active, config.weatherLocation]);
+    }, [active, mode, config.weatherLocation]);
+
+    // Helper: build a shuffled play order for the slideshow
+    const reshuffle = useCallback((count: number) => {
+        const arr = Array.from({ length: count }, (_, i) => i);
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        photoOrderRef.current = arr;
+    }, []);
+
+    // Fetch photos when entering photo mode
+    useEffect(() => {
+        if (!active || mode !== 'photos') return;
+        const url = config.screensaver?.photoAlbumUrl;
+        if (!url) {
+            setPhotoError('Kein iCloud-Album konfiguriert');
+            return;
+        }
+
+        let cancelled = false;
+        const load = async () => {
+            try {
+                const res = await fetch(`${getApiUrl()}/api/icloud/album?url=${encodeURIComponent(url)}`, {
+                    headers: { 'x-device-id': deviceId }
+                });
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || `HTTP ${res.status}`);
+                }
+                const data = await res.json();
+                if (cancelled) return;
+                const list: IcloudPhoto[] = data.photos || [];
+                setPhotos(list);
+                setPhotoError(list.length ? null : 'Keine Fotos im Album');
+                reshuffle(list.length);
+                setPhotoIndex(0);
+            } catch (e) {
+                if (cancelled) return;
+                console.error('iCloud album load failed', e);
+                setPhotoError(e instanceof Error ? e.message : 'Album konnte nicht geladen werden');
+            }
+        };
+        load();
+
+        // Re-fetch every 25 minutes so the signed URLs (≈1h TTL) stay fresh.
+        const refresh = setInterval(load, 25 * 60 * 1000);
+        return () => {
+            cancelled = true;
+            clearInterval(refresh);
+        };
+    }, [active, mode, config.screensaver?.photoAlbumUrl, deviceId, reshuffle]);
+
+    // Slideshow tick
+    useEffect(() => {
+        if (!active || mode !== 'photos' || photos.length === 0) return;
+        const intervalSec = Math.max(3, config.screensaver?.photoIntervalSeconds || 10);
+        const timer = setInterval(() => {
+            setPhotoIndex(prev => {
+                const next = prev + 1;
+                if (next >= photoOrderRef.current.length) {
+                    reshuffle(photos.length);
+                    return 0;
+                }
+                return next;
+            });
+        }, intervalSec * 1000);
+        return () => clearInterval(timer);
+    }, [active, mode, photos.length, config.screensaver?.photoIntervalSeconds, reshuffle]);
 
     if (!active) return null;
 
+    if (mode === 'photos') {
+        const order = photoOrderRef.current;
+        const current = photos[order[photoIndex] ?? 0];
+        return (
+            <div
+                className="fixed inset-0 z-50 bg-black text-white cursor-none flex flex-col items-center justify-center select-none"
+                onClick={onDismiss}
+                onTouchStart={onDismiss}
+            >
+                {current ? (
+                    <img
+                        key={current.id}
+                        src={current.url}
+                        alt=""
+                        className="absolute inset-0 w-full h-full object-contain animate-fadein"
+                        draggable={false}
+                    />
+                ) : (
+                    <div className="text-slate-500 text-2xl">
+                        {photoError || 'Lade Album…'}
+                    </div>
+                )}
+
+                {/* Clock & date overlay */}
+                {current && (
+                    <div className="absolute bottom-10 left-10 text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] pointer-events-none">
+                        <div className="text-7xl font-black tabular-nums leading-none">
+                            {format(time, 'HH:mm')}
+                        </div>
+                        <div className="text-xl font-light mt-2 opacity-90">
+                            {format(time, 'EEEE, d. MMMM', { locale: de })}
+                        </div>
+                    </div>
+                )}
+
+                {/* Hint */}
+                <div className="absolute bottom-4 right-6 text-slate-500 text-xs">
+                    Berühren zum Aufwecken
+                </div>
+            </div>
+        );
+    }
+
+    // Default clock mode (night)
     return (
         <div
             className="fixed inset-0 z-50 bg-black text-white cursor-none flex flex-col items-center justify-center select-none"
