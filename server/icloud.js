@@ -15,7 +15,7 @@
 // partition API if CloudKit doesn't return a usable result, so the
 // module works for both share formats.
 
-import { cloudKitResolveShortGUID, extractPhotosFromCloudKitResolve, cloudKitQueryCMMAssets, CKJar } from './cloudkit.js';
+import { cloudKitResolveShortGUID, extractPhotosFromCloudKitResolve, cloudKitQueryCMMAssets, anonymousAccessFromResolve, CKJar } from './cloudkit.js';
 
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const cache = new Map(); // token -> { ts, photos }
@@ -428,7 +428,8 @@ export async function getSharedAlbumPhotos(rawInput) {
         const rootRecordType = firstResult?.rootRecord?.recordType;
         const photosCount = firstResult?.rootRecord?.fields?.photosCount?.value;
         const assetCount = firstResult?.rootRecord?.fields?.assetCount?.value;
-        console.log(`[icloud] CloudKit resolve (${resolveSize}b): ${resolvePhotos.length} photos from resolve response, rootRecordType=${rootRecordType}, photosCount=${photosCount}, assetCount=${assetCount}`);
+        const anonymousAccess = anonymousAccessFromResolve(firstResult);
+        console.log(`[icloud] CloudKit resolve (${resolveSize}b): ${resolvePhotos.length} photos from resolve response, rootRecordType=${rootRecordType}, photosCount=${photosCount}, assetCount=${assetCount}, anonPartition=${anonymousAccess?.partitionBase || '(none)'}, anonToken=${anonymousAccess?.webAuthToken ? 'yes' : 'no'}`);
 
         // The resolve response is "minimally resolved" and only contains the
         // CMMRoot record (album metadata + a single previewData cover image).
@@ -448,7 +449,7 @@ export async function getSharedAlbumPhotos(rawInput) {
 
         if (needsFollowUp) {
             console.log(`[icloud] CloudKit resolve needs follow-up records/query (have=${photos.length}, expected=${expectedCount || '?'}, isCMM=${isCMM})…`);
-            const queryResult = await cloudKitQueryCMMAssets(firstResult, { shortGUID: token, jar });
+            const queryResult = await cloudKitQueryCMMAssets(firstResult, { jar, anonymousAccess });
             console.log(`[icloud] CloudKit query attempts: ${JSON.stringify(queryResult.attempts)}`);
             if (queryResult.ok && queryResult.photos.length) {
                 // Prefer the query result over the resolve preview — the
@@ -533,9 +534,10 @@ export async function debugSharedAlbum(rawInput) {
         // see the full attempts list even when resolve already returned a
         // preview cover photo.
         let queryResult = null;
+        const debugAnonAccess = anonymousAccessFromResolve(data?.results?.[0]);
         if (data?.results?.[0]?.zoneID) {
             try {
-                queryResult = await cloudKitQueryCMMAssets(data.results[0], { shortGUID: token, jar });
+                queryResult = await cloudKitQueryCMMAssets(data.results[0], { jar, anonymousAccess: debugAnonAccess });
             } catch (e) {
                 queryResult = { ok: false, error: e.message };
             }
@@ -545,6 +547,12 @@ export async function debugSharedAlbum(rawInput) {
             ok: true,
             resolveMode,
             cookies: Array.from(jar.cookies.keys()),
+            anonymousAccess: debugAnonAccess ? {
+                partitionBase: debugAnonAccess.partitionBase,
+                partitionNumber: debugAnonAccess.partitionNumber,
+                ttlMs: debugAnonAccess.ttlMs,
+                tokenPresent: true
+            } : null,
             rawSize: JSON.stringify(data).length,
             topLevelKeys: Object.keys(data || {}),
             resultCount: data?.results?.length ?? 0,

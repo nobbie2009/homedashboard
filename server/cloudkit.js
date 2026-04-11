@@ -87,14 +87,18 @@ async function fetchBuildInfo() {
     return cachedBuildInfo;
 }
 
-function cloudKitUrl(endpoint, zone, buildInfo) {
+function cloudKitUrl(endpoint, zone, buildInfo, { partitionBase = CK_BASE_URL, webAuthToken = null } = {}) {
     const params = new URLSearchParams({
         remapEnums: 'true',
         getCurrentSyncToken: 'true',
         clientBuildNumber: buildInfo.build,
         clientMasteringNumber: buildInfo.mastering
     });
-    return `${CK_BASE_URL}/database/1/${CK_CONTAINER}/${CK_ENV}/${zone}/${endpoint}?${params}`;
+    // CloudKit Web Services accepts the anonymous token via the
+    // `ckWebAuthToken` query parameter. This is how the Photos3 web app
+    // authenticates share-viewer requests without a full iCloud login.
+    if (webAuthToken) params.set('ckWebAuthToken', webAuthToken);
+    return `${partitionBase}/database/1/${CK_CONTAINER}/${CK_ENV}/${zone}/${endpoint}?${params}`;
 }
 
 // A tiny cookie jar so we can emulate the browser's `credentials: include`
@@ -146,9 +150,32 @@ export class CKJar {
     }
 }
 
-async function cloudKitPost(endpoint, body, zone = 'public', jar = null) {
+/**
+ * Normalise Apple's `anonymousPublicAccess` section into our
+ * `{ partitionBase, webAuthToken }` shape. Returns null if the input is
+ * missing/empty so callers can fall back to the default ckdatabasews host.
+ */
+export function anonymousAccessFromResolve(resolveResult) {
+    const apa = resolveResult?.anonymousPublicAccess;
+    if (!apa?.token) return null;
+    // databasePartition is a full URL like "https://p50-ckdatabasews.icloud.com:443"
+    // — strip the trailing `:443` / slash so it concatenates cleanly.
+    let partitionBase = apa.databasePartition || CK_BASE_URL;
+    partitionBase = partitionBase.replace(/:443$/, '').replace(/\/$/, '');
+    return {
+        partitionBase,
+        webAuthToken: apa.token,
+        partitionNumber: apa.resolvedPartitionNumber,
+        ttlMs: apa.tokenTTL
+    };
+}
+
+async function cloudKitPost(endpoint, body, zone = 'public', { jar = null, anonymousAccess = null } = {}) {
     const buildInfo = await fetchBuildInfo();
-    const url = cloudKitUrl(endpoint, zone, buildInfo);
+    const url = cloudKitUrl(endpoint, zone, buildInfo, {
+        partitionBase: anonymousAccess?.partitionBase,
+        webAuthToken: anonymousAccess?.webAuthToken
+    });
     const res = await fetch(url, {
         method: 'POST',
         // Apple's web client sends Content-Type: text/plain even though the
@@ -159,6 +186,9 @@ async function cloudKitPost(endpoint, body, zone = 'public', jar = null) {
             'Origin': 'https://www.icloud.com',
             'Referer': 'https://www.icloud.com/',
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+            // Belt-and-braces: also send the token as a header in case some
+            // Apple backends read it from there rather than the query string.
+            ...(anonymousAccess?.webAuthToken ? { 'X-Apple-CloudKit-WebAuthToken': anonymousAccess.webAuthToken } : {}),
             ...(jar ? jar.headers() : {})
         },
         body: JSON.stringify(body)
@@ -183,7 +213,9 @@ export async function cloudKitResolveShortGUID(shortGUID, { shouldFetchRootRecor
     };
     if (shouldFetchRootRecord) body.shouldFetchRootRecord = true;
 
-    const res = await cloudKitPost('records/resolve', body, 'public', jar);
+    // The initial resolve is always anonymous on the default ckdatabasews
+    // host — this is the call that *earns* us the webAuthToken.
+    const res = await cloudKitPost('records/resolve', body, 'public', { jar });
     const text = await res.text();
     let data;
     try { data = JSON.parse(text); } catch { data = { __raw: text.slice(0, 400) }; }
@@ -305,7 +337,7 @@ const CMM_ASSET_RECORD_TYPES = [
     'CMMMediaAsset'
 ];
 
-async function runOneQuery({ zoneID, scope, recordType, zoneWide, continuationMarker, shortGUID, jar, extraBody }) {
+async function runOneQuery({ zoneID, scope, recordType, zoneWide, continuationMarker, jar, anonymousAccess }) {
     const body = {
         zoneID,
         resultsLimit: 200,
@@ -313,107 +345,32 @@ async function runOneQuery({ zoneID, scope, recordType, zoneWide, continuationMa
             filterBy: [],
             ...(recordType ? { recordType } : {})
         },
-        ...(shortGUID ? { shortGUID } : {}),
         ...(zoneWide ? { zoneWide: true } : {}),
-        ...(continuationMarker ? { continuationMarker } : {}),
-        ...extraBody
+        ...(continuationMarker ? { continuationMarker } : {})
     };
-    const res = await cloudKitPost('records/query', body, scope, jar);
+    const res = await cloudKitPost('records/query', body, scope, { jar, anonymousAccess });
     const text = await res.text();
     let data;
     try { data = JSON.parse(text); } catch { data = { __raw: text.slice(0, 400) }; }
     return { res, text, data };
 }
 
-// Anonymous share acceptance. Apple's Photos3 web app does this implicitly
-// via cookies: after resolveCMM the server sets a session cookie that
-// authorises the viewer as an anonymous participant of the share, and
-// follow-up records/query calls carry that cookie automatically (thanks to
-// `credentials: "include"`).
-//
-// In our Node client the cookie jar handles the cookie replay. Some shares
-// additionally require an explicit accept call though, which Apple's
-// internal API names `records/shareAccept` or `records/accept`. We fire
-// both optimistically and log the results; whichever (if any) succeeds is
-// enough to authorise the subsequent query.
-async function tryShareAcceptEndpoints(shortGUID, resolveResult, jar) {
-    const attempts = [];
-    const shareRecordName = resolveResult?.share?.recordName;
-    const zoneID = resolveResult?.zoneID;
-    const ownerRecordName = resolveResult?.share?.owner?.userIdentity?.userRecordName
-        || resolveResult?.share?.participants?.[0]?.userIdentity?.userRecordName;
-
-    const variants = [
-        {
-            endpoint: 'records/shareAccept',
-            scope: 'public',
-            body: { shortGUID }
-        },
-        {
-            endpoint: 'records/share/accept',
-            scope: 'public',
-            body: { shortGUID }
-        },
-        {
-            endpoint: 'records/accept',
-            scope: 'public',
-            body: { shortGUID, participantUserRecordName: ownerRecordName }
-        },
-        {
-            endpoint: 'records/accept',
-            scope: 'shared',
-            body: { shortGUID, participantUserRecordName: ownerRecordName }
-        },
-        // Some Apple docs reference a `records/share/resolve` endpoint that
-        // takes the share recordName and returns the asset children directly.
-        {
-            endpoint: 'records/share/resolve',
-            scope: 'public',
-            body: { shareRecordName, shortGUID, zoneID }
-        }
-    ];
-
-    for (const v of variants) {
-        try {
-            const res = await cloudKitPost(v.endpoint, v.body, v.scope, jar);
-            const text = await res.text();
-            let data;
-            try { data = JSON.parse(text); } catch { data = { __raw: text.slice(0, 200) }; }
-            attempts.push({
-                endpoint: v.endpoint,
-                scope: v.scope,
-                status: res.status,
-                ok: res.ok,
-                error: res.ok ? undefined : (data?.serverErrorCode || data?.reason || text.slice(0, 100))
-            });
-            if (res.ok) return { ok: true, data, attempts };
-        } catch (e) {
-            attempts.push({ endpoint: v.endpoint, scope: v.scope, error: e.message });
-        }
-    }
-    return { ok: false, attempts };
-}
-
 /**
  * Follow-up query that fetches the actual asset records from a shared
- * CMM album, given the resolved root-record metadata. This is the piece
- * Apple's own Photos3 web app does after resolveCMM: query the shared
- * database scope for the child assets in the CMM zone.
- *
- * The key to making this work anonymously is authentication state. Apple's
- * server refuses the query with 401 AUTHENTICATION_FAILED unless the caller
- * is in the right session state — which means (a) carrying cookies from a
- * previous resolve call, and/or (b) having explicitly "accepted" the share
- * via records/shareAccept.
- *
- * We do both here. The caller is expected to pass the same cookie jar that
- * was used for the initial resolve call so the session is continuous.
+ * CMM album. Apple's Photos3 web app does this after resolveCMM: the
+ * resolve response carries an `anonymousPublicAccess` block with a
+ * short-lived web-auth token AND a specific partition host (e.g.
+ * `https://p50-ckdatabasews.icloud.com:443`). All subsequent queries
+ * for this share MUST be directed at that partition and MUST carry the
+ * token (as `ckWebAuthToken` query parameter). Without either of those,
+ * CloudKit answers 401 AUTHENTICATION_FAILED.
  */
-export async function cloudKitQueryCMMAssets(resolveResult, { shortGUID = null, jar = null } = {}) {
+export async function cloudKitQueryCMMAssets(resolveResult, { jar = null, anonymousAccess: anonOverride = null } = {}) {
     if (!resolveResult?.zoneID) {
         throw new Error('cloudKitQueryCMMAssets: resolveResult.zoneID missing');
     }
     const zoneID = resolveResult.zoneID;
+    const anonymousAccess = anonOverride || anonymousAccessFromResolve(resolveResult);
     const primaryScope = (resolveResult.databaseScope || 'SHARED').toLowerCase();
     const scopesToTry = primaryScope === 'public'
         ? ['public', 'shared']
@@ -422,12 +379,6 @@ export async function cloudKitQueryCMMAssets(resolveResult, { shortGUID = null, 
     const attempts = [];
     const seenUrls = new Set();
     const collectedPhotos = [];
-
-    // Step 0: attempt share acceptance. This has no observable effect when
-    // the resolve cookie was already enough, but unlocks the query when it
-    // wasn't.
-    const acceptResult = await tryShareAcceptEndpoints(shortGUID, resolveResult, jar || new CKJar());
-    attempts.push({ strategy: 'shareAccept', ...acceptResult });
 
     const addPhotos = (photos, label) => {
         let added = 0;
@@ -454,6 +405,7 @@ export async function cloudKitQueryCMMAssets(resolveResult, { shortGUID = null, 
                 photoCount: photos.length,
                 added,
                 recordCount: Array.isArray(data?.records) ? data.records.length : 0,
+                continuationMarker: data?.continuationMarker || null,
                 error: res.ok ? undefined : (data?.serverErrorCode || data?.reason || JSON.stringify(data).slice(0, 120))
             });
             return { res, data };
@@ -463,21 +415,40 @@ export async function cloudKitQueryCMMAssets(resolveResult, { shortGUID = null, 
         }
     };
 
-    // Strategy A: zoneWide query with shortGUID in the body, cookie jar.
+    // Paginate one strategy across continuationMarker until CloudKit stops
+    // handing them out (or we've loaded 40 pages × 200 = 8000 records).
+    const paginate = async (labelBase, baseOptions) => {
+        let marker;
+        let page = 0;
+        while (page < 40) {
+            const result = await attempt(
+                `${labelBase}#${page}`,
+                { ...baseOptions, continuationMarker: marker }
+            );
+            if (!result?.res?.ok) break;
+            marker = result.data?.continuationMarker;
+            if (!marker) break;
+            page++;
+        }
+    };
+
+    // Strategy A: zoneWide query (no recordType filter). Most shares allow
+    // this and it hands back every record in one go.
     for (const scope of scopesToTry) {
-        await attempt(`zoneWide+shortGUID/${scope}`, {
-            zoneID, scope, zoneWide: true, shortGUID, jar
+        await paginate(`zoneWide/${scope}`, {
+            zoneID, scope, zoneWide: true, jar, anonymousAccess
         });
         if (collectedPhotos.length) {
             return { ok: true, recordType: 'zoneWide', photos: collectedPhotos, attempts };
         }
     }
 
-    // Strategy B: typed query with shortGUID in the body, cookie jar.
+    // Strategy B: typed query per record type. Fallback for shares where
+    // zoneWide is rejected.
     for (const scope of scopesToTry) {
         for (const recordType of CMM_ASSET_RECORD_TYPES) {
-            await attempt(`${recordType}/${scope}`, {
-                zoneID, scope, recordType, shortGUID, jar
+            await paginate(`${recordType}/${scope}`, {
+                zoneID, scope, recordType, jar, anonymousAccess
             });
         }
         if (collectedPhotos.length) {
