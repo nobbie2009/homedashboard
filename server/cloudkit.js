@@ -162,38 +162,161 @@ function pickDownloadUrl(fields) {
 }
 
 /**
- * Walk a CloudKit resolve response and turn it into a flat photo list.
- * The response schema is nested:
+ * Recursively walk a CloudKit response and collect every downloadURL we
+ * can find. Handles both the classic iCloud Shared Album schema (CPLAsset
+ * records with resJPEGFullRes / resOriginalRes derivative fields) and the
+ * newer CMM (Cloud-Managed Memories) shared photo schema where the asset
+ * URLs may live under previewData, assetData or arbitrary nested fields.
  *
- *   { results: [{
- *       shortGUID: "...",
- *       rootRecord: { recordName, recordType, fields },
- *       otherRecords?: [{ recordName, recordType, fields }, ...]
- *   }] }
- *
- * CPLAsset records carry the derivatives (downloadURLs). The rootRecord
- * itself is usually the album record and carries only metadata.
+ * We don't care about the exact field name — we just look for any nested
+ * `{ downloadURL: "..." }` objects that aren't data-URIs. Width/height and
+ * a "path" hint are attached best-effort.
+ */
+function walkDownloadUrls(node, path = '', sink = []) {
+    if (node === null || node === undefined) return sink;
+    if (typeof node !== 'object') return sink;
+
+    if (Array.isArray(node)) {
+        for (let i = 0; i < node.length; i++) {
+            walkDownloadUrls(node[i], `${path}[${i}]`, sink);
+        }
+        return sink;
+    }
+
+    // A CloudKit asset field value looks like:
+    //   { fileChecksum, size, downloadURL, referenceChecksum, wrappingKey }
+    if (typeof node.downloadURL === 'string' &&
+        !node.downloadURL.startsWith('data:') &&
+        node.downloadURL.startsWith('http')) {
+        sink.push({
+            url: node.downloadURL,
+            size: typeof node.size === 'number' ? node.size : 0,
+            path
+        });
+    }
+
+    for (const [k, v] of Object.entries(node)) {
+        walkDownloadUrls(v, path ? `${path}.${k}` : k, sink);
+    }
+    return sink;
+}
+
+/**
+ * Extract photos from ANY CloudKit response (resolve, query, or lookup).
+ * Works for both the legacy CPLAsset derivative-field schema and the
+ * arbitrary nested-asset schema used by the new CMM shared photo streams.
  */
 export function extractPhotosFromCloudKitResolve(data) {
+    const found = walkDownloadUrls(data);
+    // De-duplicate by URL (the same asset often appears in multiple
+    // derivatives — thumb, medium, full-res — and we only want one per photo).
+    const seen = new Set();
     const photos = [];
-    const results = data?.results || [];
-    for (const result of results) {
-        const records = [];
-        if (result.rootRecord) records.push(result.rootRecord);
-        if (Array.isArray(result.otherRecords)) records.push(...result.otherRecords);
-
-        for (const record of records) {
-            if (!record || !record.fields) continue;
-            const pick = pickDownloadUrl(record.fields);
-            if (!pick) continue;
-            photos.push({
-                id: record.recordName || `${photos.length}`,
-                url: pick.url,
-                width: pick.width,
-                height: pick.height,
-                caption: record.fields?.caption?.value || ''
-            });
-        }
+    // Sort by size descending so we pick the largest derivative first.
+    found.sort((a, b) => (b.size || 0) - (a.size || 0));
+    for (const item of found) {
+        // Strip query string when de-duping since Apple signs every URL.
+        const key = item.url.split('?')[0];
+        if (seen.has(key)) continue;
+        seen.add(key);
+        photos.push({
+            id: `${photos.length}`,
+            url: item.url,
+            width: 0,
+            height: 0,
+            caption: '',
+            _path: item.path
+        });
     }
     return photos;
+}
+
+/**
+ * Follow-up query that fetches the actual asset records from a shared
+ * CMM album, given the resolved root-record metadata. Apple's own Photos3
+ * web app does this after resolveCMM: it uses the zoneID from the resolve
+ * result and queries the shared database scope for the child assets.
+ *
+ * We don't know the exact record type up front — for legacy iCloud Shared
+ * Albums it's CPLAsset, for the new CMM shares it's most likely CMMAsset /
+ * CMMPhoto / CMMItem. We try a handful in sequence and return the first
+ * response whose recursive walker finds at least one downloadURL.
+ */
+export async function cloudKitQueryCMMAssets(resolveResult) {
+    if (!resolveResult?.zoneID) {
+        throw new Error('cloudKitQueryCMMAssets: resolveResult.zoneID missing');
+    }
+    const zoneID = resolveResult.zoneID;
+    // Apple reports databaseScope in uppercase (e.g. "SHARED"); the URL
+    // expects it lowercase.
+    const scope = (resolveResult.databaseScope || 'SHARED').toLowerCase();
+
+    const recordTypes = [
+        'CMMAsset',
+        'CMMPhoto',
+        'CMMItem',
+        'CMMMediaAsset',
+        'CMMAssetAndMaster',
+        'CPLAsset',
+        'CPLMaster'
+    ];
+
+    const attempts = [];
+
+    for (const recordType of recordTypes) {
+        const body = {
+            zoneID,
+            query: {
+                recordType,
+                filterBy: []
+            },
+            resultsLimit: 200
+        };
+        try {
+            const res = await cloudKitPost('records/query', body, scope);
+            const text = await res.text();
+            let data;
+            try { data = JSON.parse(text); } catch { data = { __raw: text.slice(0, 400) }; }
+
+            const photos = extractPhotosFromCloudKitResolve(data);
+            attempts.push({
+                recordType,
+                status: res.status,
+                ok: res.ok,
+                photoCount: photos.length,
+                recordCount: Array.isArray(data?.records) ? data.records.length : 0,
+                error: res.ok ? undefined : (data?.serverErrorCode || data?.reason || text.slice(0, 120))
+            });
+            if (res.ok && photos.length) {
+                return { ok: true, recordType, photos, data, attempts };
+            }
+        } catch (e) {
+            attempts.push({ recordType, error: e.message });
+        }
+    }
+
+    // Last-resort: query without any recordType filter. Some CloudKit zones
+    // allow a bare query that returns all records in the zone.
+    try {
+        const body = { zoneID, query: { filterBy: [] }, resultsLimit: 200 };
+        const res = await cloudKitPost('records/query', body, scope);
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch { data = { __raw: text.slice(0, 400) }; }
+        const photos = extractPhotosFromCloudKitResolve(data);
+        attempts.push({
+            recordType: '(none)',
+            status: res.status,
+            ok: res.ok,
+            photoCount: photos.length,
+            error: res.ok ? undefined : (data?.serverErrorCode || data?.reason || text.slice(0, 120))
+        });
+        if (res.ok && photos.length) {
+            return { ok: true, recordType: '(none)', photos, data, attempts };
+        }
+    } catch (e) {
+        attempts.push({ recordType: '(none)', error: e.message });
+    }
+
+    return { ok: false, photos: [], attempts };
 }
