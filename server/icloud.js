@@ -403,31 +403,59 @@ export async function getSharedAlbumPhotos(rawInput) {
     // tokens this succeeds directly; for old B0xxx tokens it will error
     // out with 400/404 and we fall through to the legacy partition API.
     try {
-        const resolveData = await cloudKitResolveShortGUID(token);
+        // First attempt: resolve with shouldFetchRootRecord=true so that
+        // Apple returns the fully-hydrated CMM record instead of a minimal
+        // stub. For most shares this alone is enough to pull every photo.
+        let resolveData;
+        try {
+            resolveData = await cloudKitResolveShortGUID(token, { shouldFetchRootRecord: true });
+        } catch (e) {
+            console.log(`[icloud] CloudKit resolve(full) failed: ${e.message}, retrying without shouldFetchRootRecord`);
+            resolveData = await cloudKitResolveShortGUID(token);
+        }
         const resolveSize = JSON.stringify(resolveData).length;
 
         // First try to pull photos straight out of the resolve response —
         // Apple sometimes includes a previewData asset on the CMMRoot record
         // that already has a downloadURL we can use.
-        let photos = extractPhotosFromCloudKitResolve(resolveData);
-        console.log(`[icloud] CloudKit resolve (${resolveSize}b): ${photos.length} photos from resolve response`);
+        const resolvePhotos = extractPhotosFromCloudKitResolve(resolveData);
+        const firstResult = resolveData?.results?.[0];
+        const rootRecordType = firstResult?.rootRecord?.recordType;
+        const photosCount = firstResult?.rootRecord?.fields?.photosCount?.value;
+        const assetCount = firstResult?.rootRecord?.fields?.assetCount?.value;
+        console.log(`[icloud] CloudKit resolve (${resolveSize}b): ${resolvePhotos.length} photos from resolve response, rootRecordType=${rootRecordType}, photosCount=${photosCount}, assetCount=${assetCount}`);
 
-        // The resolve response is usually "minimally resolved" and only
-        // contains the CMMRoot record (album metadata). The individual
-        // asset records have to be fetched via records/query in the
-        // shared zone that the resolve result points to.
-        if (photos.length === 0 && resolveData?.results?.[0]?.zoneID) {
-            console.log(`[icloud] CloudKit resolve is minimally resolved, running follow-up records/query…`);
-            const queryResult = await cloudKitQueryCMMAssets(resolveData.results[0]);
+        // The resolve response is "minimally resolved" and only contains the
+        // CMMRoot record (album metadata + a single previewData cover image).
+        // The individual asset records always have to be fetched via
+        // records/query in the shared zone that the resolve result points to
+        // — so we ALWAYS run the follow-up for CMMRoot, even if the resolve
+        // already handed us the cover photo. Otherwise we'd show a single
+        // preview instead of the actual 60+ photo album.
+        let photos = resolvePhotos;
+        const isCMM = rootRecordType === 'CMMRoot';
+        const expectedCount = Number(photosCount || assetCount || 0);
+        const needsFollowUp = firstResult?.zoneID && (
+            photos.length === 0 ||
+            isCMM ||
+            (expectedCount > photos.length)
+        );
+
+        if (needsFollowUp) {
+            console.log(`[icloud] CloudKit resolve needs follow-up records/query (have=${photos.length}, expected=${expectedCount || '?'}, isCMM=${isCMM})…`);
+            const queryResult = await cloudKitQueryCMMAssets(firstResult);
             console.log(`[icloud] CloudKit query attempts: ${JSON.stringify(queryResult.attempts)}`);
             if (queryResult.ok && queryResult.photos.length) {
+                // Prefer the query result over the resolve preview — the
+                // query returns the full album, the resolve only has cover.
                 photos = queryResult.photos;
                 console.log(`[icloud] CloudKit query succeeded: recordType=${queryResult.recordType}, photos=${photos.length}`);
             } else {
-                console.log(`[icloud] CloudKit query exhausted all recordTypes, 0 photos`);
+                console.log(`[icloud] CloudKit query exhausted all recordTypes, falling back to ${resolvePhotos.length} resolve-preview photo(s)`);
                 // Log the raw resolve body so we can iterate on the parser
                 // in a follow-up PR if needed.
                 console.log(`[icloud] CloudKit resolve raw (first 4000b):\n${JSON.stringify(resolveData).slice(0, 4000)}`);
+                photos = resolvePhotos;
             }
         }
 
@@ -475,11 +503,24 @@ export async function debugSharedAlbum(rawInput) {
 
     let cloudkit;
     try {
-        const data = await cloudKitResolveShortGUID(token);
+        // Try the full resolve (shouldFetchRootRecord=true) first, then the
+        // minimal one so the debug dump shows both shapes side by side.
+        let data;
+        let resolveMode;
+        try {
+            data = await cloudKitResolveShortGUID(token, { shouldFetchRootRecord: true });
+            resolveMode = 'full';
+        } catch (e) {
+            data = await cloudKitResolveShortGUID(token);
+            resolveMode = 'minimal (full failed: ' + e.message + ')';
+        }
         const resolvePhotos = extractPhotosFromCloudKitResolve(data);
 
+        // Always run the follow-up query in the debug endpoint so we can
+        // see the full attempts list even when resolve already returned a
+        // preview cover photo.
         let queryResult = null;
-        if (resolvePhotos.length === 0 && data?.results?.[0]?.zoneID) {
+        if (data?.results?.[0]?.zoneID) {
             try {
                 queryResult = await cloudKitQueryCMMAssets(data.results[0]);
             } catch (e) {
@@ -489,6 +530,7 @@ export async function debugSharedAlbum(rawInput) {
 
         cloudkit = {
             ok: true,
+            resolveMode,
             rawSize: JSON.stringify(data).length,
             topLevelKeys: Object.keys(data || {}),
             resultCount: data?.results?.length ?? 0,

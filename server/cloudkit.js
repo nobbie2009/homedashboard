@@ -118,11 +118,20 @@ async function cloudKitPost(endpoint, body, zone = 'public') {
 /**
  * Resolve a short shared-album GUID into its rootRecord + asset records.
  * This is the direct equivalent of Apple's internal `resolveCMM` call.
+ *
+ * `shouldFetchRootRecord` is a standard CloudKit flag that asks Apple to
+ * return the fully-hydrated root record instead of a minimally-resolved
+ * stub. For CMM shared albums the minimally-resolved stub only carries
+ * album metadata and a cover preview, so setting this is the difference
+ * between a single cover image and the actual 60+ asset URLs.
  */
-export async function cloudKitResolveShortGUID(shortGUID) {
-    const res = await cloudKitPost('records/resolve', {
+export async function cloudKitResolveShortGUID(shortGUID, { shouldFetchRootRecord = false } = {}) {
+    const body = {
         shortGUIDs: [{ value: shortGUID }]
-    });
+    };
+    if (shouldFetchRootRecord) body.shouldFetchRootRecord = true;
+
+    const res = await cloudKitPost('records/resolve', body);
     const text = await res.text();
     let data;
     try { data = JSON.parse(text); } catch { data = { __raw: text.slice(0, 400) }; }
@@ -242,81 +251,177 @@ export function extractPhotosFromCloudKitResolve(data) {
  * CMMPhoto / CMMItem. We try a handful in sequence and return the first
  * response whose recursive walker finds at least one downloadURL.
  */
+// Record types known or suspected to carry the actual asset URLs inside a
+// CMM shared-album zone. We try them in order from most-likely to fallback.
+// CPLAsset / CPLMaster are the classic iCloud Photo Library types — they
+// also show up inside CMM zones because Apple re-uses the same photo schema
+// for the shared moment.
+const CMM_ASSET_RECORD_TYPES = [
+    'CPLAsset',
+    'CPLMaster',
+    'CPLContainerRelationLiveChildLookup',
+    'CMMAsset',
+    'CMMAssetRevision',
+    'CMMRevision',
+    'CMMLayerAsset',
+    'CMMLayerRoot',
+    'CMMPhoto',
+    'CMMItem',
+    'CMMMediaAsset',
+    'CMMAssetAndMaster',
+    'CPLContainerRelation',
+    'CPLAlbum'
+];
+
+async function runOneQuery({ zoneID, scope, recordType, zoneWide, continuationMarker }) {
+    const body = {
+        zoneID,
+        resultsLimit: 200,
+        // desiredKeys undefined => CloudKit returns all fields, which is
+        // what we want since we don't know the schema up front.
+        query: {
+            filterBy: [],
+            ...(recordType ? { recordType } : {})
+        }
+    };
+    if (zoneWide) body.zoneWide = true;
+    if (continuationMarker) body.continuationMarker = continuationMarker;
+
+    const res = await cloudKitPost('records/query', body, scope);
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = { __raw: text.slice(0, 400) }; }
+    return { res, text, data };
+}
+
 export async function cloudKitQueryCMMAssets(resolveResult) {
     if (!resolveResult?.zoneID) {
         throw new Error('cloudKitQueryCMMAssets: resolveResult.zoneID missing');
     }
     const zoneID = resolveResult.zoneID;
     // Apple reports databaseScope in uppercase (e.g. "SHARED"); the URL
-    // expects it lowercase.
-    const scope = (resolveResult.databaseScope || 'SHARED').toLowerCase();
-
-    const recordTypes = [
-        'CMMAsset',
-        'CMMPhoto',
-        'CMMItem',
-        'CMMMediaAsset',
-        'CMMAssetAndMaster',
-        'CPLAsset',
-        'CPLMaster'
-    ];
+    // expects it lowercase. We also try the "public" scope as a fallback
+    // because CMM shared albums are publicly readable and the `public`
+    // scope does not require authentication.
+    const primaryScope = (resolveResult.databaseScope || 'SHARED').toLowerCase();
+    const scopesToTry = primaryScope === 'public'
+        ? ['public', 'shared']
+        : [primaryScope, 'public'];
 
     const attempts = [];
+    const seenUrls = new Set();
+    const collectedPhotos = [];
 
-    for (const recordType of recordTypes) {
-        const body = {
-            zoneID,
-            query: {
-                recordType,
-                filterBy: []
-            },
-            resultsLimit: 200
-        };
+    const addPhotos = (photos, label) => {
+        let added = 0;
+        for (const p of photos) {
+            const key = p.url.split('?')[0];
+            if (seenUrls.has(key)) continue;
+            seenUrls.add(key);
+            collectedPhotos.push({ ...p, id: String(collectedPhotos.length), _label: label });
+            added++;
+        }
+        return added;
+    };
+
+    // Strategy A: zoneWide query returns every record in the zone regardless
+    // of recordType. This is the most efficient path when CloudKit allows it.
+    for (const scope of scopesToTry) {
         try {
-            const res = await cloudKitPost('records/query', body, scope);
-            const text = await res.text();
-            let data;
-            try { data = JSON.parse(text); } catch { data = { __raw: text.slice(0, 400) }; }
+            let marker;
+            let pages = 0;
+            do {
+                const { res, data } = await runOneQuery({
+                    zoneID, scope, zoneWide: true, continuationMarker: marker
+                });
+                const photos = extractPhotosFromCloudKitResolve(data);
+                const added = addPhotos(photos, `zoneWide/${scope}`);
+                attempts.push({
+                    strategy: 'zoneWide',
+                    scope,
+                    page: pages,
+                    status: res.status,
+                    ok: res.ok,
+                    photoCount: photos.length,
+                    added,
+                    recordCount: Array.isArray(data?.records) ? data.records.length : 0,
+                    error: res.ok ? undefined : (data?.serverErrorCode || data?.reason || JSON.stringify(data).slice(0, 120))
+                });
+                if (!res.ok) break;
+                marker = data?.continuationMarker;
+                pages++;
+            } while (marker && pages < 20);
+            if (collectedPhotos.length) {
+                return { ok: true, recordType: 'zoneWide', photos: collectedPhotos, attempts };
+            }
+        } catch (e) {
+            attempts.push({ strategy: 'zoneWide', scope, error: e.message });
+        }
+    }
 
+    // Strategy B: typed query per record type. Each type gets paginated.
+    for (const scope of scopesToTry) {
+        for (const recordType of CMM_ASSET_RECORD_TYPES) {
+            try {
+                let marker;
+                let pages = 0;
+                let firstErrorLogged = false;
+                do {
+                    const { res, data } = await runOneQuery({
+                        zoneID, scope, recordType, continuationMarker: marker
+                    });
+                    const photos = extractPhotosFromCloudKitResolve(data);
+                    const added = addPhotos(photos, `${recordType}/${scope}`);
+                    if (!firstErrorLogged || res.ok) {
+                        attempts.push({
+                            strategy: 'typed',
+                            recordType,
+                            scope,
+                            page: pages,
+                            status: res.status,
+                            ok: res.ok,
+                            photoCount: photos.length,
+                            added,
+                            recordCount: Array.isArray(data?.records) ? data.records.length : 0,
+                            error: res.ok ? undefined : (data?.serverErrorCode || data?.reason || JSON.stringify(data).slice(0, 120))
+                        });
+                        firstErrorLogged = true;
+                    }
+                    if (!res.ok) break;
+                    marker = data?.continuationMarker;
+                    pages++;
+                } while (marker && pages < 20);
+            } catch (e) {
+                attempts.push({ strategy: 'typed', recordType, scope, error: e.message });
+            }
+        }
+        if (collectedPhotos.length) {
+            return { ok: true, recordType: 'typed-mix', photos: collectedPhotos, attempts };
+        }
+    }
+
+    // Strategy C: bare query with no recordType filter (some zones accept it).
+    for (const scope of scopesToTry) {
+        try {
+            const { res, data } = await runOneQuery({ zoneID, scope });
             const photos = extractPhotosFromCloudKitResolve(data);
+            const added = addPhotos(photos, `(none)/${scope}`);
             attempts.push({
-                recordType,
+                strategy: 'bare',
+                scope,
                 status: res.status,
                 ok: res.ok,
                 photoCount: photos.length,
-                recordCount: Array.isArray(data?.records) ? data.records.length : 0,
-                error: res.ok ? undefined : (data?.serverErrorCode || data?.reason || text.slice(0, 120))
+                added,
+                error: res.ok ? undefined : (data?.serverErrorCode || data?.reason || JSON.stringify(data).slice(0, 120))
             });
-            if (res.ok && photos.length) {
-                return { ok: true, recordType, photos, data, attempts };
+            if (collectedPhotos.length) {
+                return { ok: true, recordType: 'bare', photos: collectedPhotos, attempts };
             }
         } catch (e) {
-            attempts.push({ recordType, error: e.message });
+            attempts.push({ strategy: 'bare', scope, error: e.message });
         }
     }
 
-    // Last-resort: query without any recordType filter. Some CloudKit zones
-    // allow a bare query that returns all records in the zone.
-    try {
-        const body = { zoneID, query: { filterBy: [] }, resultsLimit: 200 };
-        const res = await cloudKitPost('records/query', body, scope);
-        const text = await res.text();
-        let data;
-        try { data = JSON.parse(text); } catch { data = { __raw: text.slice(0, 400) }; }
-        const photos = extractPhotosFromCloudKitResolve(data);
-        attempts.push({
-            recordType: '(none)',
-            status: res.status,
-            ok: res.ok,
-            photoCount: photos.length,
-            error: res.ok ? undefined : (data?.serverErrorCode || data?.reason || text.slice(0, 120))
-        });
-        if (res.ok && photos.length) {
-            return { ok: true, recordType: '(none)', photos, data, attempts };
-        }
-    } catch (e) {
-        attempts.push({ recordType: '(none)', error: e.message });
-    }
-
-    return { ok: false, photos: [], attempts };
+    return { ok: false, photos: collectedPhotos, attempts };
 }
