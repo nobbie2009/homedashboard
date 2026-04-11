@@ -11,6 +11,10 @@
 //     own JS client does this and the server returns 4xx for application/json.
 //   • The wrong-partition redirect comes back as HTTP 330 with the new host
 //     in the JSON body field "X-Apple-MMe-Host" (sometimes also as a header).
+//   • If we POST to a partition that doesn't know the token at all (e.g.
+//     newer share.icloud.com tokens against legacy p04), Apple returns plain
+//     HTTP 404 instead of a redirect. We therefore have to derive the right
+//     starting partition from the token's first character.
 //   • The signed asset URLs are valid for ~1h.
 
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
@@ -32,6 +36,37 @@ function extractToken(input) {
     if (/^[A-Za-z0-9]+$/.test(trimmed)) return trimmed;
 
     return null;
+}
+
+// Two base62 mappings are in use across known iCloud client implementations.
+// We try both and follow 330 redirects from there.
+const BASE62_LETTERS_FIRST = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const BASE62_DIGITS_FIRST = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+
+function partitionHost(n) {
+    return `p${String(n).padStart(2, '0')}-sharedstreams.icloud.com`;
+}
+
+function candidateHosts(token) {
+    const seen = new Set();
+    const hosts = [];
+    const push = (h) => {
+        if (h && !seen.has(h)) { seen.add(h); hosts.push(h); }
+    };
+
+    const first = token.charAt(0);
+    const i1 = BASE62_LETTERS_FIRST.indexOf(first);
+    const i2 = BASE62_DIGITS_FIRST.indexOf(first);
+    if (i1 >= 0) push(partitionHost(i1));
+    if (i2 >= 0) push(partitionHost(i2));
+
+    // Legacy default used by older clients.
+    push('p04-sharedstreams.icloud.com');
+
+    // A small spread of additional partitions for edge cases.
+    [1, 10, 23, 42, 50, 60, 100, 123, 147, 195].forEach(n => push(partitionHost(n)));
+
+    return hosts;
 }
 
 async function postJson(host, token, endpoint, body) {
@@ -67,16 +102,12 @@ async function readMaybeJson(res) {
     }
 }
 
-async function fetchStream(token) {
-    // Apple's web client always starts with p04 and follows the 330 redirect
-    // to the partition that actually owns the token. Allow a couple of hops
-    // in case the first redirect points at another wrong partition.
-    let host = 'p04-sharedstreams.icloud.com';
-    const tried = [];
-
-    for (let attempt = 0; attempt < 4; attempt++) {
-        tried.push(host);
-        const res = await postJson(host, token, 'webstream', { streamCtag: null });
+async function tryHost(host, token, hopBudget) {
+    let current = host;
+    const hops = [];
+    for (let i = 0; i < hopBudget; i++) {
+        hops.push(current);
+        const res = await postJson(current, token, 'webstream', { streamCtag: null });
 
         if (res.status === 330) {
             const headerHost = res.headers.get('X-Apple-MMe-Host') || res.headers.get('x-apple-mme-host');
@@ -84,22 +115,40 @@ async function fetchStream(token) {
             const bodyHost = data['X-Apple-MMe-Host'] || data['x-apple-mme-host'];
             const newHost = headerHost || bodyHost;
             if (!newHost) {
-                throw new Error(`webstream 330 ohne neuen Host (versucht: ${tried.join(', ')})`);
+                return { ok: false, status: 330, host: current, hops, error: '330 ohne Host' };
             }
-            host = newHost;
+            current = newHost;
             continue;
         }
 
-        if (!res.ok) {
-            const data = await readMaybeJson(res);
-            const detail = data.__raw || data.error || JSON.stringify(data).slice(0, 200);
-            throw new Error(`webstream HTTP ${res.status} @ ${host} – ${detail}`);
+        if (res.ok) {
+            const stream = await res.json();
+            return { ok: true, host: current, hops, stream };
         }
 
-        const stream = await res.json();
-        return { host, stream };
+        const data = await readMaybeJson(res);
+        const detail = data.__raw || data.error || JSON.stringify(data).slice(0, 120);
+        return { ok: false, status: res.status, host: current, hops, error: detail };
     }
-    throw new Error(`Zu viele Partition-Redirects (versucht: ${tried.join(', ')})`);
+    return { ok: false, status: 0, host: current, hops, error: 'zu viele Hops' };
+}
+
+async function fetchStream(token) {
+    const candidates = candidateHosts(token);
+    const failures = [];
+
+    for (const host of candidates) {
+        const result = await tryHost(host, token, 4);
+        if (result.ok) {
+            return { host: result.host, stream: result.stream };
+        }
+        failures.push(`${host}→${result.hops.slice(1).join('→') || '∅'}: HTTP ${result.status} (${result.error})`);
+        // 401/403 means the token is valid but unauthorized — no point trying
+        // further partitions, the album is gone or private.
+        if (result.status === 401 || result.status === 403) break;
+    }
+
+    throw new Error(`Kein Partition-Server akzeptierte das Token. Versucht: ${failures.slice(0, 5).join('; ')}`);
 }
 
 async function fetchAssetUrls(host, token, photoGuids) {
