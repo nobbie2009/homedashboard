@@ -15,7 +15,7 @@
 // partition API if CloudKit doesn't return a usable result, so the
 // module works for both share formats.
 
-import { cloudKitResolveShortGUID, extractPhotosFromCloudKitResolve } from './cloudkit.js';
+import { cloudKitResolveShortGUID, extractPhotosFromCloudKitResolve, cloudKitQueryCMMAssets } from './cloudkit.js';
 
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const cache = new Map(); // token -> { ts, photos }
@@ -404,15 +404,39 @@ export async function getSharedAlbumPhotos(rawInput) {
     // out with 400/404 and we fall through to the legacy partition API.
     try {
         const resolveData = await cloudKitResolveShortGUID(token);
-        const photos = extractPhotosFromCloudKitResolve(resolveData);
-        console.log(`[icloud] CloudKit resolve: ${photos.length} photos extracted (${JSON.stringify(resolveData).length}b response)`);
+        const resolveSize = JSON.stringify(resolveData).length;
+
+        // First try to pull photos straight out of the resolve response —
+        // Apple sometimes includes a previewData asset on the CMMRoot record
+        // that already has a downloadURL we can use.
+        let photos = extractPhotosFromCloudKitResolve(resolveData);
+        console.log(`[icloud] CloudKit resolve (${resolveSize}b): ${photos.length} photos from resolve response`);
+
+        // The resolve response is usually "minimally resolved" and only
+        // contains the CMMRoot record (album metadata). The individual
+        // asset records have to be fetched via records/query in the
+        // shared zone that the resolve result points to.
+        if (photos.length === 0 && resolveData?.results?.[0]?.zoneID) {
+            console.log(`[icloud] CloudKit resolve is minimally resolved, running follow-up records/query…`);
+            const queryResult = await cloudKitQueryCMMAssets(resolveData.results[0]);
+            console.log(`[icloud] CloudKit query attempts: ${JSON.stringify(queryResult.attempts)}`);
+            if (queryResult.ok && queryResult.photos.length) {
+                photos = queryResult.photos;
+                console.log(`[icloud] CloudKit query succeeded: recordType=${queryResult.recordType}, photos=${photos.length}`);
+            } else {
+                console.log(`[icloud] CloudKit query exhausted all recordTypes, 0 photos`);
+                // Log the raw resolve body so we can iterate on the parser
+                // in a follow-up PR if needed.
+                console.log(`[icloud] CloudKit resolve raw (first 4000b):\n${JSON.stringify(resolveData).slice(0, 4000)}`);
+            }
+        }
+
         if (photos.length) {
             cache.set(token, { ts: Date.now(), photos });
             return { photos, cached: false, token, source: 'cloudkit' };
         }
-        // Resolved cleanly but nothing to show — surface a hint in the log so
-        // we can iterate on the parser if the response schema is unexpected.
-        console.log(`[icloud] CloudKit resolve returned 0 photos, response keys=${Object.keys(resolveData || {}).join(',')}, first result keys=${Object.keys(resolveData?.results?.[0] || {}).join(',')}`);
+
+        console.log(`[icloud] CloudKit resolve+query returned 0 photos, falling through to legacy partition API`);
     } catch (e) {
         console.log(`[icloud] CloudKit resolve failed: ${e.message}`);
     }
@@ -440,8 +464,9 @@ export async function getSharedAlbumPhotos(rawInput) {
 }
 
 // Debug helper used by GET /api/icloud/debug — returns everything we know
-// about the album: share.icloud.com HTML discovery plus the raw CloudKit
-// resolve response so the operator can paste it into a bug report.
+// about the album: share.icloud.com HTML discovery, the raw CloudKit
+// resolve response, and the follow-up records/query attempts. Paste the
+// JSON into a bug report so we can iterate on the parser offline.
 export async function debugSharedAlbum(rawInput) {
     const token = extractToken(rawInput);
     if (!token) return { error: 'Ungültiger iCloud-Album-Link' };
@@ -451,6 +476,17 @@ export async function debugSharedAlbum(rawInput) {
     let cloudkit;
     try {
         const data = await cloudKitResolveShortGUID(token);
+        const resolvePhotos = extractPhotosFromCloudKitResolve(data);
+
+        let queryResult = null;
+        if (resolvePhotos.length === 0 && data?.results?.[0]?.zoneID) {
+            try {
+                queryResult = await cloudKitQueryCMMAssets(data.results[0]);
+            } catch (e) {
+                queryResult = { ok: false, error: e.message };
+            }
+        }
+
         cloudkit = {
             ok: true,
             rawSize: JSON.stringify(data).length,
@@ -459,10 +495,14 @@ export async function debugSharedAlbum(rawInput) {
             firstResultKeys: Object.keys(data?.results?.[0] || {}),
             rootRecordType: data?.results?.[0]?.rootRecord?.recordType,
             rootRecordFieldKeys: Object.keys(data?.results?.[0]?.rootRecord?.fields || {}),
-            otherRecordCount: data?.results?.[0]?.otherRecords?.length ?? 0,
-            sampleOtherRecord: data?.results?.[0]?.otherRecords?.[0],
-            photos: extractPhotosFromCloudKitResolve(data),
-            preview: JSON.stringify(data).slice(0, 2000)
+            zoneID: data?.results?.[0]?.zoneID,
+            databaseScope: data?.results?.[0]?.databaseScope,
+            photosFromResolve: resolvePhotos,
+            queryAttempts: queryResult?.attempts,
+            queryOk: queryResult?.ok,
+            queryRecordType: queryResult?.recordType,
+            photosFromQuery: queryResult?.photos,
+            preview: JSON.stringify(data).slice(0, 8000)
         };
     } catch (e) {
         cloudkit = { ok: false, error: e.message, status: e.status, data: e.data };
