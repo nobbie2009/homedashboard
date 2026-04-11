@@ -1,0 +1,199 @@
+// iCloud CloudKit Web Services client.
+//
+// Apple uses two entirely different backends for shared photo albums:
+//
+//   1. Legacy "iCloud Shared Albums" (iOS 6+, URLs like
+//      https://www.icloud.com/sharedalbum/#B0xxxx) talk to
+//      pXX-sharedstreams.icloud.com with the webstream / webasseturls API.
+//      This is what `icloud.js` implements.
+//
+//   2. New "iCloud Shared Photo" links (iOS 16+, URLs like
+//      https://share.icloud.com/photos/<shortGUID>) use CloudKit Web
+//      Services at https://ckdatabasews.icloud.com. No partition host,
+//      no redirect chain — just a single POST /records/resolve.
+//
+// This module handles case (2). The endpoint, container and request shape
+// were extracted verbatim from Apple's own Photos3 web-app bootstrap
+// (www.icloud.com/photos/ index.html, build 2610Build22 at the time of
+// writing). Key excerpt:
+//
+//   const i = "https://ckdatabasews.icloud.com";
+//   function h(t, e, o) {
+//       let n = arguments.length > 3 ? arguments[3] : "private";
+//       return `${e}/database/1/com.apple.photos.cloud/production/${n}/${t}
+//               ?remapEnums=true&getCurrentSyncToken=true
+//               &clientBuildNumber=${bn}&clientMasteringNumber=${mn}`;
+//   }
+//   function v(t, e, o) {  // resolveCMM
+//       return _(h("records/resolve", e, o, "public"), {
+//           body: JSON.stringify({shortGUIDs: [{value: t}]}),
+//           headers: {"content-type": "text/plain"},
+//           method: "POST",
+//           credentials: "include"
+//       });
+//   }
+//
+// The response is a CloudKit Web Services envelope whose `results[].rootRecord`
+// describes the shared album and whose `results[].otherRecords` carry the
+// individual CPLAsset records. Each asset record has derivative fields
+// (`resJPEGFullRes`, `resJPEGThumbRes`, `resOriginalRes`, ...) that carry
+// signed downloadURLs directly — no follow-up lookup required.
+
+const CK_BASE_URL = 'https://ckdatabasews.icloud.com';
+const CK_CONTAINER = 'com.apple.photos.cloud';
+const CK_ENV = 'production';
+
+// Default build numbers used as a fallback when we can't extract them from
+// Apple's live bootstrap HTML. These are advisory only — the resolve API
+// doesn't actually validate them, but Apple may start doing so in the future.
+const CK_DEFAULT_BUILD = '2610Build22';
+const CK_DEFAULT_MASTERING = '2610Build22';
+
+// In-process cache of the build numbers harvested from the Photos3 bootstrap.
+let cachedBuildInfo = null; // { build, mastering, ts }
+const BUILD_INFO_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+
+async function fetchBuildInfo() {
+    if (cachedBuildInfo && Date.now() - cachedBuildInfo.ts < BUILD_INFO_TTL_MS) {
+        return cachedBuildInfo;
+    }
+    // The Photos3 bootstrap embeds the current build via
+    //   <html data-cw-private-build-number="2610Build22" ...>
+    try {
+        const res = await fetch('https://www.icloud.com/photos/', {
+            method: 'GET',
+            headers: {
+                'Accept': 'text/html,application/xhtml+xml',
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'
+            }
+        });
+        if (res.ok) {
+            const html = await res.text();
+            const buildMatch = html.match(/data-cw-private-build-number="([^"]+)"/);
+            const masterMatch = html.match(/data-cw-private-mastering-number="([^"]+)"/);
+            if (buildMatch) {
+                cachedBuildInfo = {
+                    build: buildMatch[1],
+                    mastering: masterMatch?.[1] || buildMatch[1],
+                    ts: Date.now()
+                };
+                return cachedBuildInfo;
+            }
+        }
+    } catch {
+        // fall through to default
+    }
+    cachedBuildInfo = { build: CK_DEFAULT_BUILD, mastering: CK_DEFAULT_MASTERING, ts: Date.now() };
+    return cachedBuildInfo;
+}
+
+function cloudKitUrl(endpoint, zone, buildInfo) {
+    const params = new URLSearchParams({
+        remapEnums: 'true',
+        getCurrentSyncToken: 'true',
+        clientBuildNumber: buildInfo.build,
+        clientMasteringNumber: buildInfo.mastering
+    });
+    return `${CK_BASE_URL}/database/1/${CK_CONTAINER}/${CK_ENV}/${zone}/${endpoint}?${params}`;
+}
+
+async function cloudKitPost(endpoint, body, zone = 'public') {
+    const buildInfo = await fetchBuildInfo();
+    const url = cloudKitUrl(endpoint, zone, buildInfo);
+    return fetch(url, {
+        method: 'POST',
+        // Apple's web client sends Content-Type: text/plain even though the
+        // body is JSON — sending application/json returns an error.
+        headers: {
+            'Content-Type': 'text/plain',
+            'Accept': '*/*',
+            'Origin': 'https://www.icloud.com',
+            'Referer': 'https://www.icloud.com/',
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'
+        },
+        body: JSON.stringify(body)
+    });
+}
+
+/**
+ * Resolve a short shared-album GUID into its rootRecord + asset records.
+ * This is the direct equivalent of Apple's internal `resolveCMM` call.
+ */
+export async function cloudKitResolveShortGUID(shortGUID) {
+    const res = await cloudKitPost('records/resolve', {
+        shortGUIDs: [{ value: shortGUID }]
+    });
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = { __raw: text.slice(0, 400) }; }
+    if (!res.ok) {
+        const err = new Error(`CloudKit resolve HTTP ${res.status}: ${text.slice(0, 200)}`);
+        err.status = res.status;
+        err.data = data;
+        throw err;
+    }
+    return data;
+}
+
+// Known CPLAsset derivative fields ordered from largest to smallest.
+const DERIVATIVE_FIELDS = [
+    'resOriginalRes',
+    'resJPEGFullRes',
+    'resVidFullRes',
+    'resJPEGLargeRes',
+    'resJPEGMedRes',
+    'resJPEGThumbRes'
+];
+
+function pickDownloadUrl(fields) {
+    if (!fields) return null;
+    for (const key of DERIVATIVE_FIELDS) {
+        const field = fields[key];
+        const v = field?.value;
+        if (v && typeof v === 'object' && v.downloadURL && !v.downloadURL.startsWith('data:')) {
+            return {
+                url: v.downloadURL,
+                width: parseInt(fields.resOriginalWidth?.value ?? fields[`${key}Width`]?.value ?? 0, 10) || 0,
+                height: parseInt(fields.resOriginalHeight?.value ?? fields[`${key}Height`]?.value ?? 0, 10) || 0
+            };
+        }
+    }
+    return null;
+}
+
+/**
+ * Walk a CloudKit resolve response and turn it into a flat photo list.
+ * The response schema is nested:
+ *
+ *   { results: [{
+ *       shortGUID: "...",
+ *       rootRecord: { recordName, recordType, fields },
+ *       otherRecords?: [{ recordName, recordType, fields }, ...]
+ *   }] }
+ *
+ * CPLAsset records carry the derivatives (downloadURLs). The rootRecord
+ * itself is usually the album record and carries only metadata.
+ */
+export function extractPhotosFromCloudKitResolve(data) {
+    const photos = [];
+    const results = data?.results || [];
+    for (const result of results) {
+        const records = [];
+        if (result.rootRecord) records.push(result.rootRecord);
+        if (Array.isArray(result.otherRecords)) records.push(...result.otherRecords);
+
+        for (const record of records) {
+            if (!record || !record.fields) continue;
+            const pick = pickDownloadUrl(record.fields);
+            if (!pick) continue;
+            photos.push({
+                id: record.recordName || `${photos.length}`,
+                url: pick.url,
+                width: pick.width,
+                height: pick.height,
+                caption: record.fields?.caption?.value || ''
+            });
+        }
+    }
+    return photos;
+}

@@ -1,21 +1,21 @@
 // iCloud Shared Album proxy.
 //
-// Apple does not publish an official API for shared photo streams, but the
-// JSON endpoints used by the iCloud web viewer are publicly reachable and
-// don't require an Apple ID. This module talks to those endpoints, follows
-// the partition redirect (HTTP 330), assembles the signed download URLs and
-// caches the result for ~30 minutes.
+// Two completely different backends:
 //
-// Notes from reverse-engineering Apple's web client:
-//   • Content-Type MUST be `text/plain` even though the body is JSON. Apple's
-//     own JS client does this and the server returns 4xx for application/json.
-//   • The wrong-partition redirect comes back as HTTP 330 with the new host
-//     in the JSON body field "X-Apple-MMe-Host" (sometimes also as a header).
-//   • If we POST to a partition that doesn't know the token at all (e.g.
-//     newer share.icloud.com tokens against legacy p04), Apple returns plain
-//     HTTP 404 instead of a redirect. We therefore have to derive the right
-//     starting partition from the token's first character.
-//   • The signed asset URLs are valid for ~1h.
+//   1. Legacy "iCloud Shared Albums" (URL: www.icloud.com/sharedalbum/#B0xxx)
+//      talk to pXX-sharedstreams.icloud.com with the webstream /
+//      webasseturls API. Implemented inline below with the partition /
+//      HTTP-330 redirect resolver.
+//
+//   2. New "iCloud Shared Photo" links (URL: share.icloud.com/photos/<short>)
+//      use CloudKit Web Services at ckdatabasews.icloud.com. Implemented
+//      in ./cloudkit.js, called as the preferred path below.
+//
+// getSharedAlbumPhotos() tries CloudKit first and falls back to the
+// partition API if CloudKit doesn't return a usable result, so the
+// module works for both share formats.
+
+import { cloudKitResolveShortGUID, extractPhotosFromCloudKitResolve } from './cloudkit.js';
 
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const cache = new Map(); // token -> { ts, photos }
@@ -397,6 +397,28 @@ export async function getSharedAlbumPhotos(rawInput) {
     }
 
     console.log(`[icloud] fetching shared album token=${token}`);
+
+    // Strategy 1: CloudKit Web Services — this is what the new
+    // share.icloud.com/photos/<short> links actually use. For new-style
+    // tokens this succeeds directly; for old B0xxx tokens it will error
+    // out with 400/404 and we fall through to the legacy partition API.
+    try {
+        const resolveData = await cloudKitResolveShortGUID(token);
+        const photos = extractPhotosFromCloudKitResolve(resolveData);
+        console.log(`[icloud] CloudKit resolve: ${photos.length} photos extracted (${JSON.stringify(resolveData).length}b response)`);
+        if (photos.length) {
+            cache.set(token, { ts: Date.now(), photos });
+            return { photos, cached: false, token, source: 'cloudkit' };
+        }
+        // Resolved cleanly but nothing to show — surface a hint in the log so
+        // we can iterate on the parser if the response schema is unexpected.
+        console.log(`[icloud] CloudKit resolve returned 0 photos, response keys=${Object.keys(resolveData || {}).join(',')}, first result keys=${Object.keys(resolveData?.results?.[0] || {}).join(',')}`);
+    } catch (e) {
+        console.log(`[icloud] CloudKit resolve failed: ${e.message}`);
+    }
+
+    // Strategy 2: legacy pXX-sharedstreams.icloud.com partition API for
+    // old B0xxx tokens (www.icloud.com/sharedalbum/#B0xxx format).
     // fetchStream may translate the input token to a legacy B0xxx token
     // (resolved via the share.icloud.com URL shortener). The asset URLs have
     // to be fetched against that same legacy token, not the original.
@@ -414,16 +436,39 @@ export async function getSharedAlbumPhotos(rawInput) {
     console.log(`[icloud] built ${photos.length} photo URLs`);
 
     cache.set(token, { ts: Date.now(), photos });
-    return { photos, cached: false, token };
+    return { photos, cached: false, token, source: 'legacy' };
 }
 
-// Debug helper used by GET /api/icloud/debug — returns the full discovery
-// result so the operator can paste it into a bug report.
+// Debug helper used by GET /api/icloud/debug — returns everything we know
+// about the album: share.icloud.com HTML discovery plus the raw CloudKit
+// resolve response so the operator can paste it into a bug report.
 export async function debugSharedAlbum(rawInput) {
     const token = extractToken(rawInput);
     if (!token) return { error: 'Ungültiger iCloud-Album-Link' };
+
     const discovery = await discoverHostViaShareUrl(token);
-    return { token, discovery };
+
+    let cloudkit;
+    try {
+        const data = await cloudKitResolveShortGUID(token);
+        cloudkit = {
+            ok: true,
+            rawSize: JSON.stringify(data).length,
+            topLevelKeys: Object.keys(data || {}),
+            resultCount: data?.results?.length ?? 0,
+            firstResultKeys: Object.keys(data?.results?.[0] || {}),
+            rootRecordType: data?.results?.[0]?.rootRecord?.recordType,
+            rootRecordFieldKeys: Object.keys(data?.results?.[0]?.rootRecord?.fields || {}),
+            otherRecordCount: data?.results?.[0]?.otherRecords?.length ?? 0,
+            sampleOtherRecord: data?.results?.[0]?.otherRecords?.[0],
+            photos: extractPhotosFromCloudKitResolve(data),
+            preview: JSON.stringify(data).slice(0, 2000)
+        };
+    } catch (e) {
+        cloudkit = { ok: false, error: e.message, status: e.status, data: e.data };
+    }
+
+    return { token, discovery, cloudkit };
 }
 
 export function clearAlbumCache() {
