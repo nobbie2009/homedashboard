@@ -90,10 +90,12 @@ function render(devices) {
     });
 
     console.clear();
-    console.log(`${C.bold}${C.cyan}=== HomeDashboard: Geräte-Verwaltung ===${C.reset}\n`);
+    console.log(`${C.bold}${C.cyan}=== HomeDashboard: Geräte-Verwaltung ===${C.reset}`);
+    console.log(`${C.dim}Datei:${C.reset}   ${DEVICES_FILE}`);
+    console.log(`${C.dim}Gesamt:${C.reset}  ${list.length} Gerät(e)\n`);
 
     if (list.length === 0) {
-        console.log(`${C.dim}Keine registrierten Geräte.${C.reset}`);
+        console.log(`${C.dim}Keine registrierten Geräte.${C.reset}\n`);
         return list;
     }
 
@@ -114,14 +116,17 @@ function render(devices) {
 
 function printMenu() {
     console.log(`${C.bold}Aktionen:${C.reset}`);
-    console.log(`  ${C.green}<Nr>${C.reset}       Gerät ${C.green}freigeben${C.reset} (approve)`);
-    console.log(`  ${C.red}r <Nr>${C.reset}     Gerät ${C.red}ablehnen${C.reset} (reject)`);
-    console.log(`  ${C.yellow}p <Nr>${C.reset}     Gerät auf ${C.yellow}pending${C.reset} setzen`);
-    console.log(`  ${C.red}d <Nr>${C.reset}     Gerät ${C.red}löschen${C.reset}`);
-    console.log(`  ${C.cyan}l${C.reset}          Liste neu laden`);
-    console.log(`  ${C.cyan}q${C.reset}          beenden`);
+    console.log(`  ${C.green}<Nr>${C.reset}               Gerät ${C.green}freigeben${C.reset} (approve)`);
+    console.log(`  ${C.red}r <Nr>${C.reset}             Gerät ${C.red}ablehnen${C.reset} (reject)`);
+    console.log(`  ${C.yellow}p <Nr>${C.reset}             Gerät auf ${C.yellow}pending${C.reset} setzen`);
+    console.log(`  ${C.red}d <Nr>${C.reset}             Gerät ${C.red}löschen${C.reset}`);
+    console.log(`  ${C.green}add <uuid> [name]${C.reset}  Gerät manuell hinzufügen und freigeben`);
+    console.log(`  ${C.cyan}l${C.reset}                  Liste neu laden`);
+    console.log(`  ${C.cyan}q${C.reset}                  beenden`);
     console.log('');
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -140,6 +145,33 @@ function prompt() {
         }
 
         if (input === 'l' || input === 'list') {
+            render(loadDevices());
+            printMenu();
+            return prompt();
+        }
+
+        // add <uuid> [name]  -> legt Gerät direkt als approved an
+        const addMatch = answer.trim().match(/^add\s+([0-9a-fA-F-]+)(?:\s+(.+))?$/);
+        if (addMatch) {
+            const uuid = addMatch[1];
+            const name = (addMatch[2] || 'Manuell hinzugefügt').trim();
+            if (!UUID_RE.test(uuid)) {
+                console.log(`${C.red}Ungültige UUID-Form.${C.reset} Erwartet: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx\n`);
+                return prompt();
+            }
+            const devices = loadDevices();
+            const existing = devices[uuid];
+            devices[uuid] = {
+                id: uuid,
+                name: existing?.name || name,
+                status: 'approved',
+                firstSeen: existing?.firstSeen || new Date().toISOString(),
+                lastSeen: new Date().toISOString(),
+                ip: existing?.ip || 'manual',
+                userAgent: existing?.userAgent || 'manual-cli',
+            };
+            saveDevices(devices);
+            console.log(`${C.green}✓ Gerät ${existing ? 'aktualisiert' : 'hinzugefügt'} und freigegeben:${C.reset} ${devices[uuid].name} (${uuid})\n`);
             render(loadDevices());
             printMenu();
             return prompt();
