@@ -115,7 +115,8 @@ export const Screensaver: React.FC<Props> = ({ active, mode, onDismiss }) => {
                 });
                 if (!res.ok) {
                     const data = await res.json().catch(() => ({}));
-                    throw new Error(data.error || `HTTP ${res.status}`);
+                    const msg = data.details || data.error || `HTTP ${res.status}`;
+                    throw new Error(msg);
                 }
                 const data = await res.json();
                 if (cancelled) return;
@@ -164,7 +165,7 @@ export const Screensaver: React.FC<Props> = ({ active, mode, onDismiss }) => {
         const current = photos[order[photoIndex] ?? 0];
         return (
             <div
-                className="fixed inset-0 z-50 bg-black text-white cursor-none flex flex-col items-center justify-center select-none"
+                className="fixed inset-0 z-[9999] bg-black text-white cursor-none flex flex-col items-center justify-center select-none"
                 onClick={onDismiss}
                 onTouchStart={onDismiss}
             >
@@ -205,7 +206,7 @@ export const Screensaver: React.FC<Props> = ({ active, mode, onDismiss }) => {
     // Default clock mode (night)
     return (
         <div
-            className="fixed inset-0 z-50 bg-black text-white cursor-none flex flex-col items-center justify-center select-none"
+            className="fixed inset-0 z-[9999] bg-black text-white cursor-none flex flex-col items-center justify-center select-none"
             onClick={onDismiss}
             onTouchStart={onDismiss}
         >
