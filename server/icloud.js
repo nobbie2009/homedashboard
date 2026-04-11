@@ -125,6 +125,7 @@ async function discoverHostViaShareUrl(token, hopBudget = 5) {
     // Scan the trace + body for partition hosts and legacy tokens.
     const hosts = new Set();
     const legacyTokens = new Set();
+    const extras = {};
 
     const scan = (s) => {
         if (!s) return;
@@ -140,6 +141,32 @@ async function discoverHostViaShareUrl(token, hopBudget = 5) {
         }
     };
 
+    // Look for additional indicators that might give us a clue about how
+    // Apple really wants us to fetch this album in the new format.
+    const scanExtras = (s) => {
+        if (!s) return;
+        // <meta http-equiv="refresh" content="0; url=...">
+        const metaRefresh = s.match(/http-equiv=["']refresh["'][^>]*url=([^"'>\s]+)/i);
+        if (metaRefresh) extras.metaRefresh = metaRefresh[1];
+
+        // window.location = "..." or window.location.href = "..."
+        const jsRedirect = s.match(/window\.location(?:\.href)?\s*=\s*["']([^"']+)["']/);
+        if (jsRedirect) extras.jsRedirect = jsRedirect[1];
+
+        // Embedded JSON config blobs commonly used by Apple's web apps
+        const bootArgs = s.match(/(?:bootArgs|__INITIAL_STATE__|window\.SCNF)\s*=\s*({[\s\S]{0,500})/);
+        if (bootArgs) extras.bootArgs = bootArgs[1].slice(0, 300);
+
+        // Any *.icloud.com URL that is not the share host itself
+        const icloudUrls = s.match(/https:\/\/[a-z0-9.-]+\.icloud\.com[^"'\s<>]*/gi);
+        if (icloudUrls) {
+            const filtered = [...new Set(icloudUrls)]
+                .filter(u => !u.includes('share.icloud.com'))
+                .slice(0, 6);
+            if (filtered.length) extras.icloudUrls = filtered;
+        }
+    };
+
     for (const t of trace) {
         scan(t.location);
     }
@@ -147,10 +174,18 @@ async function discoverHostViaShareUrl(token, hopBudget = 5) {
         scan(lastRes.headers.get('x-apple-mme-host'));
     }
     scan(lastBody);
+    scanExtras(lastBody);
+
+    // Log the full body to docker logs (capped) for offline diagnosis.
+    console.log(`[icloud] discovery body (${lastBody.length}b, status=${lastRes?.status}):\n${lastBody.slice(0, 4000)}`);
+    if (Object.keys(extras).length) {
+        console.log(`[icloud] discovery extras:`, JSON.stringify(extras));
+    }
 
     return {
         hosts: Array.from(hosts),
         legacyTokens: Array.from(legacyTokens),
+        extras,
         status: lastRes?.status ?? 0,
         trace,
         bodyPreview: lastBody.slice(0, 400)
@@ -238,6 +273,7 @@ async function fetchStream(token) {
     const discovery = await discoverHostViaShareUrl(token);
     const discoveredHosts = discovery.hosts || [];
     const legacyTokens = discovery.legacyTokens || [];
+    const extras = discovery.extras || {};
 
     if (discovery.error) {
         console.log(`[icloud] share.icloud.com discovery failed: ${discovery.error}`);
@@ -268,10 +304,29 @@ async function fetchStream(token) {
         }
     }
 
-    const discoveryHint = discovery.error
-        ? ` Discovery: ${discovery.error}.`
-        : ` Discovery: status=${discovery.status}, hosts=[${discoveredHosts.join(',')}], legacy=[${legacyTokens.join(',')}].`;
-    throw new Error(`Kein Partition-Server akzeptierte das Token.${discoveryHint} Versucht: ${failures.slice(0, 6).join('; ')}`);
+    // Build a rich error string that includes the most useful piece of
+    // diagnostics from discovery — depending on what Apple sent back, this
+    // will be the meta refresh URL, a JS redirect target, an iCloud URL list,
+    // or as a last resort the first 200 chars of the HTML body.
+    const hint = [];
+    if (discovery.error) {
+        hint.push(`error=${discovery.error}`);
+    } else {
+        hint.push(`status=${discovery.status}`);
+        if (discoveredHosts.length) hint.push(`hosts=[${discoveredHosts.join(',')}]`);
+        if (legacyTokens.length) hint.push(`legacy=[${legacyTokens.join(',')}]`);
+        if (extras.metaRefresh) hint.push(`metaRefresh=${extras.metaRefresh}`);
+        if (extras.jsRedirect) hint.push(`jsRedirect=${extras.jsRedirect}`);
+        if (extras.icloudUrls?.length) hint.push(`icloudUrls=[${extras.icloudUrls.join(',')}]`);
+        if (extras.bootArgs) hint.push(`bootArgs=${extras.bootArgs.slice(0, 80)}…`);
+        if (!discoveredHosts.length && !legacyTokens.length && !Object.keys(extras).length) {
+            hint.push(`bodyPreview=${(discovery.bodyPreview || '').slice(0, 200).replace(/\s+/g, ' ')}`);
+        }
+    }
+    throw new Error(
+        `Kein Partition-Server akzeptierte das Token. Discovery: ${hint.join(', ')}. ` +
+        `Versucht: ${failures.slice(0, 6).join('; ')}`
+    );
 }
 
 async function fetchAssetUrls(host, token, photoGuids) {
