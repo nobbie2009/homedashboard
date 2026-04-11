@@ -60,13 +60,56 @@ function candidateHosts(token) {
     if (i1 >= 0) push(partitionHost(i1));
     if (i2 >= 0) push(partitionHost(i2));
 
-    // Legacy default used by older clients.
+    // Legacy default used by older clients — known to resolve at DNS level.
     push('p04-sharedstreams.icloud.com');
 
-    // A small spread of additional partitions for edge cases.
-    [1, 10, 23, 42, 50, 60, 100, 123, 147, 195].forEach(n => push(partitionHost(n)));
+    // Sequential probe through low-numbered partitions; these are the
+    // partitions Apple has historically used and are very likely to have
+    // valid DNS records, so we won't waste time on NXDOMAIN.
+    for (let n = 1; n <= 30; n++) push(partitionHost(n));
+
+    // A few higher numbers we've seen in the wild.
+    [42, 50, 60, 100, 123, 147, 195].forEach(n => push(partitionHost(n)));
 
     return hosts;
+}
+
+// Apple's share.icloud.com page sometimes responds with a redirect or with
+// HTML containing a `pXX-sharedstreams.icloud.com` reference. We probe the
+// share URL once at the very start so we can jump straight to the right
+// partition without doing dozens of POST attempts.
+async function discoverHostViaShareUrl(token) {
+    const url = `https://share.icloud.com/photos/${token}`;
+    let res;
+    try {
+        res = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'
+            },
+            redirect: 'manual'
+        });
+    } catch (e) {
+        return { error: `share.icloud.com unreachable: ${e.message}${e.cause?.code ? ` (${e.cause.code})` : ''}` };
+    }
+
+    const found = new Set();
+    const collect = (s) => {
+        if (!s) return;
+        const matches = s.match(/p\d{2,3}-sharedstreams\.icloud\.com/g);
+        if (matches) matches.forEach(m => found.add(m));
+    };
+
+    collect(res.headers.get('location'));
+    collect(res.headers.get('x-apple-mme-host'));
+
+    try {
+        const text = await res.text();
+        collect(text);
+    } catch { /* ignore */ }
+
+    return { hosts: Array.from(found), status: res.status };
 }
 
 async function postJson(host, token, endpoint, body) {
@@ -107,7 +150,16 @@ async function tryHost(host, token, hopBudget) {
     const hops = [];
     for (let i = 0; i < hopBudget; i++) {
         hops.push(current);
-        const res = await postJson(current, token, 'webstream', { streamCtag: null });
+        let res;
+        try {
+            res = await postJson(current, token, 'webstream', { streamCtag: null });
+        } catch (e) {
+            // Network-level failure (DNS, TCP, TLS, timeout). Surface the
+            // underlying cause code so the operator can tell DNS misses
+            // (ENOTFOUND) apart from real reachability problems.
+            const code = e.cause?.code || e.code || 'fetch';
+            return { ok: false, status: 0, host: current, hops, error: `${code}: ${e.message}` };
+        }
 
         if (res.status === 330) {
             const headerHost = res.headers.get('X-Apple-MMe-Host') || res.headers.get('x-apple-mme-host');
@@ -134,15 +186,32 @@ async function tryHost(host, token, hopBudget) {
 }
 
 async function fetchStream(token) {
-    const candidates = candidateHosts(token);
     const failures = [];
+
+    // 1) Try to discover the host directly from share.icloud.com first.
+    const discovery = await discoverHostViaShareUrl(token);
+    const discovered = discovery.hosts || [];
+    if (discovered.length) {
+        console.log(`[icloud] share.icloud.com discovery → ${discovered.join(', ')}`);
+    } else if (discovery.error) {
+        console.log(`[icloud] share.icloud.com discovery failed: ${discovery.error}`);
+    } else {
+        console.log(`[icloud] share.icloud.com discovery: HTTP ${discovery.status}, no host hint`);
+    }
+
+    // 2) Build the candidate ordering: discovered first, then derived ones.
+    const candidates = [];
+    const seen = new Set();
+    for (const h of [...discovered, ...candidateHosts(token)]) {
+        if (!seen.has(h)) { seen.add(h); candidates.push(h); }
+    }
 
     for (const host of candidates) {
         const result = await tryHost(host, token, 4);
         if (result.ok) {
             return { host: result.host, stream: result.stream };
         }
-        failures.push(`${host}→${result.hops.slice(1).join('→') || '∅'}: HTTP ${result.status} (${result.error})`);
+        failures.push(`${host}: HTTP ${result.status} (${result.error})`);
         // 401/403 means the token is valid but unauthorized — no point trying
         // further partitions, the album is gone or private.
         if (result.status === 401 || result.status === 403) break;
