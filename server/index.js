@@ -16,7 +16,7 @@ const __dirname = path.dirname(__filename);
 
 import { security } from './security.js';
 import sonos from './sonos.js';
-import { getSharedAlbumPhotos, clearAlbumCache } from './icloud.js';
+import { getSharedAlbumPhotos, clearAlbumCache, debugSharedAlbum } from './icloud.js';
 
 const app = express();
 app.use(cors());
@@ -1333,6 +1333,19 @@ app.get('/api/icloud/album', async (req, res) => {
 app.post('/api/icloud/album/refresh', (req, res) => {
     clearAlbumCache();
     res.json({ success: true });
+});
+
+// Debug endpoint: returns the raw share.icloud.com discovery result so the
+// operator can inspect what Apple actually responds with for a given album.
+app.get('/api/icloud/debug', async (req, res) => {
+    const url = req.query.url;
+    if (!url) return res.status(400).json({ error: 'url-Parameter fehlt' });
+    try {
+        const result = await debugSharedAlbum(url);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // --- SSE (Server-Sent Events) for Real-time Triggers (Doorbell) ---

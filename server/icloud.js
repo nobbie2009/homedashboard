@@ -78,38 +78,83 @@ function candidateHosts(token) {
 // HTML containing a `pXX-sharedstreams.icloud.com` reference. We probe the
 // share URL once at the very start so we can jump straight to the right
 // partition without doing dozens of POST attempts.
-async function discoverHostViaShareUrl(token) {
-    const url = `https://share.icloud.com/photos/${token}`;
-    let res;
-    try {
-        res = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'
-            },
-            redirect: 'manual'
-        });
-    } catch (e) {
-        return { error: `share.icloud.com unreachable: ${e.message}${e.cause?.code ? ` (${e.cause.code})` : ''}` };
+//
+// We also try to extract a *legacy* token from the redirect Location: the
+// new short share.icloud.com/photos/<short> URLs are URL shorteners that
+// 30x to www.icloud.com/sharedalbum/#B0xxxx — and only the legacy B0xxx
+// token is recognised by the pXX-sharedstreams.icloud.com webstream API.
+async function discoverHostViaShareUrl(token, hopBudget = 5) {
+    let url = `https://share.icloud.com/photos/${token}`;
+    const trace = [];
+    let lastRes = null;
+    let lastBody = '';
+
+    for (let hop = 0; hop < hopBudget; hop++) {
+        let res;
+        try {
+            res = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'
+                },
+                redirect: 'manual'
+            });
+        } catch (e) {
+            return {
+                error: `share.icloud.com unreachable: ${e.message}${e.cause?.code ? ` (${e.cause.code})` : ''}`,
+                trace
+            };
+        }
+
+        const location = res.headers.get('location');
+        trace.push({ url, status: res.status, location });
+        lastRes = res;
+
+        // Follow 30x manually so we can record the chain.
+        if (res.status >= 300 && res.status < 400 && location) {
+            url = new URL(location, url).toString();
+            continue;
+        }
+
+        try { lastBody = await res.text(); } catch { lastBody = ''; }
+        break;
     }
 
-    const found = new Set();
-    const collect = (s) => {
+    // Scan the trace + body for partition hosts and legacy tokens.
+    const hosts = new Set();
+    const legacyTokens = new Set();
+
+    const scan = (s) => {
         if (!s) return;
-        const matches = s.match(/p\d{2,3}-sharedstreams\.icloud\.com/g);
-        if (matches) matches.forEach(m => found.add(m));
+        const hostMatches = s.match(/p\d{2,3}-sharedstreams\.icloud\.com/g);
+        if (hostMatches) hostMatches.forEach(m => hosts.add(m));
+        // Legacy share token in URL fragments / paths, e.g. .../sharedalbum/#B0xyz...
+        const tokenMatches = s.match(/sharedalbum\/?#?([A-Za-z0-9]{12,})/g);
+        if (tokenMatches) {
+            for (const m of tokenMatches) {
+                const t = m.replace(/.*sharedalbum\/?#?/, '');
+                if (t && t !== token) legacyTokens.add(t);
+            }
+        }
     };
 
-    collect(res.headers.get('location'));
-    collect(res.headers.get('x-apple-mme-host'));
+    for (const t of trace) {
+        scan(t.location);
+    }
+    if (lastRes) {
+        scan(lastRes.headers.get('x-apple-mme-host'));
+    }
+    scan(lastBody);
 
-    try {
-        const text = await res.text();
-        collect(text);
-    } catch { /* ignore */ }
-
-    return { hosts: Array.from(found), status: res.status };
+    return {
+        hosts: Array.from(hosts),
+        legacyTokens: Array.from(legacyTokens),
+        status: lastRes?.status ?? 0,
+        trace,
+        bodyPreview: lastBody.slice(0, 400)
+    };
 }
 
 async function postJson(host, token, endpoint, body) {
@@ -188,36 +233,45 @@ async function tryHost(host, token, hopBudget) {
 async function fetchStream(token) {
     const failures = [];
 
-    // 1) Try to discover the host directly from share.icloud.com first.
+    // 1) Probe share.icloud.com — may yield a partition host AND/OR a legacy
+    //    B0xxx token that the partition API actually understands.
     const discovery = await discoverHostViaShareUrl(token);
-    const discovered = discovery.hosts || [];
-    if (discovered.length) {
-        console.log(`[icloud] share.icloud.com discovery → ${discovered.join(', ')}`);
-    } else if (discovery.error) {
+    const discoveredHosts = discovery.hosts || [];
+    const legacyTokens = discovery.legacyTokens || [];
+
+    if (discovery.error) {
         console.log(`[icloud] share.icloud.com discovery failed: ${discovery.error}`);
     } else {
-        console.log(`[icloud] share.icloud.com discovery: HTTP ${discovery.status}, no host hint`);
+        console.log(`[icloud] share.icloud.com discovery: status=${discovery.status} hosts=[${discoveredHosts.join(',')}] legacyTokens=[${legacyTokens.join(',')}]`);
     }
 
-    // 2) Build the candidate ordering: discovered first, then derived ones.
-    const candidates = [];
-    const seen = new Set();
-    for (const h of [...discovered, ...candidateHosts(token)]) {
-        if (!seen.has(h)) { seen.add(h); candidates.push(h); }
-    }
+    // 2) If discovery handed us a legacy token, switch to it for the API
+    //    calls below — the original short token isn't accepted by webstream.
+    const tokensToTry = [];
+    for (const t of legacyTokens) tokensToTry.push(t);
+    tokensToTry.push(token); // fall back to the original
 
-    for (const host of candidates) {
-        const result = await tryHost(host, token, 4);
-        if (result.ok) {
-            return { host: result.host, stream: result.stream };
+    for (const activeToken of tokensToTry) {
+        const candidates = [];
+        const seen = new Set();
+        for (const h of [...discoveredHosts, ...candidateHosts(activeToken)]) {
+            if (!seen.has(h)) { seen.add(h); candidates.push(h); }
         }
-        failures.push(`${host}: HTTP ${result.status} (${result.error})`);
-        // 401/403 means the token is valid but unauthorized — no point trying
-        // further partitions, the album is gone or private.
-        if (result.status === 401 || result.status === 403) break;
+
+        for (const host of candidates) {
+            const result = await tryHost(host, activeToken, 4);
+            if (result.ok) {
+                return { host: result.host, token: activeToken, stream: result.stream };
+            }
+            failures.push(`${activeToken === token ? '' : `[${activeToken}] `}${host}: HTTP ${result.status} (${result.error})`);
+            if (result.status === 401 || result.status === 403) break;
+        }
     }
 
-    throw new Error(`Kein Partition-Server akzeptierte das Token. Versucht: ${failures.slice(0, 5).join('; ')}`);
+    const discoveryHint = discovery.error
+        ? ` Discovery: ${discovery.error}.`
+        : ` Discovery: status=${discovery.status}, hosts=[${discoveredHosts.join(',')}], legacy=[${legacyTokens.join(',')}].`;
+    throw new Error(`Kein Partition-Server akzeptierte das Token.${discoveryHint} Versucht: ${failures.slice(0, 6).join('; ')}`);
 }
 
 async function fetchAssetUrls(host, token, photoGuids) {
@@ -288,21 +342,33 @@ export async function getSharedAlbumPhotos(rawInput) {
     }
 
     console.log(`[icloud] fetching shared album token=${token}`);
-    const { host, stream } = await fetchStream(token);
+    // fetchStream may translate the input token to a legacy B0xxx token
+    // (resolved via the share.icloud.com URL shortener). The asset URLs have
+    // to be fetched against that same legacy token, not the original.
+    const { host, token: activeToken, stream } = await fetchStream(token);
     const photoGuids = (stream.photos || []).map(p => p.photoGuid).filter(Boolean);
-    console.log(`[icloud] resolved partition=${host}, photos=${photoGuids.length}`);
+    console.log(`[icloud] resolved partition=${host}, activeToken=${activeToken}, photos=${photoGuids.length}`);
 
     if (!photoGuids.length) {
         cache.set(token, { ts: Date.now(), photos: [] });
         return { photos: [], cached: false, token };
     }
 
-    const assets = await fetchAssetUrls(host, token, photoGuids);
+    const assets = await fetchAssetUrls(host, activeToken, photoGuids);
     const photos = buildPhotoList(stream, assets);
     console.log(`[icloud] built ${photos.length} photo URLs`);
 
     cache.set(token, { ts: Date.now(), photos });
     return { photos, cached: false, token };
+}
+
+// Debug helper used by GET /api/icloud/debug — returns the full discovery
+// result so the operator can paste it into a bug report.
+export async function debugSharedAlbum(rawInput) {
+    const token = extractToken(rawInput);
+    if (!token) return { error: 'Ungültiger iCloud-Album-Link' };
+    const discovery = await discoverHostViaShareUrl(token);
+    return { token, discovery };
 }
 
 export function clearAlbumCache() {
