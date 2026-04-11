@@ -15,7 +15,7 @@
 // partition API if CloudKit doesn't return a usable result, so the
 // module works for both share formats.
 
-import { cloudKitResolveShortGUID, extractPhotosFromCloudKitResolve, cloudKitQueryCMMAssets } from './cloudkit.js';
+import { cloudKitResolveShortGUID, extractPhotosFromCloudKitResolve, cloudKitQueryCMMAssets, CKJar } from './cloudkit.js';
 
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const cache = new Map(); // token -> { ts, photos }
@@ -403,17 +403,22 @@ export async function getSharedAlbumPhotos(rawInput) {
     // tokens this succeeds directly; for old B0xxx tokens it will error
     // out with 400/404 and we fall through to the legacy partition API.
     try {
+        // Shared cookie jar: the follow-up query depends on the session
+        // cookie that Apple's server sets on the resolve response.
+        const jar = new CKJar();
+
         // First attempt: resolve with shouldFetchRootRecord=true so that
         // Apple returns the fully-hydrated CMM record instead of a minimal
         // stub. For most shares this alone is enough to pull every photo.
         let resolveData;
         try {
-            resolveData = await cloudKitResolveShortGUID(token, { shouldFetchRootRecord: true });
+            resolveData = await cloudKitResolveShortGUID(token, { shouldFetchRootRecord: true, jar });
         } catch (e) {
             console.log(`[icloud] CloudKit resolve(full) failed: ${e.message}, retrying without shouldFetchRootRecord`);
-            resolveData = await cloudKitResolveShortGUID(token);
+            resolveData = await cloudKitResolveShortGUID(token, { jar });
         }
         const resolveSize = JSON.stringify(resolveData).length;
+        console.log(`[icloud] CloudKit resolve cookies captured: ${Array.from(jar.cookies.keys()).join(',') || '(none)'}`);
 
         // First try to pull photos straight out of the resolve response —
         // Apple sometimes includes a previewData asset on the CMMRoot record
@@ -443,7 +448,7 @@ export async function getSharedAlbumPhotos(rawInput) {
 
         if (needsFollowUp) {
             console.log(`[icloud] CloudKit resolve needs follow-up records/query (have=${photos.length}, expected=${expectedCount || '?'}, isCMM=${isCMM})…`);
-            const queryResult = await cloudKitQueryCMMAssets(firstResult);
+            const queryResult = await cloudKitQueryCMMAssets(firstResult, { shortGUID: token, jar });
             console.log(`[icloud] CloudKit query attempts: ${JSON.stringify(queryResult.attempts)}`);
             if (queryResult.ok && queryResult.photos.length) {
                 // Prefer the query result over the resolve preview — the
@@ -453,8 +458,14 @@ export async function getSharedAlbumPhotos(rawInput) {
             } else {
                 console.log(`[icloud] CloudKit query exhausted all recordTypes, falling back to ${resolvePhotos.length} resolve-preview photo(s)`);
                 // Log the raw resolve body so we can iterate on the parser
-                // in a follow-up PR if needed.
-                console.log(`[icloud] CloudKit resolve raw (first 4000b):\n${JSON.stringify(resolveData).slice(0, 4000)}`);
+                // in a follow-up PR if needed. 16k so rootRecord is visible.
+                console.log(`[icloud] CloudKit resolve raw (first 16000b):\n${JSON.stringify(resolveData).slice(0, 16000)}`);
+                // Additionally dump just the rootRecord so we can see which
+                // asset references (if any) it has.
+                const rootRecord = firstResult?.rootRecord;
+                if (rootRecord) {
+                    console.log(`[icloud] rootRecord full:\n${JSON.stringify(rootRecord, null, 2).slice(0, 8000)}`);
+                }
                 photos = resolvePhotos;
             }
         }
@@ -503,15 +514,17 @@ export async function debugSharedAlbum(rawInput) {
 
     let cloudkit;
     try {
+        const jar = new CKJar();
+
         // Try the full resolve (shouldFetchRootRecord=true) first, then the
         // minimal one so the debug dump shows both shapes side by side.
         let data;
         let resolveMode;
         try {
-            data = await cloudKitResolveShortGUID(token, { shouldFetchRootRecord: true });
+            data = await cloudKitResolveShortGUID(token, { shouldFetchRootRecord: true, jar });
             resolveMode = 'full';
         } catch (e) {
-            data = await cloudKitResolveShortGUID(token);
+            data = await cloudKitResolveShortGUID(token, { jar });
             resolveMode = 'minimal (full failed: ' + e.message + ')';
         }
         const resolvePhotos = extractPhotosFromCloudKitResolve(data);
@@ -522,7 +535,7 @@ export async function debugSharedAlbum(rawInput) {
         let queryResult = null;
         if (data?.results?.[0]?.zoneID) {
             try {
-                queryResult = await cloudKitQueryCMMAssets(data.results[0]);
+                queryResult = await cloudKitQueryCMMAssets(data.results[0], { shortGUID: token, jar });
             } catch (e) {
                 queryResult = { ok: false, error: e.message };
             }
@@ -531,12 +544,14 @@ export async function debugSharedAlbum(rawInput) {
         cloudkit = {
             ok: true,
             resolveMode,
+            cookies: Array.from(jar.cookies.keys()),
             rawSize: JSON.stringify(data).length,
             topLevelKeys: Object.keys(data || {}),
             resultCount: data?.results?.length ?? 0,
             firstResultKeys: Object.keys(data?.results?.[0] || {}),
             rootRecordType: data?.results?.[0]?.rootRecord?.recordType,
             rootRecordFieldKeys: Object.keys(data?.results?.[0]?.rootRecord?.fields || {}),
+            rootRecord: data?.results?.[0]?.rootRecord,
             zoneID: data?.results?.[0]?.zoneID,
             databaseScope: data?.results?.[0]?.databaseScope,
             photosFromResolve: resolvePhotos,
@@ -544,7 +559,7 @@ export async function debugSharedAlbum(rawInput) {
             queryOk: queryResult?.ok,
             queryRecordType: queryResult?.recordType,
             photosFromQuery: queryResult?.photos,
-            preview: JSON.stringify(data).slice(0, 8000)
+            preview: JSON.stringify(data).slice(0, 16000)
         };
     } catch (e) {
         cloudkit = { ok: false, error: e.message, status: e.status, data: e.data };
