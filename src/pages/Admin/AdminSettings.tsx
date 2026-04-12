@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useKiosk } from '../../contexts/KioskContext';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useSecurity } from '../../contexts/SecurityContext';
-import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download, Smartphone, Trash2, Shield, ShieldAlert, ClipboardCheck, Plus, Cake, RefreshCw, Server, GitBranch, Database, Keyboard, Trophy, Star } from 'lucide-react';
+import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download, Smartphone, Trash2, Shield, ShieldAlert, ClipboardCheck, Plus, Cake, RefreshCw, Server, GitBranch, Database, Keyboard, Trophy, Star, Image } from 'lucide-react';
 import { IconMap, ChoreIcon } from '../../components/ChoreIcon';
 // import clsx from 'clsx';
 
@@ -759,6 +759,24 @@ const AdminSettings: React.FC = () => {
                                                 className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 w-full"
                                             />
                                         </div>
+                                        <div>
+                                            <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">Übergangseffekt</label>
+                                            <select
+                                                value={config.screensaver?.photoTransition ?? 'random'}
+                                                onChange={(e) => updateConfig({
+                                                    screensaver: { ...config.screensaver!, photoTransition: e.target.value as any }
+                                                })}
+                                                className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 w-full"
+                                            >
+                                                <option value="random">Zufall</option>
+                                                <option value="crossfade">Überblenden</option>
+                                                <option value="slide">Hereingleiten</option>
+                                                <option value="push">Schieben</option>
+                                                <option value="zoom">Zoom</option>
+                                                <option value="flip">3D-Kippen</option>
+                                                <option value="blur">Weichzeichner</option>
+                                            </select>
+                                        </div>
                                         <p className="col-span-2 text-xs text-slate-400 dark:text-slate-500">
                                             Die Diashow startet außerhalb des Nacht-Zeitraums nach der oben angegebenen Inaktivität. Im Nacht-Zeitraum wird stattdessen der schwarze Uhr-Bildschirmschoner verwendet.
                                         </p>
@@ -955,6 +973,34 @@ const AdminSettings: React.FC = () => {
                                         className="w-full py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold transition shadow-lg shadow-green-900/20"
                                     >
                                         Update starten
+                                    </button>
+                                </div>
+
+                                {/* 4. Album Cache Reset */}
+                                <div className="bg-white/40 dark:bg-slate-900/40 p-6 rounded-xl border border-slate-300/50 dark:border-slate-700/50 flex flex-col items-start hover:border-purple-500/50 transition">
+                                    <div className="bg-purple-500/20 p-3 rounded-lg text-purple-400 mb-4">
+                                        <Image className="w-8 h-8" />
+                                    </div>
+                                    <h4 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Album-Cache leeren</h4>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 flex-grow">
+                                        Leert den Server-Cache der iCloud-Album-Fotos. Beim nächsten Screensaver-Start werden frische Bilder geladen.
+                                    </p>
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                const res = await fetch(`${getApiUrl()}/api/icloud/album/refresh`, { method: 'POST' });
+                                                if (res.ok) {
+                                                    alert('Album-Cache wurde geleert.');
+                                                } else {
+                                                    alert('Fehler beim Leeren des Caches.');
+                                                }
+                                            } catch {
+                                                alert('Server nicht erreichbar.');
+                                            }
+                                        }}
+                                        className="w-full py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-900 dark:text-white rounded-lg font-medium transition border border-slate-400 dark:border-slate-600"
+                                    >
+                                        Cache leeren
                                     </button>
                                 </div>
                             </div>

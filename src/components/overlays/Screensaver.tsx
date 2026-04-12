@@ -31,6 +31,34 @@ const getWeatherIcon = (code: number, className?: string) => {
     return <Moon className={className} />; // Night mode default
 };
 
+// --- Transition effects ---
+const TRANSITION_TYPES = ['crossfade', 'slide', 'push', 'zoom', 'flip', 'blur'] as const;
+type TransitionType = typeof TRANSITION_TYPES[number];
+
+const ENTER_CLASS: Record<TransitionType, string> = {
+    crossfade: 'animate-ss-crossfade-enter',
+    slide: 'animate-ss-slide-enter',
+    push: 'animate-ss-push-enter',
+    zoom: 'animate-ss-zoom-enter',
+    flip: 'animate-ss-flip-enter',
+    blur: 'animate-ss-blur-enter',
+};
+const EXIT_CLASS: Record<TransitionType, string> = {
+    crossfade: 'animate-ss-crossfade-exit',
+    slide: 'animate-ss-slide-exit',
+    push: 'animate-ss-push-exit',
+    zoom: 'animate-ss-zoom-exit',
+    flip: 'animate-ss-flip-exit',
+    blur: 'animate-ss-blur-exit',
+};
+
+function pickTransition(setting: string | undefined): TransitionType {
+    if (setting && setting !== 'random' && TRANSITION_TYPES.includes(setting as TransitionType)) {
+        return setting as TransitionType;
+    }
+    return TRANSITION_TYPES[Math.floor(Math.random() * TRANSITION_TYPES.length)];
+}
+
 export type ScreensaverMode = 'clock' | 'photos';
 
 interface Props {
@@ -47,9 +75,17 @@ export const Screensaver: React.FC<Props> = ({ active, mode, onDismiss }) => {
 
     // Photo slideshow state
     const [photos, setPhotos] = useState<IcloudPhoto[]>([]);
-    const [photoIndex, setPhotoIndex] = useState(0);
     const [photoError, setPhotoError] = useState<string | null>(null);
     const photoOrderRef = useRef<number[]>([]);
+
+    // A/B swap state for transitions
+    const [slotA, setSlotA] = useState<IcloudPhoto | null>(null);
+    const [slotB, setSlotB] = useState<IcloudPhoto | null>(null);
+    const [activeSlot, setActiveSlot] = useState<'a' | 'b'>('a');
+    const [transition, setTransition] = useState<TransitionType>('crossfade');
+    const [animating, setAnimating] = useState(false);
+    const orderIndexRef = useRef(0);
+    const isFirstPhoto = useRef(true);
 
     // Clock Tick
     useEffect(() => {
@@ -85,7 +121,6 @@ export const Screensaver: React.FC<Props> = ({ active, mode, onDismiss }) => {
         };
 
         fetchWeather();
-        // No auto-refresh for screensaver to save resources, just on mount/show
     }, [active, mode, config.weatherLocation]);
 
     // Helper: build a shuffled play order for the slideshow
@@ -124,7 +159,8 @@ export const Screensaver: React.FC<Props> = ({ active, mode, onDismiss }) => {
                 setPhotos(list);
                 setPhotoError(list.length ? null : 'Keine Fotos im Album');
                 reshuffle(list.length);
-                setPhotoIndex(0);
+                orderIndexRef.current = 0;
+                isFirstPhoto.current = true;
             } catch (e) {
                 if (cancelled) return;
                 console.error('iCloud album load failed', e);
@@ -141,51 +177,118 @@ export const Screensaver: React.FC<Props> = ({ active, mode, onDismiss }) => {
         };
     }, [active, mode, config.screensaver?.photoAlbumUrl, deviceId, reshuffle]);
 
-    // Slideshow tick
+    // Show first photo immediately when photos load
     useEffect(() => {
-        if (!active || mode !== 'photos' || photos.length === 0) return;
+        if (photos.length > 0 && isFirstPhoto.current) {
+            isFirstPhoto.current = false;
+            const firstIdx = photoOrderRef.current[0] ?? 0;
+            setSlotA(photos[firstIdx]);
+            setSlotB(null);
+            setActiveSlot('a');
+            setAnimating(false);
+            orderIndexRef.current = 1;
+        }
+    }, [photos]);
+
+    // Slideshow tick — advance with transition
+    useEffect(() => {
+        if (!active || mode !== 'photos' || photos.length < 2) return;
         const intervalSec = Math.max(3, config.screensaver?.photoIntervalSeconds || 10);
         const timer = setInterval(() => {
-            setPhotoIndex(prev => {
-                const next = prev + 1;
-                if (next >= photoOrderRef.current.length) {
-                    reshuffle(photos.length);
-                    return 0;
-                }
-                return next;
-            });
+            let idx = orderIndexRef.current;
+            if (idx >= photoOrderRef.current.length) {
+                reshuffle(photos.length);
+                idx = 0;
+            }
+            const nextPhoto = photos[photoOrderRef.current[idx] ?? 0];
+            orderIndexRef.current = idx + 1;
+
+            const effect = pickTransition(config.screensaver?.photoTransition);
+            setTransition(effect);
+            setAnimating(true);
+
+            if (activeSlot === 'a') {
+                setSlotB(nextPhoto);
+                setActiveSlot('b');
+            } else {
+                setSlotA(nextPhoto);
+                setActiveSlot('a');
+            }
+
+            // Clear animating flag after the longest animation duration (1.5s)
+            setTimeout(() => setAnimating(false), 1600);
         }, intervalSec * 1000);
         return () => clearInterval(timer);
-    }, [active, mode, photos.length, config.screensaver?.photoIntervalSeconds, reshuffle]);
+    }, [active, mode, photos, activeSlot, config.screensaver?.photoIntervalSeconds, config.screensaver?.photoTransition, reshuffle]);
+
+    // Reset state when screensaver deactivates
+    useEffect(() => {
+        if (!active) {
+            setSlotA(null);
+            setSlotB(null);
+            setActiveSlot('a');
+            setAnimating(false);
+            isFirstPhoto.current = true;
+            orderIndexRef.current = 0;
+        }
+    }, [active]);
 
     if (!active) return null;
 
     if (mode === 'photos') {
-        const order = photoOrderRef.current;
-        const current = photos[order[photoIndex] ?? 0];
+        const currentPhoto = activeSlot === 'a' ? slotA : slotB;
+        const needsPerspective = transition === 'flip';
+
         return (
             <div
-                className="fixed inset-0 z-[9999] bg-black text-white cursor-none flex flex-col items-center justify-center select-none"
+                className="fixed inset-0 z-[9999] bg-black text-white cursor-none flex flex-col items-center justify-center select-none overflow-hidden"
+                style={needsPerspective ? { perspective: '1200px' } : undefined}
                 onClick={onDismiss}
                 onTouchStart={onDismiss}
             >
-                {current ? (
+                {/* Slot A */}
+                {slotA && (
                     <img
-                        key={current.id}
-                        src={current.url}
+                        key={`a-${slotA.id}`}
+                        src={slotA.url}
                         alt=""
-                        className="absolute inset-0 w-full h-full object-contain animate-fadein"
+                        className={`absolute inset-0 w-full h-full object-contain ${
+                            animating
+                                ? activeSlot === 'a'
+                                    ? ENTER_CLASS[transition]
+                                    : EXIT_CLASS[transition]
+                                : activeSlot === 'a'
+                                    ? 'opacity-100'
+                                    : 'opacity-0'
+                        }`}
+                        style={{ zIndex: activeSlot === 'a' ? 2 : 1 }}
                         draggable={false}
                     />
-                ) : (
-                    <div className="text-slate-500 text-2xl">
-                        {photoError || 'Lade Album…'}
-                    </div>
+                )}
+
+                {/* Slot B */}
+                {slotB && (
+                    <img
+                        key={`b-${slotB.id}`}
+                        src={slotB.url}
+                        alt=""
+                        className={`absolute inset-0 w-full h-full object-contain ${
+                            animating
+                                ? activeSlot === 'b'
+                                    ? ENTER_CLASS[transition]
+                                    : EXIT_CLASS[transition]
+                                : activeSlot === 'b'
+                                    ? 'opacity-100'
+                                    : 'opacity-0'
+                        }`}
+                        style={{ zIndex: activeSlot === 'b' ? 2 : 1 }}
+                        draggable={false}
+                    />
                 )}
 
                 {/* Clock & date overlay */}
-                {current && (
-                    <div className="absolute bottom-10 left-10 text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] pointer-events-none">
+                {currentPhoto && (
+                    <div className="absolute bottom-10 left-10 z-10 text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] pointer-events-none">
                         <div className="text-7xl font-black tabular-nums leading-none">
                             {format(time, 'HH:mm')}
                         </div>
@@ -195,8 +298,15 @@ export const Screensaver: React.FC<Props> = ({ active, mode, onDismiss }) => {
                     </div>
                 )}
 
+                {/* Error / loading state */}
+                {!currentPhoto && (
+                    <div className="text-slate-500 text-2xl z-10">
+                        {photoError || 'Lade Album\u2026'}
+                    </div>
+                )}
+
                 {/* Hint */}
-                <div className="absolute bottom-4 right-6 text-slate-500 text-xs">
+                <div className="absolute bottom-4 right-6 z-10 text-slate-500 text-xs">
                     Berühren zum Aufwecken
                 </div>
             </div>

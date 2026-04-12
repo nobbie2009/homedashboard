@@ -81,6 +81,7 @@ export interface AppConfig {
         photoAlbumUrl?: string;
         photoIdleMinutes?: number;     // How long the dashboard must be idle
         photoIntervalSeconds?: number; // How long each photo is shown
+        photoTransition?: 'random' | 'crossfade' | 'slide' | 'push' | 'zoom' | 'flip' | 'blur';
     };
     weatherAlertExclusions?: string[]; // List of event codes/names to ignore (e.g., 'FROST', 'FOG')
     adminPin?: string;
