@@ -988,7 +988,10 @@ const AdminSettings: React.FC = () => {
                                     <button
                                         onClick={async () => {
                                             try {
-                                                const res = await fetch(`${getApiUrl()}/api/icloud/album/refresh`, { method: 'POST' });
+                                                const res = await fetch(`${getApiUrl()}/api/icloud/album/refresh`, {
+                                                    method: 'POST',
+                                                    headers: { 'x-device-id': deviceId }
+                                                });
                                                 if (res.ok) {
                                                     alert('Album-Cache wurde geleert.');
                                                 } else {
