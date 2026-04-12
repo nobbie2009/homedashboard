@@ -15,7 +15,7 @@
 // partition API if CloudKit doesn't return a usable result, so the
 // module works for both share formats.
 
-import { cloudKitResolveShortGUID, extractPhotosFromCloudKitResolve, cloudKitQueryCMMAssets, anonymousAccessFromResolve, CKJar } from './cloudkit.js';
+import { cloudKitResolveShortGUID, extractPhotosFromCloudKitResolve, cloudKitQueryCMMAssets, anonymousAccessFromResolve, CKJar, warmUpSession } from './cloudkit.js';
 
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const cache = new Map(); // token -> { ts, photos }
@@ -403,9 +403,12 @@ export async function getSharedAlbumPhotos(rawInput) {
     // tokens this succeeds directly; for old B0xxx tokens it will error
     // out with 400/404 and we fall through to the legacy partition API.
     try {
-        // Shared cookie jar: the follow-up query depends on the session
-        // cookie that Apple's server sets on the resolve response.
+        // Shared cookie jar: the follow-up query depends on session cookies
+        // from the icloud.com domain. We warm up the jar by visiting the
+        // Photos3 bootstrap page first, then carry those cookies through
+        // the resolve and query steps.
         const jar = new CKJar();
+        await warmUpSession(jar);
 
         // First attempt: resolve with shouldFetchRootRecord=true so that
         // Apple returns the fully-hydrated CMM record instead of a minimal
@@ -516,6 +519,7 @@ export async function debugSharedAlbum(rawInput) {
     let cloudkit;
     try {
         const jar = new CKJar();
+        await warmUpSession(jar);
 
         // Try the full resolve (shouldFetchRootRecord=true) first, then the
         // minimal one so the debug dump shows both shapes side by side.

@@ -87,6 +87,47 @@ async function fetchBuildInfo() {
     return cachedBuildInfo;
 }
 
+/**
+ * Warm up the CKJar by visiting icloud.com pages that Apple's servers
+ * use to set anonymous session cookies (X-APPLE-WEBAUTH-*, WS-*, etc.).
+ * These cookies travel to ckdatabasews.icloud.com via `credentials: include`
+ * in the browser — we emulate that by capturing them into the jar.
+ *
+ * Without this step, the resolve response contains no cookies and all
+ * follow-up records/query calls return 401 AUTHENTICATION_FAILED.
+ */
+export async function warmUpSession(jar) {
+    const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15';
+    const urls = [
+        // The Photos3 bootstrap sets session cookies on the .icloud.com domain
+        'https://www.icloud.com/photos/',
+        // The setup/validate endpoint is called early by icloud.com and may
+        // set additional auth cookies
+        'https://setup.icloud.com/setup/ws/1/validate?clientBuildNumber=2610Build22&clientMasteringNumber=2610Build22'
+    ];
+    for (const url of urls) {
+        try {
+            const res = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'User-Agent': UA,
+                    'Origin': 'https://www.icloud.com',
+                    'Referer': 'https://www.icloud.com/'
+                },
+                redirect: 'follow'
+            });
+            jar.ingest(res);
+            // consume body to free the socket
+            await res.text().catch(() => {});
+        } catch (e) {
+            console.log(`[icloud] session warm-up ${url}: ${e.message}`);
+        }
+    }
+    const cookies = Array.from(jar.cookies.keys());
+    console.log(`[icloud] session warm-up captured ${cookies.length} cookies: ${cookies.join(', ') || '(none)'}`);
+}
+
 function cloudKitUrl(endpoint, zone, buildInfo, { partitionBase = CK_BASE_URL, webAuthToken = null } = {}) {
     const params = new URLSearchParams({
         remapEnums: 'true',
