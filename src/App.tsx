@@ -13,7 +13,8 @@ import {
     SmartHomeView,
     SonosView,
     AdminSettings,
-    BathroomView
+    BathroomView,
+    HouseholdView
 } from './pages';
 
 // Task List:
@@ -55,6 +56,7 @@ function App() {
                                     <Route path="smarthome" element={<SmartHomeView />} />
                                     <Route path="sonos" element={<SonosView />} />
                                     <Route path="bathroom" element={<BathroomView />} />
+                                    <Route path="household" element={<HouseholdView />} />
                                     <Route path="admin" element={<AdminSettings />} />
                                     <Route path="*" element={<Navigate to="/" replace />} />
                                 </Route>
