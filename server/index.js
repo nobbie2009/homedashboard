@@ -445,6 +445,11 @@ import {
     loadBathroomState, saveBathroomState,
     computeActiveWindow, reconcileWindow, nextWindowInfo
 } from './bathroomState.js';
+import { computeNextDue, sortByDueDate } from './householdLogic.js';
+
+// Household undo shadow: taskId -> { priorNextDueAt, priorLastCompletedAt, priorLastCompletedBy, completedAt }
+const householdUndoShadow = new Map();
+const HOUSEHOLD_UNDO_WINDOW_MS = 30_000;
 
 const performRotationCheck = () => {
     if (!appConfig.chores) return;
@@ -490,6 +495,21 @@ app.get('/api/config', (req, res) => {
 app.post('/api/config', (req, res) => {
     try {
         const newConfig = { ...appConfig, ...req.body };
+
+        // Household: unconditionally recompute nextDueAt for every task so
+        // recurrence/startDate edits propagate, and brand-new tasks get a
+        // sensible initial value without client-side date math.
+        if (newConfig.household?.tasks) {
+            for (const t of newConfig.household.tasks) {
+                try {
+                    const anchor = t.lastCompletedAt ?? Date.now();
+                    t.nextDueAt = computeNextDue(t, anchor);
+                } catch (err) {
+                    console.warn(`[household] normalize failed for task ${t?.id}:`, err.message);
+                }
+            }
+        }
+
         appConfig = newConfig;
         fs.writeFileSync(CONFIG_PATH, JSON.stringify(appConfig, null, 2));
         console.log("Config saved.");
@@ -1638,6 +1658,79 @@ app.post('/api/system/keyboard', (req, res) => {
 // Send current state on connection
 // We need to modify the SSE setup slightly to send initial state,
 // or clients can fetch it. Ideally SSE sends it on connect.
+
+
+// --- HOUSEHOLD ROUTES ---
+
+app.get('/api/household/tasks', (req, res) => {
+    const h = appConfig.household || { members: [], tasks: [] };
+    res.json({
+        tasks: sortByDueDate(h.tasks || []),
+        members: h.members || [],
+        now: Date.now()
+    });
+});
+
+app.post('/api/household/complete', (req, res) => {
+    const { taskId, memberId } = req.body || {};
+    if (!taskId) return res.status(400).json({ error: 'taskId missing' });
+
+    const h = appConfig.household || { members: [], tasks: [] };
+    const task = (h.tasks || []).find(t => t.id === taskId);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+
+    householdUndoShadow.set(task.id, {
+        priorNextDueAt: task.nextDueAt,
+        priorLastCompletedAt: task.lastCompletedAt,
+        priorLastCompletedBy: task.lastCompletedBy,
+        completedAt: Date.now()
+    });
+    setTimeout(() => {
+        const s = householdUndoShadow.get(task.id);
+        if (s && Date.now() - s.completedAt >= HOUSEHOLD_UNDO_WINDOW_MS) {
+            householdUndoShadow.delete(task.id);
+        }
+    }, HOUSEHOLD_UNDO_WINDOW_MS + 100);
+
+    const now = Date.now();
+    task.lastCompletedAt = now;
+    task.lastCompletedBy = memberId || task.assignedTo || null;
+    try {
+        task.nextDueAt = computeNextDue(task, now);
+    } catch (err) {
+        return res.status(400).json({ error: `Invalid recurrence: ${err.message}` });
+    }
+
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(appConfig, null, 2));
+    res.json({ task, completedAt: now });
+});
+
+app.post('/api/household/undo', (req, res) => {
+    const { taskId } = req.body || {};
+    if (!taskId) return res.status(400).json({ error: 'taskId missing' });
+
+    const shadow = householdUndoShadow.get(taskId);
+    if (!shadow) return res.status(410).json({ error: 'No recent completion' });
+    if (Date.now() - shadow.completedAt > HOUSEHOLD_UNDO_WINDOW_MS) {
+        householdUndoShadow.delete(taskId);
+        return res.status(410).json({ error: 'Undo window expired' });
+    }
+
+    const h = appConfig.household || { members: [], tasks: [] };
+    const task = (h.tasks || []).find(t => t.id === taskId);
+    if (!task) {
+        householdUndoShadow.delete(taskId);
+        return res.status(404).json({ error: 'Task not found' });
+    }
+
+    task.nextDueAt = shadow.priorNextDueAt;
+    task.lastCompletedAt = shadow.priorLastCompletedAt;
+    task.lastCompletedBy = shadow.priorLastCompletedBy;
+    householdUndoShadow.delete(taskId);
+
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(appConfig, null, 2));
+    res.json({ task });
+});
 
 
 // --- BATHROOM ROUTES ---
