@@ -5,6 +5,7 @@ import { Cloud, CloudRain, CloudSnow, Moon, CloudLightning } from 'lucide-react'
 import { useConfig } from '../../contexts/ConfigContext';
 import { useSecurity } from '../../contexts/SecurityContext';
 import { getApiUrl } from '../../utils/api';
+import { CatCareWidget } from '../widgets/CatCareWidget';
 
 interface WeatherData {
     current: {
@@ -72,6 +73,39 @@ export const Screensaver: React.FC<Props> = ({ active, mode, onDismiss }) => {
     const { deviceId } = useSecurity();
     const [time, setTime] = useState(new Date());
     const [weather, setWeather] = useState<WeatherData | null>(null);
+    const [noteText, setNoteText] = useState<string>(config.note?.text || '');
+
+    // Refresh note on activation and via SSE while active
+    useEffect(() => {
+        if (!active) return;
+        let cancelled = false;
+
+        const load = async () => {
+            try {
+                const res = await fetch(`${getApiUrl()}/api/note`, {
+                    headers: { 'x-device-id': deviceId }
+                });
+                if (res.ok && !cancelled) {
+                    const data = await res.json();
+                    setNoteText(data?.text || '');
+                }
+            } catch {}
+        };
+        load();
+
+        const src = new EventSource(`${getApiUrl()}/api/stream/events`);
+        src.addEventListener('note', (e: MessageEvent) => {
+            try {
+                const data = JSON.parse(e.data);
+                if (!cancelled) setNoteText(data?.text || '');
+            } catch {}
+        });
+        src.onerror = () => src.close();
+        return () => {
+            cancelled = true;
+            src.close();
+        };
+    }, [active, deviceId]);
 
     // Photo slideshow state
     const [photos, setPhotos] = useState<IcloudPhoto[]>([]);
@@ -305,8 +339,27 @@ export const Screensaver: React.FC<Props> = ({ active, mode, onDismiss }) => {
                     </div>
                 )}
 
+                {/* Note (bottom center, subtle) */}
+                {noteText && (
+                    <div
+                        className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 max-w-[60vw] bg-yellow-300/90 text-slate-900 px-4 py-2 rounded-full shadow-xl font-semibold text-base truncate pointer-events-none"
+                        title={noteText}
+                    >
+                        📌 {noteText}
+                    </div>
+                )}
+
+                {/* Cat care icons (bottom right, small) */}
+                <div
+                    className="absolute bottom-6 right-6 z-10"
+                    onClick={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                >
+                    <CatCareWidget variant="screensaver" />
+                </div>
+
                 {/* Hint */}
-                <div className="absolute bottom-4 right-6 z-10 text-slate-500 text-xs">
+                <div className="absolute top-4 right-6 z-10 text-slate-500 text-xs">
                     Berühren zum Aufwecken
                 </div>
             </div>
@@ -339,6 +392,25 @@ export const Screensaver: React.FC<Props> = ({ active, mode, onDismiss }) => {
                         </div>
                     )}
                 </div>
+            </div>
+
+            {/* Note (subtle, above hint) */}
+            {noteText && (
+                <div
+                    className="absolute bottom-28 left-1/2 -translate-x-1/2 max-w-[70vw] text-slate-600 text-2xl font-light italic truncate pointer-events-none"
+                    title={noteText}
+                >
+                    📌 {noteText}
+                </div>
+            )}
+
+            {/* Cat care icons (bottom right, small) */}
+            <div
+                className="absolute bottom-6 right-6"
+                onClick={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+            >
+                <CatCareWidget variant="screensaver" />
             </div>
 
             {/* Hint */}

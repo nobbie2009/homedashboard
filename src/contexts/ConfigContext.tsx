@@ -43,6 +43,21 @@ export interface RotationSettings {
     lastRotation?: number; // timestamp
 }
 
+export interface CatCareConfig {
+    enabled: boolean;
+    feedingTimes: string[];      // ["07:00", "18:00"]
+    gracePreMinutes: number;     // Vorab-Fenster in Minuten
+    litterEnabled: boolean;
+    litterIntervalDays: number;
+    litterTime: string;          // "HH:MM"
+}
+
+export interface NoteConfig {
+    text: string;
+    updatedAt: number;
+    author?: string;
+}
+
 export interface AppConfig {
     weatherLocation: string;
     cameraUrl?: string; // RTSP or HTTP Stream URL
@@ -50,6 +65,8 @@ export interface AppConfig {
     enabledCalendars: string[];
     showSeconds: boolean;
     schoolNames: string[];
+    catCare?: CatCareConfig;
+    note?: NoteConfig;
     edupage?: {
         username?: string;
         password?: string;
@@ -150,6 +167,18 @@ const defaultConfig: AppConfig = {
     themeSchedule: {
         darkStart: '20:00',
         darkEnd: '07:00'
+    },
+    catCare: {
+        enabled: false,
+        feedingTimes: ['07:00', '18:00'],
+        gracePreMinutes: 120,
+        litterEnabled: false,
+        litterIntervalDays: 2,
+        litterTime: '08:00'
+    },
+    note: {
+        text: '',
+        updatedAt: 0
     }
 };
 
@@ -207,6 +236,19 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
                             kidStars: data.rewards?.kidStars || prev.rewards?.kidStars || {},
                             sharedStars: data.rewards?.sharedStars ?? prev.rewards?.sharedStars ?? 0,
                         },
+                        catCare: {
+                            enabled: data.catCare?.enabled ?? prev.catCare?.enabled ?? false,
+                            feedingTimes: data.catCare?.feedingTimes || prev.catCare?.feedingTimes || ['07:00', '18:00'],
+                            gracePreMinutes: data.catCare?.gracePreMinutes ?? prev.catCare?.gracePreMinutes ?? 120,
+                            litterEnabled: data.catCare?.litterEnabled ?? prev.catCare?.litterEnabled ?? false,
+                            litterIntervalDays: data.catCare?.litterIntervalDays ?? prev.catCare?.litterIntervalDays ?? 2,
+                            litterTime: data.catCare?.litterTime || prev.catCare?.litterTime || '08:00'
+                        },
+                        note: {
+                            text: data.note?.text ?? prev.note?.text ?? '',
+                            updatedAt: data.note?.updatedAt ?? prev.note?.updatedAt ?? 0,
+                            author: data.note?.author ?? prev.note?.author
+                        },
                         theme: data.theme || prev.theme || 'dark'
                     };
 
@@ -221,6 +263,21 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
                 console.error("Config load error:", err);
             });
     }, [deviceId]);
+
+    // Keep the note field in sync with updates broadcast from other devices
+    // so that a stale note isn't re-posted when the user saves unrelated config.
+    useEffect(() => {
+        if (!deviceId) return;
+        const src = new EventSource(`${API_URL}/api/stream/events`);
+        src.addEventListener('note', (e: MessageEvent) => {
+            try {
+                const data = JSON.parse(e.data);
+                setConfig(prev => ({ ...prev, note: data }));
+            } catch {}
+        });
+        src.onerror = () => src.close();
+        return () => src.close();
+    }, [deviceId, API_URL]);
 
     const updateConfig = (newConfig: Partial<AppConfig>) => {
         setConfig((prev) => {

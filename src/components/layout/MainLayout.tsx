@@ -12,6 +12,7 @@ import { Screensaver, ScreensaverMode } from '../overlays/Screensaver';
 import { OnScreenKeyboard } from '../overlays/OnScreenKeyboard';
 import { useConfig } from '../../contexts/ConfigContext';
 import { ErrorBoundary } from '../ErrorBoundary';
+import { NoteBanner } from '../widgets/NoteBanner';
 
 const SCREENSAVER_NIGHT_IDLE_MS = 180000; // 3 minutes (clock screensaver fallback)
 const SCREENSAVER_CHECK_INTERVAL = 10000; // 10 seconds
@@ -238,8 +239,11 @@ export const MainLayout: React.FC = () => {
 
             {/* Header / Status Bar */}
             <header className="flex-none h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 transition-colors duration-200">
-                <div className="text-xl font-bold bg-gradient-to-r from-blue-500 to-teal-500 dark:from-blue-400 dark:to-teal-400 bg-clip-text text-transparent">
-                    FamilyHub
+                <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className="text-xl font-bold bg-gradient-to-r from-blue-500 to-teal-500 dark:from-blue-400 dark:to-teal-400 bg-clip-text text-transparent flex-shrink-0">
+                        FamilyHub
+                    </div>
+                    <NoteBanner />
                 </div>
                 <div className="flex items-center space-x-4">
                     {!isLocked && (
