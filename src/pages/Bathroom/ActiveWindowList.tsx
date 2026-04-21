@@ -52,6 +52,23 @@ export const ActiveWindowList: React.FC<Props> = ({ state, onToggle, error }) =>
     const WindowIcon = isMorning ? Sunrise : Moon;
     const doneCount = state.items.filter(i => state.completed[i.id]).length;
 
+    // Group items by kid so we can render one column per child.
+    // Kids without any items in this window are omitted to avoid empty columns.
+    const itemsByKid = state.kids
+        .map(kid => ({
+            kid,
+            items: state.items.filter(i => i.assignedTo === kid.id),
+        }))
+        .filter(group => group.items.length > 0);
+
+    const unassigned = state.items.filter(i => !kidMap.has(i.assignedTo));
+    if (unassigned.length > 0) {
+        itemsByKid.push({
+            kid: { id: '__unassigned', name: 'Sonstiges', color: '#94a3b8' } as (typeof state.kids)[number],
+            items: unassigned,
+        });
+    }
+
     const handleTap = async (item: (typeof state.items)[number]) => {
         const done = !!state.completed[item.id];
         if (done) {
@@ -84,30 +101,50 @@ export const ActiveWindowList: React.FC<Props> = ({ state, onToggle, error }) =>
             </div>
 
             <div className="flex-1 overflow-y-auto">
-                {state.items.map(item => {
-                    const done = !!state.completed[item.id];
-                    const kid = kidMap.get(item.assignedTo);
-                    return (
-                        <button
-                            key={item.id}
-                            onClick={() => handleTap(item)}
-                            className={`w-full h-[88px] px-4 flex items-center gap-3 border-b border-slate-800 active:bg-slate-800 transition ${
-                                done ? 'opacity-50' : 'bg-slate-900'
-                            }`}
-                        >
-                            <span
-                                className="w-4 h-4 rounded-full flex-none"
-                                style={{ backgroundColor: kid?.color || '#94a3b8' }}
-                                title={kid?.name || 'Unbekannt'}
-                            />
-                            <ChoreIcon icon={item.icon} className="w-8 h-8 text-white flex-none" />
-                            <span className={`text-2xl font-bold flex-1 text-left ${done ? 'line-through' : ''}`}>
-                                {item.label}
-                            </span>
-                            {done && <Check className="w-8 h-8 text-green-400 flex-none" />}
-                        </button>
-                    );
-                })}
+                <div className={`grid gap-x-px bg-slate-800 ${
+                    itemsByKid.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'
+                }`}>
+                    {itemsByKid.map(({ kid, items }) => {
+                        const kidDone = items.filter(i => state.completed[i.id]).length;
+                        return (
+                            <div key={kid.id} className="flex flex-col bg-slate-900">
+                                <div
+                                    className="flex-none h-12 px-3 flex items-center justify-between border-b-2"
+                                    style={{ borderBottomColor: kid.color, backgroundColor: `${kid.color}22` }}
+                                >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <span
+                                            className="w-3 h-3 rounded-full flex-none"
+                                            style={{ backgroundColor: kid.color }}
+                                        />
+                                        <span className="font-bold text-lg truncate">{kid.name}</span>
+                                    </div>
+                                    <span className="text-sm text-slate-400 tabular-nums flex-none">
+                                        {kidDone}/{items.length}
+                                    </span>
+                                </div>
+                                {items.map(item => {
+                                    const done = !!state.completed[item.id];
+                                    return (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => handleTap(item)}
+                                            className={`w-full h-14 px-3 flex items-center gap-2 border-b border-slate-800 active:bg-slate-800 transition ${
+                                                done ? 'opacity-50' : 'bg-slate-900'
+                                            }`}
+                                        >
+                                            <ChoreIcon icon={item.icon} className="w-6 h-6 text-white flex-none" />
+                                            <span className={`text-base font-semibold flex-1 text-left truncate ${done ? 'line-through' : ''}`}>
+                                                {item.label}
+                                            </span>
+                                            {done && <Check className="w-6 h-6 text-green-400 flex-none" />}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
 
             {undo && (

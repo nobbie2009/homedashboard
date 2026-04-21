@@ -7,15 +7,36 @@ interface KioskContextType {
     unlock: (pin: string) => boolean;
     lock: () => void;
     lastActivity: React.MutableRefObject<number>;
+    isKioskDevice: boolean;
 }
 
 const KioskContext = createContext<KioskContextType | undefined>(undefined);
 
 const IDLE_TIMEOUT_MS = 60000;
 const IDLE_CHECK_INTERVAL = 5000;
+const KIOSK_DEVICE_KEY = 'is_kiosk_device';
+
+function detectKioskDevice(): boolean {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const paramValue = params.get('kiosk');
+        if (paramValue === '1' || paramValue === 'true') {
+            localStorage.setItem(KIOSK_DEVICE_KEY, 'true');
+            return true;
+        }
+        if (paramValue === '0' || paramValue === 'false') {
+            localStorage.removeItem(KIOSK_DEVICE_KEY);
+            return false;
+        }
+        return localStorage.getItem(KIOSK_DEVICE_KEY) === 'true';
+    } catch {
+        return false;
+    }
+}
 
 export function KioskProvider({ children }: { children: React.ReactNode }) {
     const { config } = useConfig();
+    const [isKioskDevice] = useState(() => detectKioskDevice());
     const [isLocked, setIsLocked] = useState(() => {
         const stored = localStorage.getItem('kiosk_is_locked');
         return stored !== null ? JSON.parse(stored) : true;
@@ -54,7 +75,7 @@ export function KioskProvider({ children }: { children: React.ReactNode }) {
     }, [isLocked, lock, lastActivity]);
 
     return (
-        <KioskContext.Provider value={{ isLocked, unlock, lock, lastActivity }}>
+        <KioskContext.Provider value={{ isLocked, unlock, lock, lastActivity, isKioskDevice }}>
             {children}
         </KioskContext.Provider>
     );

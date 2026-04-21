@@ -19,7 +19,7 @@ const SCREENSAVER_CHECK_INTERVAL = 10000; // 10 seconds
 const IDLE_REDIRECT_MS = 180000; // 3 minutes
 
 export const MainLayout: React.FC = () => {
-    const { isLocked, lock, lastActivity } = useKiosk();
+    const { isLocked, lock, lastActivity, isKioskDevice } = useKiosk();
     const { deviceId } = useSecurity();
     const { config, updateConfig } = useConfig();
     const [serverIp, setServerIp] = React.useState<string>('');
@@ -239,7 +239,8 @@ export const MainLayout: React.FC = () => {
 
             {keyboardActive && <OnScreenKeyboard onClose={() => setKeyboardActive(false)} />}
 
-            {/* Header / Status Bar */}
+            {/* Header / Status Bar (kiosk device only) */}
+            {isKioskDevice && (
             <header className="flex-none h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 transition-colors duration-200">
                 <div className="flex items-center gap-4 flex-1 min-w-0">
                     <div className="text-xl font-bold bg-gradient-to-r from-blue-500 to-teal-500 dark:from-blue-400 dark:to-teal-400 bg-clip-text text-transparent flex-shrink-0">
@@ -296,15 +297,17 @@ export const MainLayout: React.FC = () => {
                     </button>
                 </div>
             </header>
+            )}
 
             {/* Main Content Area */}
-            <main className="flex-1 overflow-auto p-4 relative">
+            <main className={`flex-1 overflow-auto relative ${isKioskDevice ? 'p-4' : ''}`}>
                 <ErrorBoundary>
                     <Outlet />
                 </ErrorBoundary>
             </main>
 
-            {/* Bottom Navigation */}
+            {/* Bottom Navigation (kiosk device only) */}
+            {isKioskDevice && (
             <nav className="flex-none h-20 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex transition-colors duration-200">
                 {navItems.map((item) => (
                     <NavLink
@@ -334,6 +337,7 @@ export const MainLayout: React.FC = () => {
                     <span className="text-xs">Admin</span>
                 </NavLink>
             </nav>
+            )}
         </div>
     );
 };

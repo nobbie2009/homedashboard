@@ -54,6 +54,17 @@ echo ""
 read -p "Enter the Dashboard URL/IP (e.g. http://192.168.1.10:8080): " DASHBOARD_URL
 read -p "Enter daily reboot time (HH:MM, e.g. 04:00): " REBOOT_TIME
 
+# Mark this browser as the kiosk device so the app hides the header/footer
+# on external (non-kiosk) devices. The flag is persisted in localStorage on
+# first load, so subsequent visits keep it even without the query string.
+if [[ "$DASHBOARD_URL" != *"kiosk="* ]]; then
+    if [[ "$DASHBOARD_URL" == *"?"* ]]; then
+        DASHBOARD_URL="${DASHBOARD_URL}&kiosk=1"
+    else
+        DASHBOARD_URL="${DASHBOARD_URL}?kiosk=1"
+    fi
+fi
+
 # 4. Configure Autostart (XDG Method)
 echo "--> Configuring Autostart..."
 
