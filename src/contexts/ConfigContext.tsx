@@ -43,6 +43,27 @@ export interface RotationSettings {
     lastRotation?: number; // timestamp
 }
 
+export interface BathroomItem {
+    id: string;
+    label: string;
+    icon: string;
+    assignedTo: string;
+    timeSlot: 'morning' | 'evening' | 'both';
+    linkedChoreId?: string;
+}
+
+export interface BathroomSchedule {
+    morningStart: string;
+    morningEnd: string;
+    eveningStart: string;
+    eveningEnd: string;
+}
+
+export interface BathroomConfig {
+    items: BathroomItem[];
+    schedule: BathroomSchedule;
+}
+
 export interface CatCareConfig {
     enabled: boolean;
     feedingTimes: string[];      // ["07:00", "18:00"]
@@ -86,6 +107,7 @@ export interface AppConfig {
         tasks: Chore[];
         settings: RotationSettings;
     };
+    bathroom?: BathroomConfig;
     santaRouteEnabled?: boolean;
     santaRouteAddress?: string;
     screensaver?: {
@@ -142,6 +164,15 @@ const defaultConfig: AppConfig = {
         ],
         tasks: [],
         settings: { interval: 'weekly' }
+    },
+    bathroom: {
+        items: [],
+        schedule: {
+            morningStart: '06:00',
+            morningEnd: '10:00',
+            eveningStart: '18:00',
+            eveningEnd: '22:00'
+        }
     },
     santaRouteEnabled: false,
     santaRouteAddress: '',
@@ -217,6 +248,15 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
                             kids: data.chores?.kids || prev.chores?.kids || [],
                             tasks: data.chores?.tasks || prev.chores?.tasks || [],
                             settings: { ...prev.chores?.settings, ...(data.chores?.settings || {}) }
+                        },
+                        bathroom: {
+                            items: data.bathroom?.items || prev.bathroom?.items || [],
+                            schedule: {
+                                morningStart: data.bathroom?.schedule?.morningStart || prev.bathroom?.schedule?.morningStart || '06:00',
+                                morningEnd:   data.bathroom?.schedule?.morningEnd   || prev.bathroom?.schedule?.morningEnd   || '10:00',
+                                eveningStart: data.bathroom?.schedule?.eveningStart || prev.bathroom?.schedule?.eveningStart || '18:00',
+                                eveningEnd:   data.bathroom?.schedule?.eveningEnd   || prev.bathroom?.schedule?.eveningEnd   || '22:00'
+                            }
                         },
                         screensaver: {
                             enabled: data.screensaver?.enabled ?? prev.screensaver?.enabled ?? false,
