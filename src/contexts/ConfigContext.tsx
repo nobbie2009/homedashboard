@@ -64,6 +64,40 @@ export interface BathroomConfig {
     schedule: BathroomSchedule;
 }
 
+export interface HouseholdMember {
+    id: string;
+    name: string;
+    color: string;
+    photo?: string;
+}
+
+export type IntervalUnit = 'days' | 'weeks' | 'months';
+export type RecurrenceMode = 'relative' | 'absolute';
+
+export interface HouseholdRecurrence {
+    mode: RecurrenceMode;
+    intervalValue: number;
+    intervalUnit: IntervalUnit;
+    startDate?: string;
+}
+
+export interface HouseholdTask {
+    id: string;
+    label: string;
+    icon: string;
+    description?: string;
+    assignedTo?: string;
+    recurrence: HouseholdRecurrence;
+    nextDueAt: number;
+    lastCompletedAt?: number;
+    lastCompletedBy?: string;
+}
+
+export interface HouseholdConfig {
+    members: HouseholdMember[];
+    tasks: HouseholdTask[];
+}
+
 export interface CatCareConfig {
     enabled: boolean;
     feedingTimes: string[];      // ["07:00", "18:00"]
@@ -108,6 +142,7 @@ export interface AppConfig {
         settings: RotationSettings;
     };
     bathroom?: BathroomConfig;
+    household?: HouseholdConfig;
     santaRouteEnabled?: boolean;
     santaRouteAddress?: string;
     screensaver?: {
@@ -174,6 +209,7 @@ const defaultConfig: AppConfig = {
             eveningEnd: '22:00'
         }
     },
+    household: { members: [], tasks: [] },
     santaRouteEnabled: false,
     santaRouteAddress: '',
     screensaver: {
@@ -257,6 +293,10 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
                                 eveningStart: data.bathroom?.schedule?.eveningStart || prev.bathroom?.schedule?.eveningStart || '18:00',
                                 eveningEnd:   data.bathroom?.schedule?.eveningEnd   || prev.bathroom?.schedule?.eveningEnd   || '22:00'
                             }
+                        },
+                        household: {
+                            members: data.household?.members || prev.household?.members || [],
+                            tasks: data.household?.tasks || prev.household?.tasks || []
                         },
                         screensaver: {
                             enabled: data.screensaver?.enabled ?? prev.screensaver?.enabled ?? false,
