@@ -440,7 +440,7 @@ const eventCache = new Map();
 const CACHE_TTL = 10 * 60 * 1000; // 10 Minutes
 
 // --- CHORE ROTATION ---
-import { checkAndRotateChores } from './choreLogic.js';
+import { checkAndRotateChores, grantChoreStars, revokeChoreStars } from './choreLogic.js';
 
 const performRotationCheck = () => {
     if (!appConfig.chores) return;
@@ -961,40 +961,16 @@ app.post('/api/rewards/complete', (req, res) => {
         return res.status(401).json({ error: 'Falsche PIN' });
     }
 
-    const task = appConfig.chores?.tasks?.find(t => t.id === taskId);
-    const kid = appConfig.chores?.kids?.find(k => k.id === kidId);
-    if (!task || !kid) {
-        return res.status(404).json({ error: 'Aufgabe oder Kind nicht gefunden' });
+    try {
+        const { entry, rewards } = grantChoreStars(appConfig, rewardsData, {
+            taskId, kidId, source: 'chore'
+        });
+        fs.writeFileSync(CONFIG_PATH, JSON.stringify(appConfig, null, 2));
+        saveRewardsData();
+        res.json({ success: true, entry, rewards });
+    } catch (err) {
+        res.status(404).json({ error: err.message });
     }
-
-    const stars = task.difficulty || 1;
-
-    const entry = {
-        id: Date.now().toString(),
-        taskId: task.id,
-        taskLabel: task.label,
-        kidId: kid.id,
-        kidName: kid.name,
-        stars,
-        timestamp: Date.now()
-    };
-    rewardsData.completions.push(entry);
-
-    if (!appConfig.rewards) {
-        appConfig.rewards = { mode: 'individual', targetStars: 20, currentReward: '', kidStars: {}, sharedStars: 0 };
-    }
-
-    if (appConfig.rewards.mode === 'shared') {
-        appConfig.rewards.sharedStars = (appConfig.rewards.sharedStars || 0) + stars;
-    } else {
-        if (!appConfig.rewards.kidStars) appConfig.rewards.kidStars = {};
-        appConfig.rewards.kidStars[kid.id] = (appConfig.rewards.kidStars[kid.id] || 0) + stars;
-    }
-
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify(appConfig, null, 2));
-    saveRewardsData();
-
-    res.json({ success: true, entry, rewards: appConfig.rewards });
 });
 
 // Get completion history

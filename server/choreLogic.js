@@ -103,3 +103,75 @@ const getNextMonday = (fromDate) => {
     return nextMonday;
 };
 
+/**
+ * Grants stars for a completed chore. Pure function operating on passed-in
+ * state objects (appConfig, rewardsData). Mutates both. Throws on invalid
+ * task/kid. Caller is responsible for persisting appConfig/rewardsData.
+ *
+ * Used by both the legacy /api/rewards/complete route (after PIN check)
+ * and the bathroom endpoints (no PIN, server-enforced once-per-window).
+ */
+export function grantChoreStars(appConfig, rewardsData, { taskId, kidId, source }) {
+    const task = appConfig.chores?.tasks?.find(t => t.id === taskId);
+    const kid = appConfig.chores?.kids?.find(k => k.id === kidId);
+    if (!task) throw new Error(`Task not found: ${taskId}`);
+    if (!kid) throw new Error(`Kid not found: ${kidId}`);
+
+    const stars = task.difficulty || 1;
+    const mode = appConfig.rewards?.mode || 'individual';
+
+    const entry = {
+        id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
+        taskId: task.id,
+        taskLabel: task.label,
+        kidId: kid.id,
+        kidName: kid.name,
+        stars,
+        timestamp: Date.now(),
+        source: source || 'chore',
+        mode
+    };
+    rewardsData.completions.push(entry);
+
+    if (!appConfig.rewards) {
+        appConfig.rewards = { mode: 'individual', targetStars: 20, currentReward: '', kidStars: {}, sharedStars: 0 };
+    }
+
+    if (mode === 'shared') {
+        appConfig.rewards.sharedStars = (appConfig.rewards.sharedStars || 0) + stars;
+    } else {
+        if (!appConfig.rewards.kidStars) appConfig.rewards.kidStars = {};
+        appConfig.rewards.kidStars[kid.id] = (appConfig.rewards.kidStars[kid.id] || 0) + stars;
+    }
+
+    return { entry, rewards: appConfig.rewards };
+}
+
+/**
+ * Reverses a grant. Uses the entry's persisted `mode` (not current config
+ * mode) so rollbacks are correct even if the admin switches modes in
+ * between. Silent no-op if entry not found. Floor decrement at 0.
+ */
+export function revokeChoreStars(appConfig, rewardsData, completionId) {
+    const idx = rewardsData.completions.findIndex(e => e.id === completionId);
+    if (idx === -1) return { rewards: appConfig.rewards };
+
+    const entry = rewardsData.completions[idx];
+    const stars = entry.stars || 0;
+    const mode = entry.mode || 'individual';
+
+    if (!appConfig.rewards) {
+        appConfig.rewards = { mode: 'individual', targetStars: 20, currentReward: '', kidStars: {}, sharedStars: 0 };
+    }
+
+    if (mode === 'shared') {
+        appConfig.rewards.sharedStars = Math.max(0, (appConfig.rewards.sharedStars || 0) - stars);
+    } else {
+        if (!appConfig.rewards.kidStars) appConfig.rewards.kidStars = {};
+        appConfig.rewards.kidStars[entry.kidId] = Math.max(0, (appConfig.rewards.kidStars[entry.kidId] || 0) - stars);
+    }
+
+    rewardsData.completions.splice(idx, 1);
+    return { rewards: appConfig.rewards };
+}
+
