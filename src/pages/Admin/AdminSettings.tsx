@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useKiosk } from '../../contexts/KioskContext';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useSecurity } from '../../contexts/SecurityContext';
-import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download, Smartphone, Trash2, Shield, ShieldAlert, ClipboardCheck, Plus, Cake, RefreshCw, Server, GitBranch, Database, Keyboard, Trophy, Star, Image, Cat, StickyNote, X, Droplets } from 'lucide-react';
+import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download, Smartphone, Trash2, Shield, ShieldAlert, ClipboardCheck, Plus, Cake, RefreshCw, Server, GitBranch, Database, Keyboard, Trophy, Star, Image, Cat, StickyNote, X, Droplets, Wrench } from 'lucide-react';
 import { IconMap, ChoreIcon } from '../../components/ChoreIcon';
 import BathroomAdmin from './BathroomAdmin';
+import HouseholdAdmin from './HouseholdAdmin';
 // import clsx from 'clsx';
 
 import { getApiUrl } from '../../utils/api';
@@ -131,6 +132,7 @@ const AdminSettings: React.FC = () => {
         { id: 'aufgaben', label: 'Aufgaben', icon: ClipboardCheck },
         { id: 'belohnungen', label: 'Belohnungen', icon: Trophy },
         { id: 'bad', label: 'Bad', icon: Droplets },
+        { id: 'haushalt', label: 'Haushalt', icon: Wrench },
         { id: 'katze', label: 'Katze & Notiz', icon: Cat },
         { id: 'zugangsdaten', label: 'Zugangsdaten', icon: Lock },
         { id: 'ansicht', label: 'Ansicht', icon: CheckCircle }, // Reusing CheckCircle as generic icon for View
@@ -1625,6 +1627,11 @@ const AdminSettings: React.FC = () => {
                 {/* BATHROOM TAB */}
                 {activeTab === 'bad' && (
                     <BathroomAdmin />
+                )}
+
+                {/* HAUSHALT TAB */}
+                {activeTab === 'haushalt' && (
+                    <HouseholdAdmin />
                 )}
 
                 {/* CAT CARE & NOTE TAB */}
