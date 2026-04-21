@@ -1,6 +1,8 @@
 FROM node:20-alpine
 
-RUN apk add --no-cache ffmpeg python3 py3-pip git
+RUN apk add --no-cache ffmpeg python3 py3-pip git tzdata
+
+ENV TZ=Europe/Berlin
 
 # Setup Python Virtual Environment and Install Edupage API
 RUN python3 -m venv /opt/venv
