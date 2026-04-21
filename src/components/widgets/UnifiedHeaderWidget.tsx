@@ -146,13 +146,19 @@ export const UnifiedHeaderWidget: React.FC = () => {
         });
     }, [alerts, config.weatherAlertExclusions]);
 
-    // Grid config: 3 columns normally, 4 if alerts exist (Clock | Weather | Alerts | Date)
-    // Or adjust the middle section to split. Let's try flexible grid.
+    // Grid layout: Clock | Weather | [Alerts] | [CatCare] | Date
     const hasAlerts = filteredAlerts.length > 0;
-    // Wider columns to prevent text cutoff
-    const gridClass = hasAlerts
-        ? "grid grid-cols-[auto_1fr_minmax(280px,1.5fr)_auto]"
-        : "grid grid-cols-[auto_1fr_auto]";
+    const hasCatCare = !!config.catCare?.enabled;
+    let gridClass: string;
+    if (hasAlerts && hasCatCare) {
+        gridClass = 'grid grid-cols-[auto_1fr_minmax(280px,1.5fr)_auto_auto]';
+    } else if (hasAlerts) {
+        gridClass = 'grid grid-cols-[auto_1fr_minmax(280px,1.5fr)_auto]';
+    } else if (hasCatCare) {
+        gridClass = 'grid grid-cols-[auto_1fr_auto_auto]';
+    } else {
+        gridClass = 'grid grid-cols-[auto_1fr_auto]';
+    }
 
     return (
         <div className={`${gridClass} items-center bg-slate-200/60 dark:bg-slate-800/60 rounded-xl backdrop-blur-md shadow-lg w-full h-full border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white relative transition-all duration-500`}>
@@ -228,6 +234,13 @@ export const UnifiedHeaderWidget: React.FC = () => {
                 </div>
             )}
 
+            {/* CAT CARE: inline column between weather/alerts and date (only when enabled) */}
+            {hasCatCare && (
+                <div className="flex items-center justify-center px-6 h-full border-r border-slate-300/50 dark:border-slate-700/50">
+                    <CatCareWidget variant="header" />
+                </div>
+            )}
+
             {/* RIGHT: Date + Sunrise/Sunset */}
             <div className="flex flex-col items-end justify-center pr-8 h-full">
                 <div className="text-5xl font-bold text-blue-400 uppercase tracking-wide">
@@ -255,10 +268,6 @@ export const UnifiedHeaderWidget: React.FC = () => {
                 </div>
             </div>
 
-            {/* Cat care status: fixed to bottom-right of header widget so it never overlaps the date text */}
-            <div className="absolute bottom-3 right-4 pointer-events-auto">
-                <CatCareWidget variant="header" />
-            </div>
         </div>
     );
 };
