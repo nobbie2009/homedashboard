@@ -7,3 +7,4 @@ export { default as SmartHomeView } from './SmartHome/SmartHomeView';
 export { default as RewardBoard } from './Rewards/RewardBoard';
 export { default as SonosView } from './Sonos/SonosView';
 export { default as AdminSettings } from './Admin/AdminSettings';
+export { default as BathroomView } from './Bathroom/BathroomView';
