@@ -441,6 +441,10 @@ const CACHE_TTL = 10 * 60 * 1000; // 10 Minutes
 
 // --- CHORE ROTATION ---
 import { checkAndRotateChores, grantChoreStars, revokeChoreStars } from './choreLogic.js';
+import {
+    loadBathroomState, saveBathroomState,
+    computeActiveWindow, reconcileWindow, nextWindowInfo
+} from './bathroomState.js';
 
 const performRotationCheck = () => {
     if (!appConfig.chores) return;
@@ -1632,8 +1636,155 @@ app.post('/api/system/keyboard', (req, res) => {
 });
 
 // Send current state on connection
-// We need to modify the SSE setup slightly to send initial state, 
+// We need to modify the SSE setup slightly to send initial state,
 // or clients can fetch it. Ideally SSE sends it on connect.
+
+
+// --- BATHROOM ROUTES ---
+
+const DEFAULT_BATHROOM_SCHEDULE = {
+    morningStart: '06:00', morningEnd: '10:00',
+    eveningStart: '18:00', eveningEnd: '22:00'
+};
+
+function getBathroomSchedule() {
+    return { ...DEFAULT_BATHROOM_SCHEDULE, ...(appConfig.bathroom?.schedule || {}) };
+}
+
+function getBathroomItems() {
+    return appConfig.bathroom?.items || [];
+}
+
+function bathroomItemIsInWindow(item, window) {
+    if (!item) return false;
+    if (item.timeSlot === 'both') return window === 'morning' || window === 'evening';
+    return item.timeSlot === window;
+}
+
+function buildBathroomStateResponse(state, schedule) {
+    const window = state.currentWindow;
+    const items = window === 'none'
+        ? []
+        : getBathroomItems().filter(i => bathroomItemIsInWindow(i, window));
+    return {
+        currentWindow: window,
+        schedule,
+        items,
+        completed: state.completed,
+        kids: appConfig.chores?.kids || [],
+        nextWindow: nextWindowInfo(schedule)
+    };
+}
+
+app.get('/api/bathroom/state', (req, res) => {
+    const schedule = getBathroomSchedule();
+    const active = computeActiveWindow(schedule);
+    let state = loadBathroomState();
+    const rec = reconcileWindow(state, active);
+    if (rec.changed) {
+        state = rec.state;
+        saveBathroomState(state);
+    }
+    res.json(buildBathroomStateResponse(state, schedule));
+});
+
+app.post('/api/bathroom/toggle', (req, res) => {
+    const { itemId, action } = req.body || {};
+    if (!itemId || !['complete', 'uncomplete'].includes(action)) {
+        return res.status(400).json({ error: 'Invalid body' });
+    }
+
+    const schedule = getBathroomSchedule();
+    const active = computeActiveWindow(schedule);
+    let state = loadBathroomState();
+    const rec = reconcileWindow(state, active);
+    state = rec.state;
+    if (rec.changed) saveBathroomState(state);
+
+    if (active === 'none') {
+        return res.status(400).json({ error: 'Outside active window' });
+    }
+
+    const item = getBathroomItems().find(i => i.id === itemId);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+    if (!bathroomItemIsInWindow(item, active)) {
+        return res.status(400).json({ error: 'Item not in current window' });
+    }
+
+    if (action === 'complete') {
+        const existing = state.completed[itemId];
+        if (existing && existing.window === active) {
+            return res.status(409).json({ error: 'Already completed in this window' });
+        }
+
+        let linkedChoreCompletionId;
+        let linkedChoreWarning = false;
+        if (item.linkedChoreId) {
+            try {
+                const { entry } = grantChoreStars(appConfig, rewardsData, {
+                    taskId: item.linkedChoreId,
+                    kidId: item.assignedTo,
+                    source: 'bathroom'
+                });
+                linkedChoreCompletionId = entry.id;
+            } catch (err) {
+                console.warn('[bathroom] linked chore grant failed:', err.message);
+                linkedChoreWarning = true;
+            }
+        }
+
+        const timestamp = Date.now();
+        state.completed[itemId] = { timestamp, window: active, linkedChoreCompletionId };
+        saveBathroomState(state);
+        if (linkedChoreCompletionId) {
+            fs.writeFileSync(CONFIG_PATH, JSON.stringify(appConfig, null, 2));
+            saveRewardsData();
+        }
+
+        return res.json({
+            ...buildBathroomStateResponse(state, schedule),
+            completedAt: timestamp,
+            linkedChoreWarning
+        });
+    }
+
+    // uncomplete
+    const entry = state.completed[itemId];
+    if (!entry || entry.window !== active) {
+        return res.status(404).json({ error: 'No active completion to undo' });
+    }
+    const UNDO_WINDOW_MS = 30_000;
+    if (Date.now() - entry.timestamp > UNDO_WINDOW_MS) {
+        return res.status(410).json({ error: 'Undo window expired' });
+    }
+    if (entry.linkedChoreCompletionId) {
+        revokeChoreStars(appConfig, rewardsData, entry.linkedChoreCompletionId);
+        fs.writeFileSync(CONFIG_PATH, JSON.stringify(appConfig, null, 2));
+        saveRewardsData();
+    }
+    delete state.completed[itemId];
+    saveBathroomState(state);
+    return res.json(buildBathroomStateResponse(state, schedule));
+});
+
+app.post('/api/bathroom/reset', (req, res) => {
+    const { pin } = req.body || {};
+    const adminPin = appConfig.adminPin || '1234';
+    if (pin !== adminPin) return res.status(401).json({ error: 'Falsche PIN' });
+
+    const schedule = getBathroomSchedule();
+    const active = computeActiveWindow(schedule);
+    let state = loadBathroomState();
+    const kept = {};
+    for (const [itemId, entry] of Object.entries(state.completed || {})) {
+        if (entry?.window !== active) kept[itemId] = entry;
+    }
+    state.completed = kept;
+    state.currentWindow = active;
+    state.windowStartedAt = Date.now();
+    saveBathroomState(state);
+    res.json(buildBathroomStateResponse(state, schedule));
+});
 
 
 // --- EXECUTE ---
