@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { ClipboardList, Lock, Unlock, Settings as SettingsIcon, Calendar, LayoutDashboard, GraduationCap, ClipboardCheck, Home, RefreshCw, WifiOff, Trophy, Sun, Moon, Clock, Music, Droplets } from 'lucide-react';
+import { ClipboardList, Lock, Unlock, Settings as SettingsIcon, Calendar, LayoutDashboard, GraduationCap, ClipboardCheck, Home, RefreshCw, WifiOff, Trophy, Sun, Moon, Clock, Music, Droplets, Wrench } from 'lucide-react';
 import { useKiosk } from '../../contexts/KioskContext';
 import { getApiUrl } from '../../utils/api';
 import { useSecurity } from '../../contexts/SecurityContext';
@@ -190,6 +190,7 @@ export const MainLayout: React.FC = () => {
         { path: '/smarthome', icon: Home, label: 'SmartHome' },
         { path: '/sonos', icon: Music, label: 'Sonos' },
         { path: '/bathroom', icon: Droplets, label: 'Bad' },
+        { path: '/household', icon: Wrench, label: 'Haushalt' },
     ];
 
     // Doorbell & Keyboard Logic
