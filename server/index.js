@@ -239,10 +239,12 @@ if (!fs.existsSync(DATA_DIR)) {
 const TOKEN_PATH = path.join(DATA_DIR, 'tokens.json');
 const CONFIG_PATH = path.join(DATA_DIR, 'config.json');
 const REWARDS_PATH = path.join(DATA_DIR, 'rewards_history.json');
+const CATCARE_STATE_PATH = path.join(DATA_DIR, 'catcare_state.json');
 
 let userTokens = null;
 let appConfig = {};
 let rewardsData = { completions: [], rewardHistory: [] };
+let catCareState = { feedings: {}, lastLitterCleaned: 0 };
 
 // Load rewards history
 if (fs.existsSync(REWARDS_PATH)) {
@@ -256,6 +258,139 @@ if (fs.existsSync(REWARDS_PATH)) {
 
 const saveRewardsData = () => {
     fs.writeFileSync(REWARDS_PATH, JSON.stringify(rewardsData, null, 2));
+};
+
+// --- Cat Care State ---
+if (fs.existsSync(CATCARE_STATE_PATH)) {
+    try {
+        catCareState = JSON.parse(fs.readFileSync(CATCARE_STATE_PATH, 'utf8'));
+        if (!catCareState.feedings) catCareState.feedings = {};
+        if (typeof catCareState.lastLitterCleaned !== 'number') catCareState.lastLitterCleaned = 0;
+        console.log("Loaded catCare state from file.");
+    } catch (err) {
+        console.error("Failed to load catCare state:", err);
+        catCareState = { feedings: {}, lastLitterCleaned: 0 };
+    }
+}
+
+const saveCatCareState = () => {
+    try {
+        fs.writeFileSync(CATCARE_STATE_PATH, JSON.stringify(catCareState, null, 2));
+    } catch (e) {
+        console.error("Failed to save catCare state:", e);
+    }
+};
+
+const CATCARE_DEFAULTS = {
+    enabled: false,
+    feedingTimes: ['07:00', '18:00'],
+    gracePreMinutes: 120,
+    litterEnabled: false,
+    litterIntervalDays: 2,
+    litterTime: '08:00'
+};
+
+const formatLocalDate = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+};
+
+const parseHHMM = (s) => {
+    const [h, m] = (s || '00:00').split(':').map(Number);
+    return { h: h || 0, m: m || 0 };
+};
+
+const getCatCareConfig = () => ({ ...CATCARE_DEFAULTS, ...(appConfig.catCare || {}) });
+
+// Prune old feeding entries (keep only last 7 days) to limit state size
+const pruneOldFeedings = () => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 7);
+    const cutoffStr = formatLocalDate(cutoff);
+    let changed = false;
+    for (const day of Object.keys(catCareState.feedings || {})) {
+        if (day < cutoffStr) {
+            delete catCareState.feedings[day];
+            changed = true;
+        }
+    }
+    return changed;
+};
+
+const computeCatCareStatus = (now = new Date()) => {
+    const cfg = getCatCareConfig();
+    const today = formatLocalDate(now);
+    const completedToday = (catCareState.feedings[today] || []).slice();
+    const times = (cfg.feedingTimes || []).slice().sort();
+    const graceMs = Math.max(0, cfg.gracePreMinutes || 0) * 60 * 1000;
+
+    const feedingTimes = times.map((t) => {
+        const { h, m } = parseHHMM(t);
+        const at = new Date(now);
+        at.setHours(h, m, 0, 0);
+        const inReach = now.getTime() >= at.getTime() - graceMs;
+        const completed = completedToday.includes(t);
+        return {
+            time: t,
+            completed,
+            inReach,
+            due: !completed && inReach,
+            scheduledAt: at.getTime()
+        };
+    });
+
+    const feedingDue = feedingTimes.some((t) => t.due);
+    const allCompleted = feedingTimes.length > 0 && feedingTimes.every((t) => t.completed);
+
+    // Next open time (chronologically) in reach
+    const nextOpenInReach = feedingTimes.find((t) => !t.completed && t.inReach)?.time || null;
+    const nextScheduledOpen = feedingTimes.find((t) => !t.completed)?.time || null;
+
+    // Litter status
+    let litter = null;
+    if (cfg.litterEnabled) {
+        const { h, m } = parseHHMM(cfg.litterTime);
+        const intervalDays = Math.max(1, cfg.litterIntervalDays || 1);
+        const last = catCareState.lastLitterCleaned || 0;
+        // Next due: last cleaned + N days, snapped to configured HH:MM on that day.
+        let nextDueAt;
+        if (last <= 0) {
+            const d = new Date(now);
+            d.setHours(h, m, 0, 0);
+            if (d.getTime() < now.getTime()) d.setDate(d.getDate() + 1);
+            nextDueAt = d.getTime();
+        } else {
+            const d = new Date(last);
+            d.setDate(d.getDate() + intervalDays);
+            d.setHours(h, m, 0, 0);
+            nextDueAt = d.getTime();
+        }
+        litter = {
+            enabled: true,
+            due: now.getTime() >= nextDueAt,
+            lastCleaned: last || null,
+            nextDueAt
+        };
+    } else {
+        litter = { enabled: false, due: false, lastCleaned: null, nextDueAt: null };
+    }
+
+    return {
+        enabled: !!cfg.enabled,
+        config: cfg,
+        feeding: {
+            times: feedingTimes,
+            completedToday,
+            due: feedingDue,
+            allCompleted,
+            nextOpenInReach,
+            nextScheduledOpen
+        },
+        litter,
+        now: now.getTime()
+    };
 };
 
 // Load tokens on startup
@@ -354,10 +489,128 @@ app.post('/api/config', (req, res) => {
         appConfig = newConfig;
         fs.writeFileSync(CONFIG_PATH, JSON.stringify(appConfig, null, 2));
         console.log("Config saved.");
+        // Broadcast cat care / note updates so other dashboards pick them up
+        try { broadcastEvent('catcare', computeCatCareStatus()); } catch {}
+        try { broadcastEvent('note', appConfig.note || { text: '', updatedAt: 0 }); } catch {}
         res.json({ success: true, config: appConfig });
     } catch (err) {
         console.error("Failed to save config:", err);
         res.status(500).json({ error: "Failed to save config" });
+    }
+});
+
+// --- Cat Care Endpoints ---
+app.get('/api/catcare/status', (req, res) => {
+    res.json(computeCatCareStatus());
+});
+
+app.post('/api/catcare/feed', (req, res) => {
+    const cfg = getCatCareConfig();
+    if (!cfg.enabled) return res.status(400).json({ error: 'Cat care not enabled' });
+
+    const now = new Date();
+    const today = formatLocalDate(now);
+    if (!catCareState.feedings[today]) catCareState.feedings[today] = [];
+    const completed = catCareState.feedings[today];
+    const times = (cfg.feedingTimes || []).slice().sort();
+    const graceMs = Math.max(0, cfg.gracePreMinutes || 0) * 60 * 1000;
+
+    // Optional explicit time in body: mark exactly that (toggle-safe)
+    const bodyTime = typeof req.body?.time === 'string' ? req.body.time : null;
+
+    let markedTime = null;
+    if (bodyTime && times.includes(bodyTime)) {
+        if (!completed.includes(bodyTime)) {
+            completed.push(bodyTime);
+            markedTime = bodyTime;
+        }
+    } else {
+        // Mark next open time that is "in reach" (>= scheduled - grace)
+        for (const t of times) {
+            if (completed.includes(t)) continue;
+            const { h, m } = parseHHMM(t);
+            const at = new Date(now);
+            at.setHours(h, m, 0, 0);
+            if (now.getTime() >= at.getTime() - graceMs) {
+                completed.push(t);
+                markedTime = t;
+                break;
+            }
+        }
+    }
+
+    if (!markedTime) {
+        return res.status(200).json({
+            success: false,
+            reason: 'Keine Fütterungszeit im aktuellen Fenster offen.',
+            status: computeCatCareStatus(now)
+        });
+    }
+
+    pruneOldFeedings();
+    saveCatCareState();
+    const status = computeCatCareStatus(now);
+    broadcastEvent('catcare', status);
+    res.json({ success: true, marked: markedTime, status });
+});
+
+app.post('/api/catcare/feed/undo', (req, res) => {
+    const cfg = getCatCareConfig();
+    if (!cfg.enabled) return res.status(400).json({ error: 'Cat care not enabled' });
+    const now = new Date();
+    const today = formatLocalDate(now);
+    const completed = catCareState.feedings[today] || [];
+    const bodyTime = typeof req.body?.time === 'string' ? req.body.time : null;
+
+    let removed = null;
+    if (bodyTime && completed.includes(bodyTime)) {
+        catCareState.feedings[today] = completed.filter((t) => t !== bodyTime);
+        removed = bodyTime;
+    } else if (completed.length > 0) {
+        // Remove most recent (last in chronological sort)
+        const sorted = completed.slice().sort();
+        removed = sorted[sorted.length - 1];
+        catCareState.feedings[today] = completed.filter((t) => t !== removed);
+    }
+
+    if (!removed) {
+        return res.json({ success: false, status: computeCatCareStatus(now) });
+    }
+    saveCatCareState();
+    const status = computeCatCareStatus(now);
+    broadcastEvent('catcare', status);
+    res.json({ success: true, removed, status });
+});
+
+app.post('/api/catcare/litter', (req, res) => {
+    const cfg = getCatCareConfig();
+    if (!cfg.enabled || !cfg.litterEnabled) {
+        return res.status(400).json({ error: 'Litter tracking not enabled' });
+    }
+    catCareState.lastLitterCleaned = Date.now();
+    saveCatCareState();
+    const status = computeCatCareStatus();
+    broadcastEvent('catcare', status);
+    res.json({ success: true, status });
+});
+
+// --- Note Endpoint (globale Familien-Notiz) ---
+app.get('/api/note', (req, res) => {
+    res.json(appConfig.note || { text: '', updatedAt: 0 });
+});
+
+app.post('/api/note', (req, res) => {
+    try {
+        const text = typeof req.body?.text === 'string' ? req.body.text : '';
+        const author = typeof req.body?.author === 'string' ? req.body.author : undefined;
+        const note = { text, updatedAt: Date.now(), author };
+        appConfig.note = note;
+        fs.writeFileSync(CONFIG_PATH, JSON.stringify(appConfig, null, 2));
+        broadcastEvent('note', note);
+        res.json({ success: true, note });
+    } catch (err) {
+        console.error('Failed to save note:', err);
+        res.status(500).json({ error: 'Failed to save note' });
     }
 });
 

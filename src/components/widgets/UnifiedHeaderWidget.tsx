@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { Cloud, CloudRain, Sun, CloudSnow, Sunrise, Sunset } from 'lucide-react';
 import { useConfig } from '../../contexts/ConfigContext';
+import { CatCareWidget } from './CatCareWidget';
 
 // --- Weather Types & Helper ---
 interface WeatherData {
@@ -252,6 +253,11 @@ export const UnifiedHeaderWidget: React.FC = () => {
                         </div>
                     )}
                 </div>
+            </div>
+
+            {/* Cat care status: fixed to bottom-right of header widget so it never overlaps the date text */}
+            <div className="absolute bottom-3 right-4 pointer-events-auto">
+                <CatCareWidget variant="header" />
             </div>
         </div>
     );

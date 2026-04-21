@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useKiosk } from '../../contexts/KioskContext';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useSecurity } from '../../contexts/SecurityContext';
-import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download, Smartphone, Trash2, Shield, ShieldAlert, ClipboardCheck, Plus, Cake, RefreshCw, Server, GitBranch, Database, Keyboard, Trophy, Star, Image } from 'lucide-react';
+import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download, Smartphone, Trash2, Shield, ShieldAlert, ClipboardCheck, Plus, Cake, RefreshCw, Server, GitBranch, Database, Keyboard, Trophy, Star, Image, Cat, StickyNote, X } from 'lucide-react';
 import { IconMap, ChoreIcon } from '../../components/ChoreIcon';
 // import clsx from 'clsx';
 
@@ -129,6 +129,7 @@ const AdminSettings: React.FC = () => {
         { id: 'kalender', label: 'Kalender', icon: CalendarIcon },
         { id: 'aufgaben', label: 'Aufgaben', icon: ClipboardCheck },
         { id: 'belohnungen', label: 'Belohnungen', icon: Trophy },
+        { id: 'katze', label: 'Katze & Notiz', icon: Cat },
         { id: 'zugangsdaten', label: 'Zugangsdaten', icon: Lock },
         { id: 'ansicht', label: 'Ansicht', icon: CheckCircle }, // Reusing CheckCircle as generic icon for View
         { id: 'extern', label: 'Externe Daten', icon: Upload }, // Reusing Upload/Download/Server equivalent
@@ -1614,6 +1615,192 @@ const AdminSettings: React.FC = () => {
                                         <span className="text-green-400 font-medium animate-pulse">{bonusSuccess}</span>
                                     )}
                                 </div>
+                            </div>
+                        </section>
+                    </div>
+                )}
+
+                {/* CAT CARE & NOTE TAB */}
+                {activeTab === 'katze' && (
+                    <div className="space-y-6">
+                        {/* Katze */}
+                        <section className="bg-slate-200/30 dark:bg-slate-800/30 p-6 rounded-xl border border-slate-300 dark:border-slate-700 space-y-6">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                    <Cat className="w-5 h-5 text-pink-400" />
+                                    Katzen-Tracking
+                                </h3>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={!!config.catCare?.enabled}
+                                        onChange={(e) => updateConfig({
+                                            catCare: { ...(config.catCare || {} as any), enabled: e.target.checked }
+                                        })}
+                                        className="w-5 h-5"
+                                    />
+                                    <span className="text-sm text-slate-700 dark:text-slate-200">Aktiv</span>
+                                </label>
+                            </div>
+
+                            {config.catCare?.enabled && (
+                                <div className="space-y-6">
+                                    {/* Feeding times */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
+                                            Fütterungszeiten (HH:MM)
+                                        </label>
+                                        <div className="flex flex-wrap gap-2 items-center">
+                                            {(config.catCare?.feedingTimes || []).map((t, idx) => (
+                                                <div key={idx} className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1">
+                                                    <input
+                                                        type="time"
+                                                        value={t}
+                                                        onChange={(e) => {
+                                                            const times = [...(config.catCare?.feedingTimes || [])];
+                                                            times[idx] = e.target.value;
+                                                            updateConfig({
+                                                                catCare: { ...(config.catCare || {} as any), feedingTimes: times }
+                                                            });
+                                                        }}
+                                                        className="bg-transparent text-slate-900 dark:text-white text-lg font-mono focus:outline-none"
+                                                    />
+                                                    <button
+                                                        onClick={() => {
+                                                            const times = (config.catCare?.feedingTimes || []).filter((_, i) => i !== idx);
+                                                            updateConfig({
+                                                                catCare: { ...(config.catCare || {} as any), feedingTimes: times }
+                                                            });
+                                                        }}
+                                                        className="text-red-500 hover:text-red-700 p-1"
+                                                        title="Entfernen"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                            <button
+                                                onClick={() => {
+                                                    const times = [...(config.catCare?.feedingTimes || []), '12:00'];
+                                                    updateConfig({
+                                                        catCare: { ...(config.catCare || {} as any), feedingTimes: times }
+                                                    });
+                                                }}
+                                                className="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded-lg text-sm font-medium"
+                                            >
+                                                <Plus className="w-4 h-4" />
+                                                Zeit hinzufügen
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                            Reset erfolgt automatisch um Mitternacht.
+                                        </p>
+                                    </div>
+
+                                    {/* Grace window */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
+                                            Vorab-Fenster (Grace) in Minuten: <span className="font-mono text-blue-500">{config.catCare?.gracePreMinutes ?? 120}</span>
+                                        </label>
+                                        <input
+                                            type="range"
+                                            min={0}
+                                            max={240}
+                                            step={15}
+                                            value={config.catCare?.gracePreMinutes ?? 120}
+                                            onChange={(e) => updateConfig({
+                                                catCare: { ...(config.catCare || {} as any), gracePreMinutes: Number(e.target.value) }
+                                            })}
+                                            className="w-full"
+                                        />
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                            So viele Minuten <em>vor</em> der Fütterungszeit zählt ein Klick bereits als erledigt. Pro Klick wird nur eine Zeit markiert — keine Doppel-Erfassung.
+                                        </p>
+                                    </div>
+
+                                    {/* Litter */}
+                                    <div className="border-t border-slate-300 dark:border-slate-700 pt-4">
+                                        <label className="flex items-center gap-2 cursor-pointer mb-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={!!config.catCare?.litterEnabled}
+                                                onChange={(e) => updateConfig({
+                                                    catCare: { ...(config.catCare || {} as any), litterEnabled: e.target.checked }
+                                                })}
+                                                className="w-5 h-5"
+                                            />
+                                            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                                Katzenklo-Reinigung tracken
+                                            </span>
+                                        </label>
+
+                                        {config.catCare?.litterEnabled && (
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                                                        Intervall (Tage)
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        min={1}
+                                                        max={14}
+                                                        value={config.catCare?.litterIntervalDays ?? 2}
+                                                        onChange={(e) => updateConfig({
+                                                            catCare: { ...(config.catCare || {} as any), litterIntervalDays: Math.max(1, Number(e.target.value)) }
+                                                        })}
+                                                        className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 w-full text-lg text-slate-900 dark:text-white"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                                                        Fällig-Uhrzeit
+                                                    </label>
+                                                    <input
+                                                        type="time"
+                                                        value={config.catCare?.litterTime || '08:00'}
+                                                        onChange={(e) => updateConfig({
+                                                            catCare: { ...(config.catCare || {} as any), litterTime: e.target.value }
+                                                        })}
+                                                        className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 w-full text-lg text-slate-900 dark:text-white font-mono"
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </section>
+
+                        {/* Notiz */}
+                        <section className="bg-slate-200/30 dark:bg-slate-800/30 p-6 rounded-xl border border-slate-300 dark:border-slate-700 space-y-4">
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                <StickyNote className="w-5 h-5 text-yellow-400" />
+                                Familien-Notiz
+                            </h3>
+
+                            <label className="block text-sm text-slate-600 dark:text-slate-300">
+                                Text (wird im Header, auf dem Nacht-Screensaver und in der Foto-Slideshow angezeigt):
+                            </label>
+                            <textarea
+                                value={config.note?.text || ''}
+                                onChange={(e) => updateConfig({
+                                    note: { text: e.target.value, updatedAt: Date.now(), author: config.note?.author }
+                                })}
+                                onFocus={() => !isKeyboardActive && toggleKeyboard()}
+                                rows={3}
+                                placeholder="Z.B. 'Denk an den Elternabend am Mittwoch 19:00'"
+                                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-3 text-lg text-slate-900 dark:text-white"
+                            />
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs text-slate-500 dark:text-slate-400">
+                                    Leer lassen, um die Notiz zu entfernen.
+                                </span>
+                                <button
+                                    onClick={() => updateConfig({ note: { text: '', updatedAt: Date.now() } })}
+                                    className="text-sm text-red-600 dark:text-red-400 hover:underline"
+                                >
+                                    Notiz löschen
+                                </button>
                             </div>
                         </section>
                     </div>
