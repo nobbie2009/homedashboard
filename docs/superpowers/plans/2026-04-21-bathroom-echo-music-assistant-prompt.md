@@ -1,70 +1,147 @@
-# Claude-Code Prompt: music-assistant-pwa Bad-Link
+# Claude-Code Prompt: music-assistant-pwa — Tab „Räume" durch „Bad" ersetzen
 
-Copy the block between the fences into a fresh Claude-Code session started
-inside the `music-assistant-pwa` repo
-(`https://github.com/nobbie2009/music-assistant-pwa`). It is
-self-contained — no context from this repo is needed.
+Dieser Prompt ist spezifisch für das Repo
+`https://github.com/nobbie2009/music-assistant-pwa` (Default-Branch `master`).
+Die Struktur wurde bereits geprüft, daher enthält der Prompt konkrete
+Datei- und Codepfade.
+
+## So nutzt du diesen Prompt
+
+1. Klone das Repo lokal:
+   ```bash
+   git clone https://github.com/nobbie2009/music-assistant-pwa
+   cd music-assistant-pwa
+   ```
+2. Starte eine Claude-Code-Session dort:
+   ```bash
+   claude
+   ```
+3. Paste den Block zwischen den ` ``` ` unten in die Session.
 
 ---
 
 ```
-Ich möchte in dieser PWA einen Button/Kachel ergänzen, der die Bad-
-Checkliste meines homedashboard-Projekts öffnet. Die Checkliste ist eine
-eigene Web-Seite — diese PWA soll nur in derselben Browser-Session dahin
-navigieren. KEINE API-Integration, KEIN Datenabruf, KEINE iframes.
+Ersetze in diesem Repo den Bottom-Navigation-Tab "Räume" durch einen
+neuen Tab "Bad", der die Bad-Aufgabenliste meines separaten
+homedashboard-Projekts in einem iframe anzeigt. Die URL kommt aus einer
+Env-Variable, damit sie pro Installation konfigurierbar ist.
 
-Kontext zum Ziel:
-- Die Bad-Checkliste wird vom homedashboard serviert unter dem Pfad
-  `/bathroom` (z.B. http://<dashboard-host>/bathroom in Produktion oder
-  http://<dashboard-host>:3001/bathroom wenn das Backend direkt erreichbar
-  ist). Die Ziel-URL ist pro Installation unterschiedlich und muss
-  konfigurierbar sein.
-- Gerät: Echo Show 5 (960×480, Silk-Browser auf Fire OS mit ~40–50 px
-  nicht ausblendbarer Top-Bar).
-- Diese PWA läuft als Kiosk/Startseite auf dem Echo. Nutzer sollen von
-  hier mit einem Tap die Bad-Liste öffnen können.
+Konkrete Änderungen:
 
-Anforderungen:
-1. Konfigurationsoption für die Bad-URL einführen. Nutze das Muster, das
-   dieses Projekt bereits für Konfiguration verwendet — bitte erst das
-   Repo anschauen (env-Vars via `import.meta.env.VITE_*` oder eine
-   bestehende Settings-Datei). Wenn kein Muster existiert, füge eine
-   Env-Variable `VITE_BATHROOM_URL` hinzu und dokumentiere sie im README.
-   Default: leer. Wenn leer, wird der Button nicht angezeigt.
-2. Sichtbarer Button/Kachel auf dem Hauptscreen, Label "Bad",
-   bathroom-Icon (Droplets oder ähnlich aus lucide-react, falls bereits
-   verwendet — sonst das Icon-Set des Projekts nutzen). Position passend
-   zum bestehenden Button-Raster.
-3. Klick/Tap ändert die Location im aktuellen Tab
-   (`window.location.href = BATHROOM_URL`). KEIN neuer Tab, KEIN
-   `window.open` — Silk auf dem Echo Show geht mit neuen Tabs schlecht
-   um.
-4. Touch-freundliche Größe: mindestens 64×64 px, gut lesbare Schrift.
-5. Keine weitere Logik, keine Auth, keine Daten. Reiner Launcher.
-6. README aktualisieren mit einem kurzen Abschnitt zur neuen Env-Variable.
+## 1. `src/components/shared/TabBar.tsx`
 
-Ablauf:
-- Zuerst das Repo scannen (Config-Muster, Component-Struktur, Styling,
-  vorhandene Buttons/Navigation) — passe dich an die vorhandenen
-  Patterns an.
-- Dann implementieren.
-- Commit mit aussagekräftiger Message; wenn ein Remote vorhanden ist,
-  auch pushen.
+Im `TABS`-Array den Eintrag `{ id: 'rooms', label: 'Räume', icon: '🏠' }`
+ersetzen durch:
 
-Bitte frag nach, falls die Konfigurationskonvention des Projekts nicht
-eindeutig ableitbar ist.
+    { id: 'bathroom', label: 'Bad', icon: '🛁' },
+
+Position im Array bleibt (zwischen 'library' und 'settings').
+
+## 2. `src/App.tsx`
+
+### 2a. Import entfernen
+    import { RoomList } from './components/MultiRoom/RoomList';
+
+### 2b. Render-Zweig austauschen
+Entferne:
+    {activeTab === 'rooms' && <RoomList />}
+
+Ersetze durch:
+    {activeTab === 'bathroom' && <BathroomFrame />}
+
+### 2c. Neuer Import
+    import { BathroomFrame } from './components/Bathroom/BathroomFrame';
+
+## 3. Neue Datei `src/components/Bathroom/BathroomFrame.tsx`
+
+Inhalt:
+
+    export function BathroomFrame() {
+        const url = import.meta.env.VITE_BATHROOM_URL as string | undefined;
+        if (!url) {
+            return (
+                <div className="w-full h-full flex items-center justify-center text-text-muted p-6 text-center">
+                    VITE_BATHROOM_URL ist nicht gesetzt. Trage die URL deiner
+                    homedashboard Bad-Seite in .env oder .env.local ein
+                    (z.B. http://192.168.1.100/bathroom) und baue die App neu.
+                </div>
+            );
+        }
+        return (
+            <iframe
+                src={url}
+                title="Bad"
+                className="w-full h-full border-0 bg-bg"
+                allow="fullscreen"
+            />
+        );
+    }
+
+## 4. Env-Variable dokumentieren
+
+Lege eine neue Datei `.env.example` an (falls noch keine existiert),
+ergänze sie sonst, mit:
+
+    VITE_BATHROOM_URL=
+
+Wenn es ein README.md gibt, ergänze einen kurzen Abschnitt unter einer
+passenden Überschrift:
+
+    ### Bad-Tab
+    Setze `VITE_BATHROOM_URL` in `.env.local` auf die URL der Bad-Seite
+    deines homedashboard (z.B. `http://192.168.1.100/bathroom`). Wenn
+    leer, zeigt der Bad-Tab einen Hinweis statt des iframes.
+
+## 5. `RoomList` nicht mehr referenziert
+
+Die Datei `src/components/MultiRoom/RoomList.tsx` bleibt liegen (kein
+Löschen), da evtl. andere Code-Teile darauf verweisen. Einfach den
+Import/Render aus App.tsx entfernen reicht.
+
+## 6. Tests / Sanity
+
+- `npm install` falls noch nicht gemacht
+- `npm run build` muss durchlaufen (TypeScript-Fehler = Blocker)
+- `npm run dev` starten und prüfen: der untere Tab zeigt jetzt "Bad 🛁"
+  statt "Räume 🏠"; Tap öffnet iframe (oder Hinweistext wenn URL leer)
+
+## 7. Commit + Push
+
+Commit-Message: "Replace Räume tab with Bad tab (iframe to homedashboard)"
+Wenn ein Remote vorhanden ist, push nach master.
+
+Kein zusätzliches Styling-Feintuning, kein Refactoring anderer Stellen.
 ```
 
 ---
 
-## Hintergrund für dich (den homedashboard-Nutzer)
+## Nach der Implementierung (was DU machst)
 
-Nach der Implementierung:
-1. Setze im `.env` der PWA `VITE_BATHROOM_URL` auf die passende URL deines
-   homedashboard (z.B. `http://192.168.1.100/bathroom`).
-2. Build + Deploy der PWA wie gehabt.
-3. Auf dem Echo Show 5: die PWA als Startseite/Bookmark öffnen — beim
-   ersten Aufruf von `/bathroom` wird der Echo als neues Gerät
-   registriert. Von einem Komfort-Gerät aus (Phone/iPad/PC) das Echo im
-   homedashboard-Admin unter "Sicherheit" freigeben. Danach lädt der
-   Button im PWA direkt die Checkliste.
+1. `.env.local` im `music-assistant-pwa` Repo anlegen:
+   ```
+   VITE_BATHROOM_URL=http://<ip-deines-dashboards>/bathroom
+   ```
+   Die IP ist die deines laufenden homedashboard-Servers (Port nur wenn ≠ 80).
+
+2. PWA bauen:
+   ```bash
+   npm run build
+   ```
+   Der `dist/` Ordner enthält die fertigen Dateien.
+
+3. PWA hosten (falls nicht schon geschehen): nginx/Apache/Docker — irgendeinen
+   Webserver, der `dist/` ausliefert. Falls die PWA heute schon läuft,
+   einfach den Inhalt austauschen.
+
+4. Auf dem Echo Show 5: im Silk-Browser die PWA-URL öffnen und
+   „Zum Startbildschirm hinzufügen". Beim ersten Aufruf des Bad-Tabs
+   zeigt der iframe die Access-Denied-Seite mit Device-ID des Echos —
+   die ID notieren, vom Handy/PC im homedashboard-Admin unter
+   „Sicherheit" freigeben. Danach läuft die Bad-Liste im iframe.
+
+## Warum iframe und nicht `window.location.href`?
+
+Ein harter Location-Wechsel würde die Music-App verlassen. Der
+Echo-Browser macht den Back-Button-Workflow unangenehm (Silk versteckt
+die Chrome-Leiste teils). Im iframe bleibt die PWA aktiv, der Tab-Switch
+bringt dich nahtlos zurück zu „Läuft" oder „Bibliothek".
