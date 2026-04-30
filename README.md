@@ -101,6 +101,37 @@ rest_command:
 
 ---
 
+## 📶 WLAN-Watchdog (Auto-Reconnect)
+
+Wenn der Raspberry Pi zeitweise die WLAN-Verbindung verliert und sich nicht von alleine neu verbindet, kann der mitgelieferte Watchdog die Verbindung automatisch wiederherstellen.
+
+Der Watchdog prüft alle 2 Minuten per `ping` (Gateway + öffentliche DNS-Server) ob das Netz erreichbar ist. Schlägt der Test fehl, läuft eine Eskalationskette:
+
+1. WLAN-Interface kurz down/up (`nmcli device disconnect/connect`).
+2. Wenn das nicht hilft: NetworkManager komplett neu starten.
+3. Optional: Nach N aufeinanderfolgenden Fehlversuchen kompletten Reboot auslösen (Standard: aus).
+
+### Installation
+
+Wird automatisch via `install_kiosk.sh` angeboten. Manuelle Installation:
+
+```bash
+sudo ./scripts/wifi-watchdog/install.sh
+```
+
+### Status & Logs
+
+```bash
+systemctl status wifi-watchdog.timer
+journalctl -u wifi-watchdog.service -f
+```
+
+### Konfiguration
+
+`/etc/default/wifi-watchdog` (Interface, Ping-Ziele, Reboot-Schwelle).
+
+---
+
 ## 🛠 Tech Stack
 
 - **Frontend**: React, Vite, TailwindCSS, Lucide Icons

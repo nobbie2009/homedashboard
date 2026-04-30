@@ -8,12 +8,14 @@
 # - No Rotation (Standard)
 # - Remove Keyrings
 # - Schedule Daily Reboot
+# - Install WiFi watchdog (auto-reconnect on connection loss)
 
 set -e
 
 # Core Configuration
 USER_HOME=$(getent passwd $SUDO_USER | cut -d: -f6)
 USER_NAME=$SUDO_USER
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 if [ -z "$USER_NAME" ]; then
     echo "This script must be run with sudo."
@@ -123,7 +125,23 @@ crontab -l | grep -v "sbin/shutdown -r" | crontab -
 # Add new job
 (crontab -l 2>/dev/null; echo "$RebootM $RebootH * * * /sbin/shutdown -r now") | crontab -
 
-# 7. Final cleanup
+# 7. WiFi Watchdog (Auto-Reconnect)
+echo ""
+read -p "WLAN-Watchdog installieren (automatischer Reconnect bei Verbindungsverlust)? (y/n) " -n 1 -r
+echo ""
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    WATCHDOG_DIR="$SCRIPT_DIR/scripts/wifi-watchdog"
+    if [ -x "$WATCHDOG_DIR/install.sh" ]; then
+        echo "--> Installing WiFi watchdog from $WATCHDOG_DIR"
+        "$WATCHDOG_DIR/install.sh"
+    else
+        echo "WARN: WiFi-Watchdog-Verzeichnis nicht gefunden ($WATCHDOG_DIR) — überspringe."
+    fi
+else
+    echo "--> WLAN-Watchdog übersprungen."
+fi
+
+# 8. Final cleanup
 echo "--> Setup Complete!"
 echo "    Target URL: $DASHBOARD_URL"
 echo "    Reboot Time: $REBOOT_TIME"
