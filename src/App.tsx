@@ -14,7 +14,8 @@ import {
     SonosView,
     AdminSettings,
     BathroomView,
-    HouseholdView
+    HouseholdView,
+    PwaApp
 } from './pages';
 
 // Task List:
@@ -46,6 +47,7 @@ function App() {
                     <SecurityGate>
                         <BrowserRouter>
                             <Routes>
+                                <Route path="/pwa" element={<PwaApp />} />
                                 <Route path="/" element={<MainLayout />}>
                                     <Route index element={<Dashboard />} />
                                     <Route path="notes" element={<NotesBoard />} />
