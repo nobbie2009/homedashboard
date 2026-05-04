@@ -351,6 +351,7 @@ export const Screensaver: React.FC<Props> = ({ active, mode, onDismiss }) => {
 
                 {/* Cat care icons (bottom right, small) */}
                 <div
+                    data-screensaver-action
                     className="absolute bottom-6 right-6 z-10"
                     onClick={(e) => e.stopPropagation()}
                     onTouchStart={(e) => e.stopPropagation()}
@@ -406,6 +407,7 @@ export const Screensaver: React.FC<Props> = ({ active, mode, onDismiss }) => {
 
             {/* Cat care icons (bottom right, small) */}
             <div
+                data-screensaver-action
                 className="absolute bottom-6 right-6"
                 onClick={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}

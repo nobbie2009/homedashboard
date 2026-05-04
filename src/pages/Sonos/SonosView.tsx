@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     Play, Pause, SkipBack, SkipForward, Volume2, VolumeX,
     Music, Radio, ListMusic, Star, Search, RefreshCw,
-    Plus, Trash2, Users, ChevronRight, Disc3, Speaker
+    Plus, Trash2, Users, ChevronRight, Disc3, Speaker, Keyboard
 } from 'lucide-react';
 import { getApiUrl } from '../../utils/api';
 import { useSecurity } from '../../contexts/SecurityContext';
+import { OnScreenKeyboard } from '../../components/overlays/OnScreenKeyboard';
 
 interface SonosTrack {
     title: string;
@@ -648,7 +649,7 @@ const RadioTab: React.FC<{
     </div>
 );
 
-const SearchTab: React.FC<{
+const SearchTabBase: React.FC<{
     searchTerm: string;
     setSearchTerm: (v: string) => void;
     searchType: 'tracks' | 'albums' | 'artists';
@@ -657,49 +658,82 @@ const SearchTab: React.FC<{
     onSearch: () => void;
     onPlay: (item: FavoriteItem) => void;
     onAddToQueue: (item: FavoriteItem) => void;
-}> = ({ searchTerm, setSearchTerm, searchType, setSearchType, results, onSearch, onPlay, onAddToQueue }) => (
-    <div>
-        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3">
-            Musikbibliothek durchsuchen
-        </h3>
-        <div className="flex gap-2 mb-4">
-            <input
-                type="text"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && onSearch()}
-                placeholder="Suchbegriff..."
-                className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <select
-                value={searchType}
-                onChange={e => setSearchType(e.target.value as typeof searchType)}
-                className="px-2 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-200"
-            >
-                <option value="tracks">Titel</option>
-                <option value="albums">Alben</option>
-                <option value="artists">Interpreten</option>
-            </select>
-            <button
-                onClick={onSearch}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
-            >
-                <Search className="w-4 h-4" />
-            </button>
+}> = ({ searchTerm, setSearchTerm, searchType, setSearchType, results, onSearch, onPlay, onAddToQueue }) => {
+    const [showKeyboard, setShowKeyboard] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const toggleKeyboard = () => {
+        setShowKeyboard(prev => {
+            const next = !prev;
+            if (next) {
+                // Focus the input so OnScreenKeyboard's document.activeElement
+                // logic targets it. inputMode="none" suppresses the native one.
+                requestAnimationFrame(() => inputRef.current?.focus());
+            }
+            return next;
+        });
+    };
+
+    return (
+        <div>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3">
+                Musikbibliothek durchsuchen
+            </h3>
+            <div className="flex gap-2 mb-4">
+                <input
+                    ref={inputRef}
+                    type="text"
+                    inputMode={showKeyboard ? 'none' : 'text'}
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && onSearch()}
+                    placeholder="Suchbegriff..."
+                    className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <select
+                    value={searchType}
+                    onChange={e => setSearchType(e.target.value as typeof searchType)}
+                    className="px-2 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-200"
+                >
+                    <option value="tracks">Titel</option>
+                    <option value="albums">Alben</option>
+                    <option value="artists">Interpreten</option>
+                </select>
+                <button
+                    onClick={toggleKeyboard}
+                    title="Bildschirmtastatur"
+                    className={`px-3 py-2 rounded-lg transition-colors text-sm border ${
+                        showKeyboard
+                            ? 'bg-blue-500 text-white border-blue-500'
+                            : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                    }`}
+                >
+                    <Keyboard className="w-4 h-4" />
+                </button>
+                <button
+                    onClick={onSearch}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+                >
+                    <Search className="w-4 h-4" />
+                </button>
+            </div>
+            {results.length === 0 ? (
+                <div className="text-sm text-slate-400">
+                    {searchTerm ? 'Keine Ergebnisse' : 'Gib einen Suchbegriff ein, um deine Musikbibliothek zu durchsuchen.'}
+                </div>
+            ) : (
+                <div className={`space-y-1 ${showKeyboard ? 'pb-[35vh]' : ''}`}>
+                    {results.map((item, i) => (
+                        <MediaRow key={i} item={item} onPlay={() => onPlay(item)} onAdd={() => onAddToQueue(item)} />
+                    ))}
+                </div>
+            )}
+            {showKeyboard && <OnScreenKeyboard onClose={() => setShowKeyboard(false)} />}
         </div>
-        {results.length === 0 ? (
-            <div className="text-sm text-slate-400">
-                {searchTerm ? 'Keine Ergebnisse' : 'Gib einen Suchbegriff ein, um deine Musikbibliothek zu durchsuchen.'}
-            </div>
-        ) : (
-            <div className="space-y-1">
-                {results.map((item, i) => (
-                    <MediaRow key={i} item={item} onPlay={() => onPlay(item)} onAdd={() => onAddToQueue(item)} />
-                ))}
-            </div>
-        )}
-    </div>
-);
+    );
+};
+
+const SearchTab = SearchTabBase;
 
 const GroupsTab: React.FC<{
     groups: GroupInfo[];

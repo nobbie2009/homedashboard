@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, Trash2, Edit2, Save, X, Star, Check, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, Star, Check } from 'lucide-react';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useSecurity } from '../../contexts/SecurityContext';
 import { getApiUrl } from '../../utils/api';
 import { ChoreIcon, IconMap } from '../../components/ChoreIcon';
+import { Sheet } from './Sheet';
 import type { Chore, Kid } from '../../contexts/ConfigContext';
 
 const ICON_KEYS = Object.keys(IconMap);
@@ -243,18 +244,33 @@ interface EditorProps {
 const ChoreEditor: React.FC<EditorProps> = ({ task, kids, onChange, onSave, onCancel, onDelete }) => {
     const set = (patch: Partial<Chore>) => onChange({ ...task, ...patch });
     return (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-end md:items-center justify-center" onClick={onCancel}>
-            <div
-                onClick={e => e.stopPropagation()}
-                className="bg-white dark:bg-slate-900 w-full max-w-md rounded-t-2xl md:rounded-2xl p-4 max-h-[90vh] overflow-y-auto space-y-4 border-t md:border border-slate-200 dark:border-slate-700"
-            >
-                <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-bold">Aufgabe bearbeiten</h3>
-                    <button onClick={onCancel} className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white">
-                        <X className="w-5 h-5" />
+        <Sheet
+            title="Aufgabe bearbeiten"
+            onClose={onCancel}
+            footer={
+                <>
+                    <button
+                        onClick={onDelete}
+                        className="flex items-center gap-1 px-3 py-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    >
+                        <Trash2 className="w-4 h-4" /> Löschen
                     </button>
-                </div>
-
+                    <div className="flex-1" />
+                    <button
+                        onClick={onCancel}
+                        className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700"
+                    >
+                        Abbrechen
+                    </button>
+                    <button
+                        onClick={onSave}
+                        className="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg active:scale-95"
+                    >
+                        <Save className="w-4 h-4" /> Speichern
+                    </button>
+                </>
+            }
+        >
                 <label className="block">
                     <span className="text-xs font-semibold text-slate-500">Bezeichnung</span>
                     <input
@@ -355,31 +371,6 @@ const ChoreEditor: React.FC<EditorProps> = ({ task, kids, onChange, onSave, onCa
                     </div>
                 </div>
 
-                <div className="flex gap-2 pt-2">
-                    <button
-                        onClick={onDelete}
-                        className="flex items-center gap-1 px-3 py-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                    >
-                        <Trash2 className="w-4 h-4" /> Löschen
-                    </button>
-                    <div className="flex-1" />
-                    <button
-                        onClick={onCancel}
-                        className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700"
-                    >
-                        Abbrechen
-                    </button>
-                    <button
-                        onClick={onSave}
-                        className="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg active:scale-95"
-                    >
-                        <Save className="w-4 h-4" /> Speichern
-                    </button>
-                </div>
-            </div>
-        </div>
+        </Sheet>
     );
 };
-
-// Avoid unused var warnings
-void ChevronRight;

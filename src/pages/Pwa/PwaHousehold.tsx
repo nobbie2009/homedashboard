@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import {
-    Plus, Trash2, Edit2, Save, X, CheckCircle2, Undo2, AlertTriangle, Users
+    Plus, Trash2, Edit2, Save, CheckCircle2, Undo2, AlertTriangle, Users
 } from 'lucide-react';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -9,6 +9,7 @@ import { useConfig } from '../../contexts/ConfigContext';
 import { useSecurity } from '../../contexts/SecurityContext';
 import { getApiUrl } from '../../utils/api';
 import { ChoreIcon, IconMap } from '../../components/ChoreIcon';
+import { Sheet } from './Sheet';
 import type {
     HouseholdMember, HouseholdTask, IntervalUnit, RecurrenceMode
 } from '../../contexts/ConfigContext';
@@ -81,16 +82,21 @@ export const PwaHousehold: React.FC = () => {
     }, [undo]);
 
     const tasks = serverState?.tasks || household.tasks || [];
-    const members = serverState?.members || household.members || [];
+    // Members come straight from the local config so additions/edits show
+    // immediately — the server fetch can race with the config POST and
+    // would otherwise display stale data until the next manual refresh.
+    const members = household.members || [];
     const now = serverState?.now || Date.now();
 
     const persistMembers = (next: HouseholdMember[]) => {
         updateConfig({ household: { members: next, tasks: household.tasks } });
+        // Refetch so server-side derived task data picks up the new member info
+        setTimeout(fetchTasks, 600);
     };
     const persistTasks = (next: HouseholdTask[]) => {
         updateConfig({ household: { members: household.members, tasks: next } });
-        // refresh from server (server recomputes nextDueAt etc.)
-        setTimeout(fetchTasks, 250);
+        // Server recomputes nextDueAt etc. — give the POST time to land
+        setTimeout(fetchTasks, 600);
     };
 
     const newMember = () => {
@@ -286,38 +292,36 @@ export const PwaHousehold: React.FC = () => {
 
             {/* Member Editor */}
             {editingMember && (
-                <div className="fixed inset-0 z-50 bg-black/60 flex items-end md:items-center justify-center" onClick={() => setEditingMember(null)}>
-                    <div onClick={e => e.stopPropagation()} className="bg-white dark:bg-slate-900 w-full max-w-md rounded-t-2xl md:rounded-2xl p-4 space-y-3 border-t md:border border-slate-200 dark:border-slate-700">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-lg font-bold">Mitglied</h3>
-                            <button onClick={() => setEditingMember(null)} className="p-2 text-slate-400">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <input
-                            autoFocus
-                            value={editingMember.name}
-                            onChange={e => setEditingMember({ ...editingMember, name: e.target.value })}
-                            placeholder="Name"
-                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2"
-                        />
-                        <label className="flex items-center gap-2">
-                            <span className="text-sm">Farbe</span>
-                            <input
-                                type="color"
-                                value={editingMember.color}
-                                onChange={e => setEditingMember({ ...editingMember, color: e.target.value })}
-                                className="h-9 w-16 rounded border border-slate-200 dark:border-slate-700"
-                            />
-                        </label>
-                        <div className="flex justify-end gap-2 pt-2">
+                <Sheet
+                    title="Mitglied"
+                    onClose={() => setEditingMember(null)}
+                    footer={
+                        <>
+                            <div className="flex-1" />
                             <button onClick={() => setEditingMember(null)} className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700">Abbrechen</button>
                             <button onClick={saveMember} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center gap-1">
                                 <Save className="w-4 h-4" /> Speichern
                             </button>
-                        </div>
-                    </div>
-                </div>
+                        </>
+                    }
+                >
+                    <input
+                        autoFocus
+                        value={editingMember.name}
+                        onChange={e => setEditingMember({ ...editingMember, name: e.target.value })}
+                        placeholder="Name"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2"
+                    />
+                    <label className="flex items-center gap-2">
+                        <span className="text-sm">Farbe</span>
+                        <input
+                            type="color"
+                            value={editingMember.color}
+                            onChange={e => setEditingMember({ ...editingMember, color: e.target.value })}
+                            className="h-9 w-16 rounded border border-slate-200 dark:border-slate-700"
+                        />
+                    </label>
+                </Sheet>
             )}
 
             {/* Task Editor */}
@@ -334,24 +338,20 @@ export const PwaHousehold: React.FC = () => {
 
             {/* Member picker */}
             {picker && (
-                <div className="fixed inset-0 z-50 bg-black/60 flex items-end md:items-center justify-center" onClick={() => setPicker(null)}>
-                    <div onClick={e => e.stopPropagation()} className="bg-white dark:bg-slate-900 w-full max-w-md rounded-t-2xl md:rounded-2xl p-4 border-t md:border border-slate-200 dark:border-slate-700">
-                        <h3 className="text-lg font-bold mb-3">Wer hat es erledigt?</h3>
-                        <div className="grid grid-cols-2 gap-2">
-                            {members.map(m => (
-                                <button
-                                    key={m.id}
-                                    onClick={() => { completeTask(picker, m.id); setPicker(null); }}
-                                    className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 active:scale-95"
-                                >
-                                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: m.color }} />
-                                    <span className="font-semibold">{m.name}</span>
-                                </button>
-                            ))}
-                        </div>
-                        <button onClick={() => setPicker(null)} className="mt-3 w-full text-sm text-slate-500">Abbrechen</button>
+                <Sheet title="Wer hat es erledigt?" onClose={() => setPicker(null)}>
+                    <div className="grid grid-cols-2 gap-2">
+                        {members.map(m => (
+                            <button
+                                key={m.id}
+                                onClick={() => { completeTask(picker, m.id); setPicker(null); }}
+                                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 active:scale-95"
+                            >
+                                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: m.color }} />
+                                <span className="font-semibold">{m.name}</span>
+                            </button>
+                        ))}
                     </div>
-                </div>
+                </Sheet>
             )}
 
             {/* Undo banner */}
@@ -392,15 +392,22 @@ const HouseholdTaskEditor: React.FC<HouseholdTaskEditorProps> = ({ task, members
         onChange({ ...task, recurrence: { ...task.recurrence, ...patch } });
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-end md:items-center justify-center" onClick={onCancel}>
-            <div onClick={e => e.stopPropagation()} className="bg-white dark:bg-slate-900 w-full max-w-md rounded-t-2xl md:rounded-2xl p-4 max-h-[90vh] overflow-y-auto space-y-3 border-t md:border border-slate-200 dark:border-slate-700">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-bold">Aufgabe</h3>
-                    <button onClick={onCancel} className="p-2 text-slate-400">
-                        <X className="w-5 h-5" />
+        <Sheet
+            title="Aufgabe"
+            onClose={onCancel}
+            footer={
+                <>
+                    <button onClick={onDelete} className="flex items-center gap-1 px-3 py-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
+                        <Trash2 className="w-4 h-4" /> Löschen
                     </button>
-                </div>
-
+                    <div className="flex-1" />
+                    <button onClick={onCancel} className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700">Abbrechen</button>
+                    <button onClick={onSave} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center gap-1">
+                        <Save className="w-4 h-4" /> Speichern
+                    </button>
+                </>
+            }
+        >
                 <input
                     autoFocus
                     value={task.label}
@@ -528,17 +535,6 @@ const HouseholdTaskEditor: React.FC<HouseholdTaskEditorProps> = ({ task, members
                     </div>
                 </div>
 
-                <div className="flex gap-2 pt-2">
-                    <button onClick={onDelete} className="flex items-center gap-1 px-3 py-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
-                        <Trash2 className="w-4 h-4" /> Löschen
-                    </button>
-                    <div className="flex-1" />
-                    <button onClick={onCancel} className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700">Abbrechen</button>
-                    <button onClick={onSave} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center gap-1">
-                        <Save className="w-4 h-4" /> Speichern
-                    </button>
-                </div>
-            </div>
-        </div>
+        </Sheet>
     );
 };

@@ -104,9 +104,17 @@ export const MainLayout: React.FC = () => {
         fetchIp();
     }, [deviceId]);
 
-    // Dismiss screensaver on any activity
+    // Dismiss screensaver on any activity, but ignore taps that originate
+    // inside an interactive screensaver widget (e.g. cat care). Without this
+    // guard, a tap on the cat icon would dismiss the screensaver and the
+    // synthesised click would land on the nav button beneath it (Admin /
+    // Haushalt), navigating the user away unintentionally.
     React.useEffect(() => {
-        const dismiss = () => setShowScreensaver(false);
+        const dismiss = (e: Event) => {
+            const target = e.target as HTMLElement | null;
+            if (target && target.closest('[data-screensaver-action]')) return;
+            setShowScreensaver(false);
+        };
         const events = ['mousedown', 'touchstart', 'keydown'] as const;
         events.forEach(e => window.addEventListener(e, dismiss, { passive: true }));
         return () => { events.forEach(e => window.removeEventListener(e, dismiss)); };

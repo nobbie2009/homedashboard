@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Star, Plus, Minus, Check, Clock, Sparkles, Trophy } from 'lucide-react';
+import { Star, Plus, Minus, Check, Clock, Sparkles, Trophy, Target, Gift, Save } from 'lucide-react';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useSecurity } from '../../contexts/SecurityContext';
 import { getApiUrl } from '../../utils/api';
-import type { CompletionEntry } from '../../contexts/ConfigContext';
+import { Sheet } from './Sheet';
+import type { CompletionEntry, RewardConfig } from '../../contexts/ConfigContext';
 
 const formatRelative = (ts: number) => {
     const m = Math.floor((Date.now() - ts) / 60000);
@@ -32,6 +33,8 @@ export const PwaStars: React.FC = () => {
     const [flash, setFlash] = useState<string>('');
     const [error, setError] = useState<string>('');
     const [history, setHistory] = useState<CompletionEntry[]>([]);
+    const [editGoal, setEditGoal] = useState(false);
+    const [goalDraft, setGoalDraft] = useState<RewardConfig | null>(null);
 
     // In individual mode the user must pick a kid explicitly — no auto-select.
     // If they switch modes or remove the previously selected kid, clear it.
@@ -96,8 +99,48 @@ export const PwaStars: React.FC = () => {
         );
     }
 
+    const openGoal = () => {
+        setGoalDraft({
+            mode: rewards?.mode || 'individual',
+            targetStars: target,
+            currentReward: rewards?.currentReward || '',
+            rewardImage: rewards?.rewardImage,
+            kidStars: rewards?.kidStars || {},
+            sharedStars: rewards?.sharedStars || 0
+        });
+        setEditGoal(true);
+    };
+
+    const saveGoal = () => {
+        if (!goalDraft) return;
+        updateConfig({ rewards: goalDraft });
+        setEditGoal(false);
+    };
+
     return (
         <div className="p-4 max-w-xl mx-auto space-y-6">
+            {/* Reward & goal banner */}
+            <section className="bg-gradient-to-br from-yellow-100 to-amber-50 dark:from-yellow-900/20 dark:to-slate-800/40 rounded-2xl p-4 border border-yellow-300 dark:border-yellow-700/40 flex items-center gap-3">
+                <Gift className="w-7 h-7 text-yellow-500 flex-none" />
+                <div className="flex-1 min-w-0">
+                    <div className="text-[10px] uppercase tracking-widest text-yellow-700/80 dark:text-yellow-500/80 font-bold">
+                        Belohnung
+                    </div>
+                    <div className="font-black truncate">
+                        {rewards?.currentReward || <span className="text-slate-400 italic font-normal">Noch nicht gesetzt</span>}
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                        {target} ★ Ziel · {sharedMode ? 'Gemeinsam' : 'Individuell'}
+                    </div>
+                </div>
+                <button
+                    onClick={openGoal}
+                    className="flex-none flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm active:scale-95"
+                >
+                    <Target className="w-4 h-4" /> Ändern
+                </button>
+            </section>
+
             {/* Star balances per kid */}
             <section>
                 <h2 className="text-sm uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold mb-3 flex items-center gap-2">
@@ -270,6 +313,95 @@ export const PwaStars: React.FC = () => {
                         })}
                     </div>
                 </section>
+            )}
+
+            {editGoal && goalDraft && (
+                <Sheet
+                    title="Ziel & Belohnung"
+                    onClose={() => setEditGoal(false)}
+                    footer={
+                        <>
+                            <div className="flex-1" />
+                            <button onClick={() => setEditGoal(false)} className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700">Abbrechen</button>
+                            <button onClick={saveGoal} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center gap-1">
+                                <Save className="w-4 h-4" /> Speichern
+                            </button>
+                        </>
+                    }
+                >
+                    <div>
+                        <span className="text-xs font-semibold text-slate-500">Modus</span>
+                        <div className="grid grid-cols-2 gap-2 mt-1">
+                            <button
+                                onClick={() => setGoalDraft({ ...goalDraft, mode: 'individual' })}
+                                className={`px-3 py-2 rounded-lg border text-sm ${
+                                    goalDraft.mode === 'individual'
+                                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                                        : 'border-slate-200 dark:border-slate-700'
+                                }`}
+                            >Individuell</button>
+                            <button
+                                onClick={() => setGoalDraft({ ...goalDraft, mode: 'shared' })}
+                                className={`px-3 py-2 rounded-lg border text-sm ${
+                                    goalDraft.mode === 'shared'
+                                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                                        : 'border-slate-200 dark:border-slate-700'
+                                }`}
+                            >Gemeinsam</button>
+                        </div>
+                    </div>
+
+                    <label className="block">
+                        <span className="text-xs font-semibold text-slate-500">Belohnung</span>
+                        <input
+                            value={goalDraft.currentReward}
+                            onChange={e => setGoalDraft({ ...goalDraft, currentReward: e.target.value })}
+                            placeholder="z.B. Eis essen gehen"
+                            className="mt-1 w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2"
+                        />
+                    </label>
+
+                    <label className="block">
+                        <span className="text-xs font-semibold text-slate-500">Ziel (Sterne)</span>
+                        <div className="flex items-center gap-3 mt-1">
+                            <button
+                                onClick={() => setGoalDraft({ ...goalDraft, targetStars: Math.max(1, goalDraft.targetStars - 5) })}
+                                className="w-11 h-11 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center active:scale-95"
+                            >
+                                <Minus className="w-5 h-5" />
+                            </button>
+                            <input
+                                type="number"
+                                inputMode="numeric"
+                                min={1}
+                                value={goalDraft.targetStars}
+                                onChange={e => setGoalDraft({ ...goalDraft, targetStars: Math.max(1, parseInt(e.target.value) || 1) })}
+                                className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-center text-2xl font-black tabular-nums"
+                            />
+                            <button
+                                onClick={() => setGoalDraft({ ...goalDraft, targetStars: goalDraft.targetStars + 5 })}
+                                className="w-11 h-11 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center active:scale-95"
+                            >
+                                <Plus className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                            {[10, 15, 20, 25, 30, 40, 50].map(n => (
+                                <button
+                                    key={n}
+                                    onClick={() => setGoalDraft({ ...goalDraft, targetStars: n })}
+                                    className={`text-xs px-2 py-1 rounded-full ${
+                                        goalDraft.targetStars === n
+                                            ? 'bg-yellow-400 text-slate-900 font-bold'
+                                            : 'bg-slate-100 dark:bg-slate-700 text-slate-500'
+                                    }`}
+                                >
+                                    {n}
+                                </button>
+                            ))}
+                        </div>
+                    </label>
+                </Sheet>
             )}
         </div>
     );
