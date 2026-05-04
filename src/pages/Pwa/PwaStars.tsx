@@ -23,16 +23,22 @@ export const PwaStars: React.FC = () => {
     const kids = config.chores?.kids || [];
     const rewards = config.rewards;
     const target = rewards?.targetStars || 20;
+    const sharedMode = rewards?.mode === 'shared';
 
     const [selectedKid, setSelectedKid] = useState<string>('');
     const [stars, setStars] = useState<number>(1);
     const [reason, setReason] = useState<string>('');
     const [busy, setBusy] = useState(false);
     const [flash, setFlash] = useState<string>('');
+    const [error, setError] = useState<string>('');
     const [history, setHistory] = useState<CompletionEntry[]>([]);
 
+    // In individual mode the user must pick a kid explicitly — no auto-select.
+    // If they switch modes or remove the previously selected kid, clear it.
     useEffect(() => {
-        if (!selectedKid && kids.length) setSelectedKid(kids[0].id);
+        if (selectedKid && !kids.find(k => k.id === selectedKid)) {
+            setSelectedKid('');
+        }
     }, [kids, selectedKid]);
 
     const fetchHistory = useCallback(() => {
@@ -45,14 +51,25 @@ export const PwaStars: React.FC = () => {
 
     useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
+    const canGrant = sharedMode || !!selectedKid;
+
     const grant = async () => {
-        if (!selectedKid || stars < 1) return;
+        if (!canGrant || stars < 1) {
+            if (!sharedMode && !selectedKid) {
+                setError('Bitte zuerst ein Kind auswählen');
+                setTimeout(() => setError(''), 2500);
+            }
+            return;
+        }
         setBusy(true);
+        setError('');
         try {
+            const body: Record<string, unknown> = { stars, reason: reason.trim() || 'Bonus' };
+            if (selectedKid) body.kidId = selectedKid;
             const res = await fetch(`${API_URL}/api/rewards/bonus`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'x-device-id': deviceId },
-                body: JSON.stringify({ kidId: selectedKid, stars, reason: reason.trim() || 'Bonus' })
+                body: JSON.stringify(body)
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Fehler');
@@ -63,13 +80,14 @@ export const PwaStars: React.FC = () => {
             setStars(1);
             fetchHistory();
         } catch (e: any) {
-            alert(e.message || 'Fehler');
+            setError(e.message || 'Fehler');
+            setTimeout(() => setError(''), 2500);
         } finally {
             setBusy(false);
         }
     };
 
-    if (kids.length === 0) {
+    if (kids.length === 0 && !sharedMode) {
         return (
             <div className="p-6 text-center text-slate-500 dark:text-slate-400">
                 <p>Keine Kinder konfiguriert.</p>
@@ -135,22 +153,31 @@ export const PwaStars: React.FC = () => {
                     <Sparkles className="w-4 h-4" /> Sterne vergeben
                 </h2>
 
-                {rewards?.mode !== 'shared' && (
-                    <div className="grid grid-cols-2 gap-2">
-                        {kids.map(k => (
-                            <button
-                                key={k.id}
-                                onClick={() => setSelectedKid(k.id)}
-                                className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-left active:scale-95 transition ${
-                                    selectedKid === k.id
-                                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                                        : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900'
-                                }`}
-                            >
-                                <span className="w-3 h-3 rounded-full flex-none" style={{ backgroundColor: k.color }} />
-                                <span className="font-semibold truncate">{k.name}</span>
-                            </button>
-                        ))}
+                {sharedMode ? (
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-600 dark:text-slate-300">
+                        Modus <span className="font-bold">Gemeinsam</span> — Sterne fließen in den Familien-Pool.
+                    </div>
+                ) : (
+                    <div>
+                        <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">
+                            Kind {selectedKid ? '' : <span className="text-red-500">— bitte auswählen</span>}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            {kids.map(k => (
+                                <button
+                                    key={k.id}
+                                    onClick={() => setSelectedKid(k.id)}
+                                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-left active:scale-95 transition ${
+                                        selectedKid === k.id
+                                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                                            : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900'
+                                    }`}
+                                >
+                                    <span className="w-3 h-3 rounded-full flex-none" style={{ backgroundColor: k.color }} />
+                                    <span className="font-semibold truncate">{k.name}</span>
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 )}
 
@@ -202,12 +229,18 @@ export const PwaStars: React.FC = () => {
 
                 <button
                     onClick={grant}
-                    disabled={busy || !selectedKid}
+                    disabled={busy || !canGrant}
                     className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-slate-900 font-black py-3 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition"
                 >
                     <Star className="w-5 h-5 fill-current" />
                     {busy ? 'Sende…' : `${stars} Stern${stars > 1 ? 'e' : ''} vergeben`}
                 </button>
+
+                {error && (
+                    <div className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg px-3 py-2 text-sm text-center">
+                        {error}
+                    </div>
+                )}
 
                 {flash && (
                     <div className="flex items-center justify-center gap-2 text-green-600 dark:text-green-400 font-bold animate-pulse">

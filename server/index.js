@@ -1083,31 +1083,37 @@ app.post('/api/rewards/claim', (req, res) => {
 app.post('/api/rewards/bonus', (req, res) => {
     const { kidId, stars, reason } = req.body;
 
-    if (!kidId || !stars || stars < 1 || stars > 5) {
-        return res.status(400).json({ error: 'Ungültige Daten (kidId, stars 1-5 erforderlich)' });
+    if (!stars || stars < 1 || stars > 5) {
+        return res.status(400).json({ error: 'Ungültige Daten (stars 1-5 erforderlich)' });
     }
 
-    const kid = appConfig.chores?.kids?.find(k => k.id === kidId);
-    if (!kid) {
-        return res.status(404).json({ error: 'Kind nicht gefunden' });
+    if (!appConfig.rewards) {
+        appConfig.rewards = { mode: 'individual', targetStars: 20, currentReward: '', kidStars: {}, sharedStars: 0 };
+    }
+    const sharedMode = appConfig.rewards.mode === 'shared';
+
+    let kid = null;
+    if (kidId) {
+        kid = appConfig.chores?.kids?.find(k => k.id === kidId);
+        if (!kid) {
+            return res.status(404).json({ error: 'Kind nicht gefunden' });
+        }
+    } else if (!sharedMode) {
+        return res.status(400).json({ error: 'kidId erforderlich (Individual-Modus)' });
     }
 
     const entry = {
         id: Date.now().toString(),
         taskId: 'bonus',
         taskLabel: reason || 'Bonus-Sterne',
-        kidId: kid.id,
-        kidName: kid.name,
+        kidId: kid ? kid.id : 'shared',
+        kidName: kid ? kid.name : 'Familie',
         stars: parseInt(stars),
         timestamp: Date.now()
     };
     rewardsData.completions.push(entry);
 
-    if (!appConfig.rewards) {
-        appConfig.rewards = { mode: 'individual', targetStars: 20, currentReward: '', kidStars: {}, sharedStars: 0 };
-    }
-
-    if (appConfig.rewards.mode === 'shared') {
+    if (sharedMode) {
         appConfig.rewards.sharedStars = (appConfig.rewards.sharedStars || 0) + parseInt(stars);
     } else {
         if (!appConfig.rewards.kidStars) appConfig.rewards.kidStars = {};
