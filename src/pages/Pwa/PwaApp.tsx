@@ -4,6 +4,7 @@ import { PwaStars } from './PwaStars';
 import { PwaChores } from './PwaChores';
 import { PwaHousehold } from './PwaHousehold';
 import { PwaBath } from './PwaBath';
+import { PwaNoteButton } from './PwaNoteButton';
 
 type Tab = 'sterne' | 'aufgaben' | 'haushalt' | 'bad';
 
@@ -23,11 +24,14 @@ const PwaApp: React.FC = () => {
                 className="flex-none px-4 pb-2 flex items-center justify-between bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30"
                 style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.5rem)' }}
             >
-                <div className="flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-yellow-400" />
-                    <span className="font-bold tracking-wide">Familien-Manager</span>
+                <div className="flex items-center gap-2 min-w-0">
+                    <Trophy className="w-5 h-5 text-yellow-400 flex-none" />
+                    <span className="font-bold tracking-wide flex-none">Familien-Manager</span>
                 </div>
-                <span className="text-[10px] text-slate-400 font-mono">PWA</span>
+                <div className="flex items-center gap-2 min-w-0">
+                    <PwaNoteButton />
+                    <span className="text-[10px] text-slate-400 font-mono">PWA</span>
+                </div>
             </header>
 
             <main
