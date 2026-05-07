@@ -1615,15 +1615,27 @@ app.get('/api/stream/events', (req, res) => {
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive'
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no'
     });
     res.write('\n');
 
     // Add client
     sseClients.add(res);
 
+    // Keep the connection alive across proxy idle timeouts (nginx defaults to 60s).
+    const heartbeat = setInterval(() => {
+        try {
+            res.write(': keepalive\n\n');
+        } catch {
+            clearInterval(heartbeat);
+            sseClients.delete(res);
+        }
+    }, 25000);
+
     // Remove on close
     req.on('close', () => {
+        clearInterval(heartbeat);
         sseClients.delete(res);
     });
 });
@@ -1631,8 +1643,12 @@ app.get('/api/stream/events', (req, res) => {
 // Broadcast helper
 const broadcastEvent = (type, data) => {
     sseClients.forEach(client => {
-        client.write(`event: ${type}\n`);
-        client.write(`data: ${JSON.stringify(data)}\n\n`);
+        try {
+            client.write(`event: ${type}\n`);
+            client.write(`data: ${JSON.stringify(data)}\n\n`);
+        } catch {
+            sseClients.delete(client);
+        }
     });
 };
 

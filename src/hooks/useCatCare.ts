@@ -80,7 +80,6 @@ export function useCatCare() {
                 setStatus(data);
             } catch {}
         });
-        src.onerror = () => src.close();
         return () => src.close();
     }, []);
 

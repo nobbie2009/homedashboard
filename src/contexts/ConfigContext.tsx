@@ -355,7 +355,6 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
                 setConfig(prev => ({ ...prev, note: data }));
             } catch {}
         });
-        src.onerror = () => src.close();
         return () => src.close();
     }, [deviceId, API_URL]);
 

@@ -44,7 +44,6 @@ export const NoteBanner: React.FC = () => {
                 setNote(JSON.parse(e.data));
             } catch {}
         });
-        src.onerror = () => src.close();
         return () => src.close();
     }, []);
 
