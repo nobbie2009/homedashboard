@@ -231,10 +231,6 @@ export const MainLayout: React.FC = () => {
             }
         });
 
-        eventSource.onerror = () => {
-            eventSource.close();
-        };
-
         return () => {
             eventSource.close();
         };

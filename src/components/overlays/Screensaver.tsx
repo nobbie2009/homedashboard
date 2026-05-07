@@ -100,7 +100,6 @@ export const Screensaver: React.FC<Props> = ({ active, mode, onDismiss }) => {
                 if (!cancelled) setNoteText(data?.text || '');
             } catch {}
         });
-        src.onerror = () => src.close();
         return () => {
             cancelled = true;
             src.close();
