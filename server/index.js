@@ -45,8 +45,13 @@ app.use((req, res, next) => {
     }
 
     // 3. Check Device ID
-    // Support both Header (for API fetch) and Query Param (for img tags/streams)
-    const deviceId = req.headers['x-device-id'] || req.query.deviceId;
+    // Support Header (API fetch), Query Param (img tags/streams) and a
+    // trailing path segment for /api/stream/events/<deviceId> — some
+    // reverse proxies strip query strings on EventSource requests, which
+    // would silently 401 every dashboard.
+    const sseMatch = req.path.match(/^\/api\/stream\/events\/([^/]+)$/);
+    const deviceIdFromPath = sseMatch ? decodeURIComponent(sseMatch[1]) : null;
+    const deviceId = req.headers['x-device-id'] || req.query.deviceId || deviceIdFromPath;
 
     if (!deviceId) {
         // No ID provided -> Unauthorized
@@ -1788,7 +1793,7 @@ app.get('/api/icloud/debug', async (req, res) => {
 // --- SSE (Server-Sent Events) for Real-time Triggers (Doorbell) ---
 const sseClients = new Set();
 
-app.get('/api/stream/events', (req, res) => {
+const sseHandler = (req, res) => {
     // SSE Setup
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -1816,7 +1821,13 @@ app.get('/api/stream/events', (req, res) => {
         clearInterval(heartbeat);
         sseClients.delete(res);
     });
-});
+};
+
+app.get('/api/stream/events', sseHandler);
+// Path-based variant: /api/stream/events/<deviceId>
+// EventSource cannot send custom headers and some reverse proxies strip
+// query strings, so we let clients put the deviceId straight in the path.
+app.get('/api/stream/events/:deviceId', sseHandler);
 
 // Broadcast helper
 const broadcastEvent = (type, data) => {

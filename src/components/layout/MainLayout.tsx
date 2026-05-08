@@ -207,11 +207,11 @@ export const MainLayout: React.FC = () => {
     const [keyboardActive, setKeyboardActive] = React.useState(false);
 
     React.useEffect(() => {
-        // EventSource cannot send custom headers, so we pass deviceId as a
-        // query parameter — without it the security middleware returns 401
-        // and the dashboard never receives doorbell / keyboard events.
+        // EventSource cannot send custom headers, so we put the deviceId in
+        // the path — query strings get stripped by some reverse proxies on
+        // long-lived EventSource requests, which silently 401s every client.
         if (!deviceId) return;
-        const url = `${getApiUrl()}/api/stream/events?deviceId=${encodeURIComponent(deviceId)}`;
+        const url = `${getApiUrl()}/api/stream/events/${encodeURIComponent(deviceId)}`;
         console.log("Connecting to SSE:", url);
         const eventSource = new EventSource(url);
 
