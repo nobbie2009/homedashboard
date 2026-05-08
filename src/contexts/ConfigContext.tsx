@@ -116,6 +116,8 @@ export interface NoteConfig {
 export interface AppConfig {
     weatherLocation: string;
     cameraUrl?: string; // RTSP or HTTP Stream URL
+    doorbellSnapshotUrl?: string; // HTTP snapshot URL for doorbell camera (e.g. Reolink: http://USER:PASS@IP/cgi-bin/api.cgi?cmd=Snap&channel=0)
+    doorbellStreamUrl?: string;   // RTSP stream URL for doorbell live view (optional)
     haUrl?: string; // Home Assistant Dashboard URL
     enabledCalendars: string[];
     showSeconds: boolean;

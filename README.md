@@ -80,10 +80,12 @@ Das Standard-Passwort für den ersten Zugriff wird in den Server-Logs angezeigt 
 Das Dashboard bietet Schnittstellen für die Integration in Smart Home Systeme (z.B. Home Assistant).
 
 ### Türklingel Trigger
-Zeigt das Kamera-Popup für 30 Sekunden auf allen verbundenen Dashboards an.
+Zeigt das Kamera-Popup für 30 Sekunden auf allen verbundenen Dashboards an —
+zuerst mit einem **frisch abgerufenen Snapshot** der Türklingel-Kamera, danach
+optional als Live-Stream.
 
 - **URL**: `http://<DASHBOARD-IP>:3001/api/webhook/doorbell`
-- **Method**: `POST`
+- **Methods**: `POST` oder `GET`
 - **Body**: `{}` (leer)
 
 **Beispiel `curl`:**
@@ -98,6 +100,37 @@ rest_command:
     url: "http://192.168.1.100:3001/api/webhook/doorbell"
     method: POST
 ```
+
+#### Reolink Türklingel einrichten
+
+1. **Snapshot URL** (Admin → Externe Daten → Türklingel-Kamera):
+   ```
+   http://USER:PASS@<REOLINK-IP>/cgi-bin/api.cgi?cmd=Snap&channel=0
+   ```
+   Diese URL wird beim Klingeln direkt vom Backend geholt und sofort
+   im Popup angezeigt — keine ffmpeg-Latenz.
+
+2. **RTSP Stream URL** (optional, für Live-Bild im Popup):
+   ```
+   rtsp://USER:PASS@<REOLINK-IP>:554/h264Preview_01_main
+   ```
+
+3. **Klingel-Trigger über Home Assistant:**
+   - Reolink Türklingel via Reolink- oder ONVIF-Integration in HA einbinden.
+   - Automation auf das `binary_sensor.<...>_visitor` (oder ONVIF `event`) Event:
+     ```yaml
+     automation:
+       - alias: "Türklingel → FamilyHub Popup"
+         trigger:
+           - platform: state
+             entity_id: binary_sensor.reolink_doorbell_visitor
+             to: "on"
+         action:
+           - service: rest_command.familyhub_doorbell
+     ```
+
+> Hinweis: Direkte HTTP-Webhooks aus der Reolink-Firmware sind je nach Modell
+> nicht stabil verfügbar — der Umweg über Home Assistant ist robuster.
 
 ---
 

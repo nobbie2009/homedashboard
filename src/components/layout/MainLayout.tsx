@@ -203,6 +203,7 @@ export const MainLayout: React.FC = () => {
 
     // Doorbell & Keyboard Logic
     const [doorbellActive, setDoorbellActive] = React.useState(false);
+    const [doorbellTs, setDoorbellTs] = React.useState<number | undefined>(undefined);
     const [keyboardActive, setKeyboardActive] = React.useState(false);
 
     React.useEffect(() => {
@@ -214,8 +215,14 @@ export const MainLayout: React.FC = () => {
             // console.log("SSE Connected");
         };
 
-        eventSource.addEventListener('doorbell', () => {
+        eventSource.addEventListener('doorbell', (e: MessageEvent) => {
             console.log("DOORBELL RINGING!");
+            try {
+                const data = e.data ? JSON.parse(e.data) : {};
+                setDoorbellTs(typeof data.timestamp === 'number' ? data.timestamp : Date.now());
+            } catch {
+                setDoorbellTs(Date.now());
+            }
             setDoorbellActive(true);
         });
 
@@ -238,7 +245,7 @@ export const MainLayout: React.FC = () => {
 
     return (
         <div className="flex flex-col h-screen w-full bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 overflow-hidden relative transition-colors duration-200">
-            <DoorbellOverlay active={doorbellActive} onClose={() => setDoorbellActive(false)} />
+            <DoorbellOverlay active={doorbellActive} eventTimestamp={doorbellTs} onClose={() => setDoorbellActive(false)} />
             <Screensaver active={showScreensaver} mode={screensaverMode} onDismiss={() => setShowScreensaver(false)} />
 
             {keyboardActive && <OnScreenKeyboard onClose={() => setKeyboardActive(false)} />}

@@ -539,6 +539,48 @@ const AdminSettings: React.FC = () => {
                         </section>
 
                         <section>
+                            <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Türklingel-Kamera (Reolink &amp; Co.)</h3>
+                            <div className="bg-white/40 dark:bg-slate-900/40 rounded-lg border border-slate-300/50 dark:border-slate-700/50 p-4 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
+                                        HTTP Snapshot URL
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={config.doorbellSnapshotUrl || ''}
+                                        onChange={(e) => updateConfig({ doorbellSnapshotUrl: e.target.value })}
+                                        placeholder="http://USER:PASS@192.168.1.50/cgi-bin/api.cgi?cmd=Snap&channel=0"
+                                        className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded w-full px-3 py-2 text-slate-900 dark:text-white placeholder-slate-600 focus:outline-none focus:border-blue-500"
+                                    />
+                                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
+                                        Reolink: <code className="text-slate-500">http://USER:PASS@IP/cgi-bin/api.cgi?cmd=Snap&amp;channel=0</code>.
+                                        Liefert sofort ein JPEG ohne ffmpeg — beste Latenz fürs Klingel-Popup.
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
+                                        RTSP Stream URL (optional, für Live-Bild)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={config.doorbellStreamUrl || ''}
+                                        onChange={(e) => updateConfig({ doorbellStreamUrl: e.target.value })}
+                                        placeholder="rtsp://USER:PASS@192.168.1.50:554/h264Preview_01_main"
+                                        className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded w-full px-3 py-2 text-slate-900 dark:text-white placeholder-slate-600 focus:outline-none focus:border-blue-500"
+                                    />
+                                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
+                                        Wird im Klingel-Popup nach 2-3 Sekunden zum Live-Bild umgeschaltet.
+                                        Bleibt leer? Dann zeigt das Popup nur den Snapshot (oder fällt auf die Hauptkamera zurück).
+                                    </p>
+                                </div>
+                                <div className="text-xs text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/50 rounded p-3 border border-slate-300/40 dark:border-slate-700/40">
+                                    <strong>Trigger:</strong> POST oder GET an <code>/api/webhook/doorbell</code> löst das Popup aus.
+                                    Reolink kann diesen Webhook über Home Assistant (z.B. via ONVIF / Reolink-Integration) bei Klingel-Events feuern.
+                                </div>
+                            </div>
+                        </section>
+
+                        <section>
                             <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Home Assistant</h3>
                             <div className="bg-white/40 dark:bg-slate-900/40 rounded-lg border border-slate-300/50 dark:border-slate-700/50 p-4">
                                 <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">

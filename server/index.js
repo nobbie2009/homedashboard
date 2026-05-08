@@ -7,6 +7,8 @@ import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
 import { execFile, exec } from 'child_process';
+import http from 'http';
+import https from 'https';
 import { Client } from '@notionhq/client';
 
 dotenv.config();
@@ -33,6 +35,12 @@ app.use((req, res, next) => {
 
     // 2. Allow OAuth Callbacks (Google)
     if (req.path.startsWith('/auth/')) {
+        return next();
+    }
+
+    // 2b. Allow inbound webhooks from cameras / smart home gateways
+    //     (they cannot send our X-Device-Id header).
+    if (req.path.startsWith('/api/webhook/')) {
         return next();
     }
 
@@ -1241,6 +1249,176 @@ app.get('/api/camera/snapshot', (req, res) => {
     ffmpeg.stdout.pipe(res);
 });
 
+// --- Doorbell Camera ---
+// Reolink doorbells (and similar) typically expose:
+//  - HTTP snapshot:  http://USER:PASS@IP/cgi-bin/api.cgi?cmd=Snap&channel=0
+//  - RTSP stream:    rtsp://USER:PASS@IP:554/h264Preview_01_main
+// We accept either for snapshots and use ffmpeg only when no HTTP snapshot is set.
+let lastDoorbellSnapshot = null; // { buffer, contentType, timestamp }
+const DOORBELL_CACHE_TTL = 8000; // 8s — popup uses cache to render instantly
+
+const fetchHttpBuffer = (url, timeoutMs = 5000) => new Promise((resolve, reject) => {
+    try {
+        const u = new URL(url);
+        const isHttps = u.protocol === 'https:';
+        const lib = isHttps ? https : http;
+        const auth = (u.username || u.password)
+            ? `${decodeURIComponent(u.username)}:${decodeURIComponent(u.password)}`
+            : undefined;
+        const options = {
+            hostname: u.hostname,
+            port: u.port || (isHttps ? 443 : 80),
+            path: u.pathname + u.search,
+            method: 'GET',
+            auth,
+            // Allow self-signed certs for local cameras
+            rejectUnauthorized: false,
+            timeout: timeoutMs,
+        };
+        const req = lib.request(options, (res) => {
+            if (res.statusCode && res.statusCode >= 400) {
+                res.resume();
+                return reject(new Error(`HTTP ${res.statusCode} from ${u.hostname}`));
+            }
+            const chunks = [];
+            res.on('data', c => chunks.push(c));
+            res.on('end', () => resolve({
+                buffer: Buffer.concat(chunks),
+                contentType: res.headers['content-type'] || 'image/jpeg',
+            }));
+            res.on('error', reject);
+        });
+        req.on('timeout', () => { req.destroy(new Error('timeout')); });
+        req.on('error', reject);
+        req.end();
+    } catch (e) {
+        reject(e);
+    }
+});
+
+const captureRtspSnapshot = (rtspUrl) => new Promise((resolve, reject) => {
+    const ff = spawn('ffmpeg', [
+        '-y',
+        '-rtsp_transport', 'tcp',
+        '-i', rtspUrl,
+        '-frames:v', '1',
+        '-f', 'image2',
+        '-vf', 'scale=800:-1',
+        '-q:v', '5',
+        '-'
+    ]);
+    const chunks = [];
+    let stderr = '';
+    ff.stdout.on('data', c => chunks.push(c));
+    ff.stderr.on('data', d => { stderr += d.toString(); });
+    ff.on('close', code => {
+        if (code === 0 && chunks.length) {
+            resolve({ buffer: Buffer.concat(chunks), contentType: 'image/jpeg' });
+        } else {
+            reject(new Error(`ffmpeg exited ${code}: ${stderr.slice(-200)}`));
+        }
+    });
+    ff.on('error', reject);
+    // Hard timeout in case ffmpeg hangs on a dead RTSP source
+    setTimeout(() => { try { ff.kill('SIGKILL'); } catch {} }, 8000);
+});
+
+const captureDoorbellSnapshot = async () => {
+    const httpUrl = appConfig.doorbellSnapshotUrl;
+    const rtspUrl = appConfig.doorbellStreamUrl || appConfig.cameraUrl;
+    if (httpUrl && /^https?:/i.test(httpUrl)) {
+        return await fetchHttpBuffer(httpUrl);
+    }
+    if (httpUrl && /^rtsp:/i.test(httpUrl)) {
+        return await captureRtspSnapshot(httpUrl);
+    }
+    if (rtspUrl) {
+        return await captureRtspSnapshot(rtspUrl);
+    }
+    throw new Error("No doorbell camera configured");
+};
+
+app.get('/api/doorbell/snapshot', async (req, res) => {
+    try {
+        // Serve cached snapshot if it's fresh — popup renders instantly
+        if (lastDoorbellSnapshot && (Date.now() - lastDoorbellSnapshot.timestamp) < DOORBELL_CACHE_TTL) {
+            res.writeHead(200, {
+                'Content-Type': lastDoorbellSnapshot.contentType,
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+            });
+            return res.end(lastDoorbellSnapshot.buffer);
+        }
+        const snap = await captureDoorbellSnapshot();
+        lastDoorbellSnapshot = { ...snap, timestamp: Date.now() };
+        res.writeHead(200, {
+            'Content-Type': snap.contentType,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+        });
+        res.end(snap.buffer);
+    } catch (e) {
+        console.error("Doorbell snapshot failed:", e.message);
+        res.status(502).send(`Doorbell snapshot failed: ${e.message}`);
+    }
+});
+
+app.get('/api/doorbell/stream', (req, res) => {
+    const streamUrl = appConfig.doorbellStreamUrl || appConfig.cameraUrl;
+    if (!streamUrl) return res.status(404).send("Doorbell stream not configured");
+
+    const BOUNDARY = 'doorbellframeboundary';
+    res.writeHead(200, {
+        'Content-Type': `multipart/x-mixed-replace; boundary=${BOUNDARY}`,
+        'Cache-Control': 'no-cache',
+        'Connection': 'close',
+        'Pragma': 'no-cache'
+    });
+
+    const ffmpeg = spawn('ffmpeg', [
+        '-probesize', '64000',
+        '-analyzeduration', '0',
+        '-rtsp_transport', 'tcp',
+        '-i', streamUrl,
+        '-vf', 'scale=800:-1',
+        '-f', 'image2pipe',
+        '-vcodec', 'mjpeg',
+        '-q:v', '8',
+        '-r', '10',
+        '-'
+    ]);
+
+    let buffer = Buffer.alloc(0);
+    const JPEG_START = Buffer.from([0xFF, 0xD8]);
+    const JPEG_END = Buffer.from([0xFF, 0xD9]);
+
+    ffmpeg.stdout.on('data', (chunk) => {
+        buffer = Buffer.concat([buffer, chunk]);
+        while (true) {
+            const startIdx = buffer.indexOf(JPEG_START);
+            if (startIdx === -1) break;
+            const endIdx = buffer.indexOf(JPEG_END, startIdx + 2);
+            if (endIdx === -1) break;
+            const frame = buffer.subarray(startIdx, endIdx + 2);
+            buffer = buffer.subarray(endIdx + 2);
+            try {
+                res.write(`\r\n--${BOUNDARY}\r\nContent-Type: image/jpeg\r\nContent-Length: ${frame.length}\r\n\r\n`);
+                res.write(frame);
+            } catch {
+                break;
+            }
+        }
+        const lastStart = buffer.indexOf(JPEG_START);
+        if (lastStart > 0) buffer = buffer.subarray(lastStart);
+        else if (lastStart === -1 && buffer.length > 200000) buffer = Buffer.alloc(0);
+    });
+
+    ffmpeg.on('close', () => { try { res.end(); } catch {} });
+    req.on('close', () => { try { ffmpeg.kill('SIGKILL'); } catch {} });
+});
+
 // --- Edupage Proxy (with cache) ---
 app.get('/api/edupage', (req, res) => {
     const username = req.headers['username'];
@@ -1653,11 +1831,22 @@ const broadcastEvent = (type, data) => {
 };
 
 // Doorbell Webhook
-app.post('/api/webhook/doorbell', (req, res) => {
+// Also accepts GET so smart home gateways with limited HTTP verbs can trigger it.
+const handleDoorbell = (req, res) => {
+    const timestamp = Date.now();
     console.log("Doorbell Triggered! Broadcasting to", sseClients.size, "clients.");
-    broadcastEvent('doorbell', { timestamp: Date.now() });
-    res.json({ success: true, clients: sseClients.size });
-});
+
+    // Fire and forget: capture a fresh snapshot so the popup's first <img>
+    // request hits a warm cache instead of waiting on RTSP/HTTP.
+    captureDoorbellSnapshot()
+        .then(snap => { lastDoorbellSnapshot = { ...snap, timestamp }; })
+        .catch(err => console.warn("Doorbell pre-capture failed:", err.message));
+
+    broadcastEvent('doorbell', { timestamp });
+    res.json({ success: true, clients: sseClients.size, timestamp });
+};
+app.post('/api/webhook/doorbell', handleDoorbell);
+app.get('/api/webhook/doorbell', handleDoorbell);
 
 // --- KEYBOARD REMOTE CONTROL ---
 let isKeyboardActive = false;
