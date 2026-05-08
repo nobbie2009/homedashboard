@@ -223,6 +223,10 @@ export const MainLayout: React.FC = () => {
             } catch {
                 setDoorbellTs(Date.now());
             }
+            // Wake the dashboard from any screensaver and reset the idle timer
+            // so the screensaver doesn't immediately reappear behind the popup.
+            setShowScreensaver(false);
+            lastActivity.current = Date.now();
             setDoorbellActive(true);
         });
 
@@ -245,7 +249,16 @@ export const MainLayout: React.FC = () => {
 
     return (
         <div className="flex flex-col h-screen w-full bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 overflow-hidden relative transition-colors duration-200">
-            <DoorbellOverlay active={doorbellActive} eventTimestamp={doorbellTs} onClose={() => setDoorbellActive(false)} />
+            <DoorbellOverlay
+                active={doorbellActive}
+                eventTimestamp={doorbellTs}
+                onClose={() => {
+                    setDoorbellActive(false);
+                    // Treat dismissal as activity so the screensaver
+                    // doesn't pop back immediately.
+                    lastActivity.current = Date.now();
+                }}
+            />
             <Screensaver active={showScreensaver} mode={screensaverMode} onDismiss={() => setShowScreensaver(false)} />
 
             {keyboardActive && <OnScreenKeyboard onClose={() => setKeyboardActive(false)} />}

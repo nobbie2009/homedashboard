@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { X, Bell, VideoOff } from 'lucide-react';
 import { getApiUrl } from '../../utils/api';
 import { useSecurity } from '../../contexts/SecurityContext';
+import { useConfig } from '../../contexts/ConfigContext';
 
 interface DoorbellOverlayProps {
     active: boolean;
@@ -9,7 +10,9 @@ interface DoorbellOverlayProps {
     eventTimestamp?: number;
 }
 
-const AUTO_CLOSE_MS = 30000;
+const DEFAULT_DURATION_S = 30;
+const MIN_DURATION_S = 5;
+const MAX_DURATION_S = 600;
 const SNAPSHOT_REFRESH_MS = 1500;
 const STREAM_KICKIN_MS = 2500;
 
@@ -19,7 +22,13 @@ export const DoorbellOverlay: React.FC<DoorbellOverlayProps> = ({ active, onClos
     const [showStream, setShowStream] = useState(false);
     const [streamFailed, setStreamFailed] = useState(false);
     const { deviceId } = useSecurity();
+    const { config } = useConfig();
     const API_URL = getApiUrl();
+    const durationS = Math.min(
+        MAX_DURATION_S,
+        Math.max(MIN_DURATION_S, config.doorbellDurationSeconds ?? DEFAULT_DURATION_S)
+    );
+    const autoCloseMs = durationS * 1000;
     const refreshTimer = useRef<ReturnType<typeof setTimeout>>();
     const streamTimer = useRef<ReturnType<typeof setTimeout>>();
     const closeTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -52,14 +61,14 @@ export const DoorbellOverlay: React.FC<DoorbellOverlayProps> = ({ active, onClos
         streamTimer.current = setTimeout(() => setShowStream(true), STREAM_KICKIN_MS);
 
         // Auto close
-        closeTimer.current = setTimeout(onClose, AUTO_CLOSE_MS);
+        closeTimer.current = setTimeout(onClose, autoCloseMs);
 
         return () => {
             if (refreshTimer.current) clearTimeout(refreshTimer.current);
             if (streamTimer.current) clearTimeout(streamTimer.current);
             if (closeTimer.current) clearTimeout(closeTimer.current);
         };
-    }, [active, eventTimestamp, onClose]);
+    }, [active, eventTimestamp, onClose, autoCloseMs]);
 
     if (!visible) return null;
 
@@ -69,7 +78,7 @@ export const DoorbellOverlay: React.FC<DoorbellOverlayProps> = ({ active, onClos
 
     return (
         <div
-            className={`fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-300 ${active ? 'opacity-100' : 'opacity-0'}`}
+            className={`fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-300 ${active ? 'opacity-100' : 'opacity-0'}`}
             onClick={onClose}
         >
             <div
