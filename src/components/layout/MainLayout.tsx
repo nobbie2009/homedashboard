@@ -207,12 +207,20 @@ export const MainLayout: React.FC = () => {
     const [keyboardActive, setKeyboardActive] = React.useState(false);
 
     React.useEffect(() => {
-        const url = `${getApiUrl()}/api/stream/events`;
+        // EventSource cannot send custom headers, so we pass deviceId as a
+        // query parameter — without it the security middleware returns 401
+        // and the dashboard never receives doorbell / keyboard events.
+        if (!deviceId) return;
+        const url = `${getApiUrl()}/api/stream/events?deviceId=${encodeURIComponent(deviceId)}`;
         console.log("Connecting to SSE:", url);
         const eventSource = new EventSource(url);
 
         eventSource.onopen = () => {
             // console.log("SSE Connected");
+        };
+
+        eventSource.onerror = (err) => {
+            console.warn("SSE error:", err);
         };
 
         eventSource.addEventListener('doorbell', (e: MessageEvent) => {
@@ -245,7 +253,7 @@ export const MainLayout: React.FC = () => {
         return () => {
             eventSource.close();
         };
-    }, []);
+    }, [deviceId]);
 
     return (
         <div className="flex flex-col h-screen w-full bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 overflow-hidden relative transition-colors duration-200">
