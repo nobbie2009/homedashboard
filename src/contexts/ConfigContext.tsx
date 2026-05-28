@@ -256,10 +256,24 @@ import { getApiUrl, fetchWithTimeout } from '../utils/api';
 
 import { useSecurity } from './SecurityContext';
 
+const CONFIG_CACHE_KEY = 'homedashboard_config_cache';
+
+function readCachedConfig(): AppConfig {
+    try {
+        const raw = localStorage.getItem(CONFIG_CACHE_KEY);
+        if (raw) return { ...defaultConfig, ...JSON.parse(raw) };
+    } catch {
+        /* ignore corrupt cache */
+    }
+    return defaultConfig;
+}
+
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 
 export function ConfigProvider({ children }: { children: React.ReactNode }) {
-    const [config, setConfig] = useState<AppConfig>(defaultConfig);
+    // Seed from the last cached config so the app renders real data offline
+    // instead of the empty defaults while /api/config is unreachable.
+    const [config, setConfig] = useState<AppConfig>(() => readCachedConfig());
     const { deviceId } = useSecurity();
 
     const API_URL = getApiUrl();
@@ -339,6 +353,11 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
                     // const rotationResult = checkAndRotateChores(merged);
                     // if (rotationResult) { ... }
 
+                    try {
+                        localStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(merged));
+                    } catch {
+                        /* quota/serialization issues are non-fatal */
+                    }
                     return merged;
                 });
             })
@@ -364,6 +383,12 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
     const updateConfig = (newConfig: Partial<AppConfig>) => {
         setConfig((prev) => {
             const updated = { ...prev, ...newConfig };
+
+            try {
+                localStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(updated));
+            } catch {
+                /* quota/serialization issues are non-fatal */
+            }
 
             // Persist to backend (Debounced ideally, but simple POST for now)
             // We only send the partial update or full? 

@@ -15,8 +15,15 @@ const TABS: { id: Tab; label: string; icon: React.FC<any> }[] = [
     { id: 'haushalt', label: 'Haushalt', icon: Wrench },
 ];
 
+const TAB_IDS: Tab[] = ['sterne', 'aufgaben', 'bad', 'haushalt'];
+
+function initialTab(): Tab {
+    const t = new URLSearchParams(window.location.search).get('tab');
+    return (TAB_IDS as string[]).includes(t || '') ? (t as Tab) : 'sterne';
+}
+
 const PwaApp: React.FC = () => {
-    const [tab, setTab] = useState<Tab>('sterne');
+    const [tab, setTab] = useState<Tab>(initialTab);
 
     return (
         <div className="flex flex-col min-h-[100dvh] bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100">

@@ -19,12 +19,21 @@ interface SecurityContextType {
 const SecurityContext = createContext<SecurityContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'homedashboard_device_id';
+const STATUS_KEY = 'homedashboard_device_status';
+
+function readCachedStatus(): Device['status'] {
+    const s = localStorage.getItem(STATUS_KEY);
+    if (s === 'approved' || s === 'pending' || s === 'rejected') return s;
+    return 'unknown';
+}
 
 export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const [deviceId, setDeviceId] = useState<string>('');
-    const [deviceStatus, setDeviceStatus] = useState<Device['status']>('unknown');
+    const [deviceStatus, setDeviceStatus] = useState<Device['status']>(() => readCachedStatus());
     const [device, setDevice] = useState<Device | null>(null);
-    const [isChecking, setIsChecking] = useState(true);
+    // Block the UI on first ever load. If a previous approval is cached we render
+    // immediately and revalidate in the background, so the app works offline.
+    const [isChecking, setIsChecking] = useState(() => readCachedStatus() !== 'approved');
 
     const API_URL = getApiUrl();
 
@@ -50,8 +59,11 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             if (data.status) {
                 setDeviceStatus(data.status);
                 setDevice(data);
+                localStorage.setItem(STATUS_KEY, data.status);
             }
         } catch (e) {
+            // Offline / server unreachable: keep the last known status from
+            // localStorage so an already-approved device stays usable offline.
             console.error("Failed to check status", e);
         } finally {
             setIsChecking(false);
