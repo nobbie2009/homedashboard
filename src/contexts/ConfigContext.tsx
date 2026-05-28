@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 // import { checkAndRotateChores } from '../utils/choreLogic'; // Removed, moved to server
 
 // Define configuration types
@@ -183,6 +183,7 @@ export interface CalendarSettings {
 interface ConfigContextType {
     config: AppConfig;
     updateConfig: (newConfig: Partial<AppConfig>) => void;
+    reloadConfig: () => Promise<void>;
 }
 
 const defaultConfig: AppConfig = {
@@ -278,20 +279,18 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
 
     const API_URL = getApiUrl();
 
-    // Load from Backend
-    useEffect(() => {
+    // Load from Backend (also exposed as reloadConfig for pull-to-refresh)
+    const loadConfig = useCallback(async () => {
         if (!deviceId) return;
 
-        fetchWithTimeout(`${API_URL}/api/config`, {
-            headers: { 'x-device-id': deviceId }
-        })
-            .then(res => {
-                if (res.ok) return res.json();
-                throw new Error("Failed to load config");
-            })
-            .then(data => {
-                // Determine deep merge or just shallow? Shallow for now, but ensure nested objects exist
-                setConfig(prev => {
+        try {
+            const res = await fetchWithTimeout(`${API_URL}/api/config`, {
+                headers: { 'x-device-id': deviceId }
+            });
+            if (!res.ok) throw new Error("Failed to load config");
+            const data = await res.json();
+            // Determine deep merge or just shallow? Shallow for now, but ensure nested objects exist
+            setConfig(prev => {
                     const merged = {
                         ...prev,
                         ...data,
@@ -360,11 +359,14 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
                     }
                     return merged;
                 });
-            })
-            .catch(err => {
-                console.error("Config load error:", err);
-            });
-    }, [deviceId]);
+        } catch (err) {
+            console.error("Config load error:", err);
+        }
+    }, [deviceId, API_URL]);
+
+    useEffect(() => {
+        loadConfig();
+    }, [loadConfig]);
 
     // Keep the note field in sync with updates broadcast from other devices
     // so that a stale note isn't re-posted when the user saves unrelated config.
@@ -410,7 +412,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <ConfigContext.Provider value={{ config, updateConfig }}>
+        <ConfigContext.Provider value={{ config, updateConfig, reloadConfig: loadConfig }}>
             {children}
         </ConfigContext.Provider>
     );

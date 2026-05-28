@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
-import { Star, ClipboardCheck, Wrench, Trophy, Droplets } from 'lucide-react';
+import { Star, ClipboardCheck, Wrench, Trophy, Droplets, Sun, Moon, Clock, WifiOff } from 'lucide-react';
 import { PwaStars } from './PwaStars';
 import { PwaChores } from './PwaChores';
 import { PwaHousehold } from './PwaHousehold';
 import { PwaBath } from './PwaBath';
 import { PwaNoteButton } from './PwaNoteButton';
+import { useTheme } from '../../hooks/useTheme';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { useConfig } from '../../contexts/ConfigContext';
+import { PwaInstallBanner } from '../../components/PwaInstallBanner';
+import { PullToRefresh } from '../../components/PullToRefresh';
 
 type Tab = 'sterne' | 'aufgaben' | 'haushalt' | 'bad';
 
@@ -24,6 +29,16 @@ function initialTab(): Tab {
 
 const PwaApp: React.FC = () => {
     const [tab, setTab] = useState<Tab>(initialTab);
+    const { isDark, theme, toggleTheme } = useTheme();
+    const isOnline = useOnlineStatus();
+    const { reloadConfig } = useConfig();
+    const [refreshKey, setRefreshKey] = useState(0);
+
+    const handleRefresh = async () => {
+        await reloadConfig();
+        // Remount the active tab so its own fetches (history, etc.) re-run.
+        setRefreshKey(k => k + 1);
+    };
 
     return (
         <div className="flex flex-col min-h-[100dvh] bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100">
@@ -35,21 +50,43 @@ const PwaApp: React.FC = () => {
                     <Trophy className="w-5 h-5 text-yellow-400 flex-none" />
                     <span className="font-bold tracking-wide flex-none">Familien-Manager</span>
                 </div>
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-1">
                     <PwaNoteButton />
-                    <span className="text-[10px] text-slate-400 font-mono">PWA</span>
+                    <button
+                        onClick={toggleTheme}
+                        aria-label="Design wechseln"
+                        title={theme === 'auto' ? 'Automatisch' : isDark ? 'Dunkel' : 'Hell'}
+                        className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-500 dark:text-slate-300 active:scale-95"
+                    >
+                        {theme === 'auto'
+                            ? <Clock className="w-5 h-5" />
+                            : isDark
+                                ? <Sun className="w-5 h-5 text-yellow-400" />
+                                : <Moon className="w-5 h-5" />}
+                    </button>
                 </div>
             </header>
 
-            <main
+            {!isOnline && (
+                <div className="flex-none flex items-center justify-center gap-2 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 text-xs font-semibold py-1.5">
+                    <WifiOff className="w-4 h-4" />
+                    Offline – zeige zuletzt geladene Daten
+                </div>
+            )}
+
+            <PullToRefresh
+                onRefresh={handleRefresh}
                 className="flex-1 overflow-y-auto"
                 style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom))' }}
             >
-                {tab === 'sterne' && <PwaStars />}
-                {tab === 'aufgaben' && <PwaChores />}
-                {tab === 'bad' && <PwaBath />}
-                {tab === 'haushalt' && <PwaHousehold />}
-            </main>
+                <PwaInstallBanner />
+                <div key={refreshKey}>
+                    {tab === 'sterne' && <PwaStars />}
+                    {tab === 'aufgaben' && <PwaChores />}
+                    {tab === 'bad' && <PwaBath />}
+                    {tab === 'haushalt' && <PwaHousehold />}
+                </div>
+            </PullToRefresh>
 
             <nav
                 className="fixed bottom-0 inset-x-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex z-30"
