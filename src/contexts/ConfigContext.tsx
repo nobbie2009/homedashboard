@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 // import { checkAndRotateChores } from '../utils/choreLogic'; // Removed, moved to server
 
 // Define configuration types
@@ -183,6 +183,7 @@ export interface CalendarSettings {
 interface ConfigContextType {
     config: AppConfig;
     updateConfig: (newConfig: Partial<AppConfig>) => void;
+    reloadConfig: () => Promise<void>;
 }
 
 const defaultConfig: AppConfig = {
@@ -256,28 +257,40 @@ import { getApiUrl, fetchWithTimeout } from '../utils/api';
 
 import { useSecurity } from './SecurityContext';
 
+const CONFIG_CACHE_KEY = 'homedashboard_config_cache';
+
+function readCachedConfig(): AppConfig {
+    try {
+        const raw = localStorage.getItem(CONFIG_CACHE_KEY);
+        if (raw) return { ...defaultConfig, ...JSON.parse(raw) };
+    } catch {
+        /* ignore corrupt cache */
+    }
+    return defaultConfig;
+}
+
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 
 export function ConfigProvider({ children }: { children: React.ReactNode }) {
-    const [config, setConfig] = useState<AppConfig>(defaultConfig);
+    // Seed from the last cached config so the app renders real data offline
+    // instead of the empty defaults while /api/config is unreachable.
+    const [config, setConfig] = useState<AppConfig>(() => readCachedConfig());
     const { deviceId } = useSecurity();
 
     const API_URL = getApiUrl();
 
-    // Load from Backend
-    useEffect(() => {
+    // Load from Backend (also exposed as reloadConfig for pull-to-refresh)
+    const loadConfig = useCallback(async () => {
         if (!deviceId) return;
 
-        fetchWithTimeout(`${API_URL}/api/config`, {
-            headers: { 'x-device-id': deviceId }
-        })
-            .then(res => {
-                if (res.ok) return res.json();
-                throw new Error("Failed to load config");
-            })
-            .then(data => {
-                // Determine deep merge or just shallow? Shallow for now, but ensure nested objects exist
-                setConfig(prev => {
+        try {
+            const res = await fetchWithTimeout(`${API_URL}/api/config`, {
+                headers: { 'x-device-id': deviceId }
+            });
+            if (!res.ok) throw new Error("Failed to load config");
+            const data = await res.json();
+            // Determine deep merge or just shallow? Shallow for now, but ensure nested objects exist
+            setConfig(prev => {
                     const merged = {
                         ...prev,
                         ...data,
@@ -339,13 +352,21 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
                     // const rotationResult = checkAndRotateChores(merged);
                     // if (rotationResult) { ... }
 
+                    try {
+                        localStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(merged));
+                    } catch {
+                        /* quota/serialization issues are non-fatal */
+                    }
                     return merged;
                 });
-            })
-            .catch(err => {
-                console.error("Config load error:", err);
-            });
-    }, [deviceId]);
+        } catch (err) {
+            console.error("Config load error:", err);
+        }
+    }, [deviceId, API_URL]);
+
+    useEffect(() => {
+        loadConfig();
+    }, [loadConfig]);
 
     // Keep the note field in sync with updates broadcast from other devices
     // so that a stale note isn't re-posted when the user saves unrelated config.
@@ -364,6 +385,12 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
     const updateConfig = (newConfig: Partial<AppConfig>) => {
         setConfig((prev) => {
             const updated = { ...prev, ...newConfig };
+
+            try {
+                localStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(updated));
+            } catch {
+                /* quota/serialization issues are non-fatal */
+            }
 
             // Persist to backend (Debounced ideally, but simple POST for now)
             // We only send the partial update or full? 
@@ -385,7 +412,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <ConfigContext.Provider value={{ config, updateConfig }}>
+        <ConfigContext.Provider value={{ config, updateConfig, reloadConfig: loadConfig }}>
             {children}
         </ConfigContext.Provider>
     );

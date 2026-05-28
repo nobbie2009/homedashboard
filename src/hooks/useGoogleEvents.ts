@@ -24,9 +24,26 @@ export interface UseGoogleEventsOptions {
     scope?: CalendarScope;
 }
 
-// Simple in-memory cache
+// Simple in-memory cache, hydrated from localStorage so events still render
+// after an offline reload.
 const rawEventCache: Record<string, { timestamp: number, data: any[] }> = {};
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_STORAGE_KEY = 'homedashboard_gcal_cache';
+
+try {
+    const saved = localStorage.getItem(CACHE_STORAGE_KEY);
+    if (saved) Object.assign(rawEventCache, JSON.parse(saved));
+} catch {
+    /* ignore corrupt cache */
+}
+
+function persistEventCache() {
+    try {
+        localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(rawEventCache));
+    } catch {
+        /* quota/serialization issues are non-fatal */
+    }
+}
 
 
 export const useGoogleEvents = (options: UseGoogleEventsOptions = {}) => {
@@ -96,6 +113,7 @@ export const useGoogleEvents = (options: UseGoogleEventsOptions = {}) => {
                     rawData = await res.json();
                     // Update Cache with RAW data
                     rawEventCache[cacheKey] = { timestamp: Date.now(), data: rawData };
+                    persistEventCache();
                 } else if (res.status === 401) {
                     // Clean default error
                     setError("AUTH_REQUIRED");
@@ -106,8 +124,15 @@ export const useGoogleEvents = (options: UseGoogleEventsOptions = {}) => {
                 }
             } catch (err) {
                 console.error("Failed to fetch events", err);
-                setError("Network error");
-                return;
+                // Offline / network error: fall back to any cached payload (even
+                // if stale) so the UI keeps showing the last known events.
+                const cached = rawEventCache[cacheKey];
+                if (cached) {
+                    rawData = cached.data;
+                } else {
+                    setError("Network error");
+                    return;
+                }
             } finally {
                 setLoading(false);
             }

@@ -25,6 +25,7 @@ import {
 
 import { SecurityProvider, useSecurity } from './contexts/SecurityContext';
 import AccessDenied from './pages/AccessDenied';
+import { PwaUpdatePrompt } from './components/PwaUpdatePrompt';
 
 function SecurityGate({ children }: { children: React.ReactNode }) {
     const { deviceStatus } = useSecurity();
@@ -41,6 +42,8 @@ function SecurityGate({ children }: { children: React.ReactNode }) {
 
 function App() {
     return (
+        <>
+        <PwaUpdatePrompt />
         <SecurityProvider>
             <ConfigProvider>
                 <KioskProvider>
@@ -68,6 +71,7 @@ function App() {
                 </KioskProvider>
             </ConfigProvider>
         </SecurityProvider>
+        </>
     );
 }
 
