@@ -18,6 +18,7 @@ const __dirname = path.dirname(__filename);
 
 import { security } from './security.js';
 import { push } from './push.js';
+import { apns } from './apns.js';
 import sonos from './sonos.js';
 import { getSharedAlbumPhotos, clearAlbumCache, debugSharedAlbum } from './icloud.js';
 
@@ -1881,6 +1882,29 @@ app.post('/api/push/test', async (req, res) => {
     res.json({ success: ok });
 });
 
+// Native iOS push (APNs) — used by the SwiftUI app.
+app.post('/api/push/apns-subscribe', (req, res) => {
+    const deviceId = req.headers['x-device-id'];
+    const { token } = req.body || {};
+    if (!token) return res.status(400).json({ error: 'Missing token' });
+    apns.saveToken(deviceId, token);
+    res.json({ success: true });
+});
+
+app.post('/api/push/apns-unsubscribe', (req, res) => {
+    apns.removeToken(req.headers['x-device-id']);
+    res.json({ success: true });
+});
+
+app.post('/api/push/apns-test', async (req, res) => {
+    const ok = await apns.sendToDevice(req.headers['x-device-id'], {
+        title: 'FamilyHub',
+        body: 'Test-Benachrichtigung',
+        url: '/pwa',
+    });
+    res.json({ success: ok });
+});
+
 // Doorbell Webhook
 // Also accepts GET so smart home gateways with limited HTTP verbs can trigger it.
 const handleDoorbell = (req, res) => {
@@ -1895,11 +1919,13 @@ const handleDoorbell = (req, res) => {
 
     broadcastEvent('doorbell', { timestamp });
 
-    // Notify approved devices that subscribed to push.
-    push.sendToAll(
-        { title: 'Es klingelt!', body: 'Jemand steht an der Tür.', tag: 'doorbell', url: '/pwa' },
-        (id) => security.isAllowed(id)
-    ).catch(err => console.warn('Doorbell push failed:', err.message));
+    // Notify approved devices that subscribed to push (web push + native iOS).
+    const doorbellPayload = { title: 'Es klingelt!', body: 'Jemand steht an der Tür.', tag: 'doorbell', url: '/pwa' };
+    const allowed = (id) => security.isAllowed(id);
+    push.sendToAll(doorbellPayload, allowed)
+        .catch(err => console.warn('Doorbell push failed:', err.message));
+    apns.sendToAll(doorbellPayload, allowed)
+        .catch(err => console.warn('Doorbell APNs failed:', err.message));
 
     res.json({ success: true, clients: sseClients.size, timestamp });
 };
