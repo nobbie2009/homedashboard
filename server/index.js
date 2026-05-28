@@ -17,6 +17,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 import { security } from './security.js';
+import { push } from './push.js';
 import sonos from './sonos.js';
 import { getSharedAlbumPhotos, clearAlbumCache, debugSharedAlbum } from './icloud.js';
 
@@ -1841,6 +1842,45 @@ const broadcastEvent = (type, data) => {
     });
 };
 
+// --- Web Push Notifications ---
+// All /api/push/* routes sit behind the security middleware, so only approved
+// devices can register or query subscriptions.
+app.get('/api/push/vapid-public-key', (req, res) => {
+    res.json({ key: push.getPublicKey() });
+});
+
+app.get('/api/push/status', (req, res) => {
+    const deviceId = req.headers['x-device-id'];
+    res.json({ subscribed: push.hasSubscription(deviceId) });
+});
+
+app.post('/api/push/subscribe', (req, res) => {
+    const deviceId = req.headers['x-device-id'];
+    const { subscription } = req.body || {};
+    if (!subscription || !subscription.endpoint) {
+        return res.status(400).json({ error: 'Invalid subscription' });
+    }
+    push.saveSubscription(deviceId, subscription);
+    res.json({ success: true });
+});
+
+app.post('/api/push/unsubscribe', (req, res) => {
+    const deviceId = req.headers['x-device-id'];
+    push.removeSubscription(deviceId);
+    res.json({ success: true });
+});
+
+app.post('/api/push/test', async (req, res) => {
+    const deviceId = req.headers['x-device-id'];
+    const ok = await push.sendToDevice(deviceId, {
+        title: 'FamilyHub',
+        body: 'Test-Benachrichtigung',
+        tag: 'test',
+        url: '/pwa',
+    });
+    res.json({ success: ok });
+});
+
 // Doorbell Webhook
 // Also accepts GET so smart home gateways with limited HTTP verbs can trigger it.
 const handleDoorbell = (req, res) => {
@@ -1854,6 +1894,13 @@ const handleDoorbell = (req, res) => {
         .catch(err => console.warn("Doorbell pre-capture failed:", err.message));
 
     broadcastEvent('doorbell', { timestamp });
+
+    // Notify approved devices that subscribed to push.
+    push.sendToAll(
+        { title: 'Es klingelt!', body: 'Jemand steht an der Tür.', tag: 'doorbell', url: '/pwa' },
+        (id) => security.isAllowed(id)
+    ).catch(err => console.warn('Doorbell push failed:', err.message));
+
     res.json({ success: true, clients: sseClients.size, timestamp });
 };
 app.post('/api/webhook/doorbell', handleDoorbell);

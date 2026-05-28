@@ -47,6 +47,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        globIgnores: ['**/push-sw.js'],
+        // Pull in the push / notificationclick handlers (see public/push-sw.js).
+        importScripts: ['/push-sw.js'],
         cleanupOutdatedCaches: true,
         // The SPA shell is reachable offline, but we always try the network
         // first so the wall kiosk picks up new deploys and never gets stuck on

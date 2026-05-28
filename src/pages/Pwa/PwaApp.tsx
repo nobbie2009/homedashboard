@@ -6,6 +6,7 @@ import { PwaHousehold } from './PwaHousehold';
 import { PwaBath } from './PwaBath';
 import { PwaAgenda } from './PwaAgenda';
 import { PwaNoteButton } from './PwaNoteButton';
+import { PwaPushButton } from './PwaPushButton';
 import { useTheme } from '../../hooks/useTheme';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { useConfig } from '../../contexts/ConfigContext';
@@ -54,6 +55,7 @@ const PwaApp: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-1">
                     <PwaNoteButton />
+                    <PwaPushButton />
                     <button
                         onClick={toggleTheme}
                         aria-label="Design wechseln"

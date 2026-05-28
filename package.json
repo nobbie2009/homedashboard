@@ -28,7 +28,8 @@
     "react-router-dom": "^6.22.2",
     "sonos": "^1.14.2",
     "tailwind-merge": "^2.2.1",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@types/node": "^20.11.24",
