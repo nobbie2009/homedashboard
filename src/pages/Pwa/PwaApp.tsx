@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Star, ClipboardCheck, Wrench, Trophy, Droplets, Sun, Moon, Clock, WifiOff } from 'lucide-react';
+import { Star, ClipboardCheck, Wrench, Trophy, Droplets, CalendarDays, Sun, Moon, Clock, WifiOff } from 'lucide-react';
 import { PwaStars } from './PwaStars';
 import { PwaChores } from './PwaChores';
 import { PwaHousehold } from './PwaHousehold';
 import { PwaBath } from './PwaBath';
+import { PwaAgenda } from './PwaAgenda';
 import { PwaNoteButton } from './PwaNoteButton';
 import { useTheme } from '../../hooks/useTheme';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
@@ -11,16 +12,17 @@ import { useConfig } from '../../contexts/ConfigContext';
 import { PwaInstallBanner } from '../../components/PwaInstallBanner';
 import { PullToRefresh } from '../../components/PullToRefresh';
 
-type Tab = 'sterne' | 'aufgaben' | 'haushalt' | 'bad';
+type Tab = 'sterne' | 'aufgaben' | 'haushalt' | 'bad' | 'kalender';
 
 const TABS: { id: Tab; label: string; icon: React.FC<any> }[] = [
     { id: 'sterne', label: 'Sterne', icon: Star },
     { id: 'aufgaben', label: 'Aufgaben', icon: ClipboardCheck },
+    { id: 'kalender', label: 'Kalender', icon: CalendarDays },
     { id: 'bad', label: 'Bad', icon: Droplets },
     { id: 'haushalt', label: 'Haushalt', icon: Wrench },
 ];
 
-const TAB_IDS: Tab[] = ['sterne', 'aufgaben', 'bad', 'haushalt'];
+const TAB_IDS: Tab[] = ['sterne', 'aufgaben', 'kalender', 'bad', 'haushalt'];
 
 function initialTab(): Tab {
     const t = new URLSearchParams(window.location.search).get('tab');
@@ -83,6 +85,7 @@ const PwaApp: React.FC = () => {
                 <div key={refreshKey}>
                     {tab === 'sterne' && <PwaStars />}
                     {tab === 'aufgaben' && <PwaChores />}
+                    {tab === 'kalender' && <PwaAgenda />}
                     {tab === 'bad' && <PwaBath />}
                     {tab === 'haushalt' && <PwaHousehold />}
                 </div>

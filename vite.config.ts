@@ -40,6 +40,7 @@ export default defineConfig({
         shortcuts: [
           { name: 'Sterne', url: '/pwa?tab=sterne', icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }] },
           { name: 'Aufgaben', url: '/pwa?tab=aufgaben', icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }] },
+          { name: 'Kalender', url: '/pwa?tab=kalender', icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }] },
           { name: 'Bad', url: '/pwa?tab=bad', icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }] },
           { name: 'Haushalt', url: '/pwa?tab=haushalt', icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }] },
         ],
