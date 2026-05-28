@@ -1,0 +1,13 @@
+[Unit]
+Description=WiFi Watchdog Timer – führt Verbindungsprüfung regelmäßig aus
+
+[Timer]
+# Erster Lauf 1 Minute nach Boot, danach alle 2 Minuten.
+OnBootSec=1min
+OnUnitActiveSec=2min
+AccuracySec=15s
+Unit=wifi-watchdog.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,16 @@
+# Konfiguration für /usr/local/bin/wifi-watchdog.sh
+# Wird von /etc/default/wifi-watchdog gelesen.
+
+# WLAN-Interface des Raspberry Pi.
+WIFI_IFACE="wlan0"
+
+# Ping-Ziele (mehrere, durch Leerzeichen getrennt).
+PING_TARGETS="1.1.1.1 8.8.8.8 9.9.9.9"
+
+# Anzahl Pings pro Versuch und Timeout je Ping (Sekunden).
+PING_COUNT=2
+PING_TIMEOUT=3
+
+# Nach wie vielen aufeinanderfolgenden Fehlversuchen soll der Pi rebootet werden?
+# 0 = Reboot deaktiviert (Standard).  Beispiel: 10 = Reboot nach ~20 Minuten.
+WIFI_WATCHDOG_REBOOT_AFTER=0

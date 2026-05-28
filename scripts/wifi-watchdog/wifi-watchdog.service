@@ -1,0 +1,10 @@
+[Unit]
+Description=WiFi Watchdog – prüft Internet-Verbindung und reconnectet bei Bedarf
+After=network.target NetworkManager.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/wifi-watchdog.sh
+# Skript darf scheitern; Timer ruft es ohnehin erneut auf.
+SuccessExitStatus=0 1
