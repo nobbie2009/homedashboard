@@ -521,7 +521,7 @@ const AdminSettings: React.FC = () => {
                     <div className="space-y-8">
                         <section>
                             <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Kamera Stream</h3>
-                            <div className="bg-white/40 dark:bg-slate-900/40 rounded-lg border border-slate-300/50 dark:border-slate-700/50 p-4">
+                            <div className="widget-card bg-white/40 dark:bg-slate-900/40 rounded-lg border border-slate-300/50 dark:border-slate-700/50 p-4">
                                 <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
                                     RTSP / HTTP Stream URL
                                 </label>
@@ -540,7 +540,7 @@ const AdminSettings: React.FC = () => {
 
                         <section>
                             <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Türklingel-Kamera (Reolink &amp; Co.)</h3>
-                            <div className="bg-white/40 dark:bg-slate-900/40 rounded-lg border border-slate-300/50 dark:border-slate-700/50 p-4 space-y-4">
+                            <div className="widget-card bg-white/40 dark:bg-slate-900/40 rounded-lg border border-slate-300/50 dark:border-slate-700/50 p-4 space-y-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
                                         HTTP Snapshot URL
@@ -606,7 +606,7 @@ const AdminSettings: React.FC = () => {
 
                         <section>
                             <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Home Assistant</h3>
-                            <div className="bg-white/40 dark:bg-slate-900/40 rounded-lg border border-slate-300/50 dark:border-slate-700/50 p-4">
+                            <div className="widget-card bg-white/40 dark:bg-slate-900/40 rounded-lg border border-slate-300/50 dark:border-slate-700/50 p-4">
                                 <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
                                     Dashboard URL
                                 </label>
@@ -685,7 +685,7 @@ const AdminSettings: React.FC = () => {
 
                         <section>
                             <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Wetter Warnungen (DWD)</h3>
-                            <div className="bg-white/40 dark:bg-slate-900/40 rounded-lg border border-slate-300/50 dark:border-slate-700/50 p-4">
+                            <div className="widget-card bg-white/40 dark:bg-slate-900/40 rounded-lg border border-slate-300/50 dark:border-slate-700/50 p-4">
                                 <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
                                     Wählen Sie aus, welche Warnmeldungen <strong>ignoriert</strong> werden sollen. Aktive Buttons bedeuten, dass diese Warnung <strong>nicht</strong> angezeigt wird.
                                 </p>
@@ -726,7 +726,7 @@ const AdminSettings: React.FC = () => {
                             </div>
                         </section>
 
-                        <section className="bg-white/40 dark:bg-slate-900/40 rounded-lg border border-slate-300/50 dark:border-slate-700/50 p-4">
+                        <section className="widget-card bg-white/40 dark:bg-slate-900/40 rounded-lg border border-slate-300/50 dark:border-slate-700/50 p-4">
                             <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Bildschirmschoner (Nachtmodus)</h3>
                             <div className="space-y-4">
                                 <label className="flex items-center space-x-3">
@@ -767,7 +767,7 @@ const AdminSettings: React.FC = () => {
                             </div>
                         </section>
 
-                        <section className="bg-white/40 dark:bg-slate-900/40 rounded-lg border border-slate-300/50 dark:border-slate-700/50 p-4">
+                        <section className="widget-card bg-white/40 dark:bg-slate-900/40 rounded-lg border border-slate-300/50 dark:border-slate-700/50 p-4">
                             <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Bildschirmschoner (Tagsüber – iCloud Album)</h3>
                             <div className="space-y-4">
                                 <label className="flex items-center space-x-3">
@@ -900,7 +900,7 @@ const AdminSettings: React.FC = () => {
 
                         <div className="mt-8 pt-8 border-t border-slate-300 dark:border-slate-700">
                             <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Notion Integration</h3>
-                            <div className="bg-white/40 dark:bg-slate-900/40 rounded-lg border border-slate-300/50 dark:border-slate-700/50 p-6 space-y-4">
+                            <div className="widget-card bg-white/40 dark:bg-slate-900/40 rounded-lg border border-slate-300/50 dark:border-slate-700/50 p-6 space-y-4">
                                 <div>
                                     <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">Notion Integration Token</label>
                                     <input
@@ -945,7 +945,7 @@ const AdminSettings: React.FC = () => {
                     <section>
                         <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Backup & Wiederherstellung</h3>
                         {/* ... backup content ... */}
-                        <div className="bg-white/40 dark:bg-slate-900/40 rounded-lg border border-slate-300/50 dark:border-slate-700/50 p-6 space-y-6">
+                        <div className="widget-card bg-white/40 dark:bg-slate-900/40 rounded-lg border border-slate-300/50 dark:border-slate-700/50 p-6 space-y-6">
                             <div>
                                 <h4 className="font-bold text-slate-700 dark:text-slate-200 mb-2">Exportieren</h4>
                                 <p className="text-sm text-slate-400 dark:text-slate-500 mb-3">Lade die aktuelle Konfiguration als JSON-Datei herunter.</p>
@@ -980,7 +980,7 @@ const AdminSettings: React.FC = () => {
                             </h3>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 {/* 1. Page Refresh */}
-                                <div className="bg-white/40 dark:bg-slate-900/40 p-6 rounded-xl border border-slate-300/50 dark:border-slate-700/50 flex flex-col items-start hover:border-blue-500/50 transition">
+                                <div className="widget-card bg-white/40 dark:bg-slate-900/40 p-6 rounded-xl border border-slate-300/50 dark:border-slate-700/50 flex flex-col items-start hover:border-blue-500/50 transition">
                                     <div className="bg-blue-500/20 p-3 rounded-lg text-blue-400 mb-4">
                                         <RefreshCw className="w-8 h-8" />
                                     </div>
@@ -997,7 +997,7 @@ const AdminSettings: React.FC = () => {
                                 </div>
 
                                 {/* 1b. Keyboard Toggle */}
-                                <div className={`p-6 rounded-xl border flex flex-col items-start transition ${isKeyboardActive ? 'bg-blue-900/40 border-blue-500/50' : 'bg-white/40 dark:bg-slate-900/40 border-slate-300/50 dark:border-slate-700/50 hover:border-blue-500/50'}`}>
+                                <div className={`widget-card p-6 rounded-xl border flex flex-col items-start transition ${isKeyboardActive ? 'bg-blue-900/40 border-blue-500/50' : 'bg-white/40 dark:bg-slate-900/40 border-slate-300/50 dark:border-slate-700/50 hover:border-blue-500/50'}`}>
                                     <div className={`p-3 rounded-lg mb-4 ${isKeyboardActive ? 'bg-blue-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}`}>
                                         <Keyboard className="w-8 h-8" />
                                     </div>
@@ -1014,7 +1014,7 @@ const AdminSettings: React.FC = () => {
                                 </div>
 
                                 {/* 2. Reload Content */}
-                                <div className="bg-white/40 dark:bg-slate-900/40 p-6 rounded-xl border border-slate-300/50 dark:border-slate-700/50 flex flex-col items-start hover:border-yellow-500/50 transition">
+                                <div className="widget-card bg-white/40 dark:bg-slate-900/40 p-6 rounded-xl border border-slate-300/50 dark:border-slate-700/50 flex flex-col items-start hover:border-yellow-500/50 transition">
                                     <div className="bg-yellow-500/20 p-3 rounded-lg text-yellow-400 mb-4">
                                         <Database className="w-8 h-8" />
                                     </div>
@@ -1031,7 +1031,7 @@ const AdminSettings: React.FC = () => {
                                 </div>
 
                                 {/* 3. Git Pull */}
-                                <div className="bg-white/40 dark:bg-slate-900/40 p-6 rounded-xl border border-slate-300/50 dark:border-slate-700/50 flex flex-col items-start hover:border-green-500/50 transition">
+                                <div className="widget-card bg-white/40 dark:bg-slate-900/40 p-6 rounded-xl border border-slate-300/50 dark:border-slate-700/50 flex flex-col items-start hover:border-green-500/50 transition">
                                     <div className="bg-green-500/20 p-3 rounded-lg text-green-400 mb-4">
                                         <GitBranch className="w-8 h-8" />
                                     </div>
@@ -1048,7 +1048,7 @@ const AdminSettings: React.FC = () => {
                                 </div>
 
                                 {/* 4. Album Cache Reset */}
-                                <div className="bg-white/40 dark:bg-slate-900/40 p-6 rounded-xl border border-slate-300/50 dark:border-slate-700/50 flex flex-col items-start hover:border-purple-500/50 transition">
+                                <div className="widget-card bg-white/40 dark:bg-slate-900/40 p-6 rounded-xl border border-slate-300/50 dark:border-slate-700/50 flex flex-col items-start hover:border-purple-500/50 transition">
                                     <div className="bg-purple-500/20 p-3 rounded-lg text-purple-400 mb-4">
                                         <Image className="w-8 h-8" />
                                     </div>
@@ -1085,7 +1085,37 @@ const AdminSettings: React.FC = () => {
                             <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4 flex items-center gap-2">
                                 Design
                             </h3>
-                            <div className="bg-white/40 dark:bg-slate-900/40 rounded-xl border border-slate-300/50 dark:border-slate-700/50 p-5 space-y-4">
+                            <div className="widget-card bg-white/40 dark:bg-slate-900/40 rounded-xl border border-slate-300/50 dark:border-slate-700/50 p-5 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-600 dark:text-slate-400 mb-2">Designstil</label>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {([
+                                            { id: 'classic', name: 'Klassisch', desc: 'Klares Standard-Design', preview: 'bg-slate-100 dark:bg-slate-950', card: 'bg-white dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700' },
+                                            { id: 'glass', name: 'Glas', desc: 'Transparente Karten mit Blur-Effekt', preview: 'bg-gradient-to-br from-blue-200 via-indigo-200 to-pink-200 dark:from-slate-900 dark:via-indigo-950 dark:to-sky-950', card: 'bg-white/40 dark:bg-slate-900/50 backdrop-blur rounded-lg border border-white/50 dark:border-white/10' },
+                                            { id: 'family', name: 'Familie', desc: 'Warm, rund & familienfreundlich', preview: 'bg-[#faf5ec] dark:bg-[#1c1917]', card: 'bg-white dark:bg-[#292524] rounded-xl border border-[#f0e7d8] dark:border-[#44403c] shadow-md' },
+                                        ] as const).map(d => (
+                                            <button
+                                                key={d.id}
+                                                onClick={() => updateConfig({ design: d.id })}
+                                                className={`text-left rounded-xl overflow-hidden border-2 transition ${
+                                                    (config.design || 'classic') === d.id
+                                                        ? 'border-blue-500 ring-2 ring-blue-500/30'
+                                                        : 'border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500'
+                                                }`}
+                                            >
+                                                <div className={`h-16 p-2 flex gap-1.5 ${d.preview}`}>
+                                                    <div className={`flex-1 ${d.card}`} />
+                                                    <div className={`flex-1 ${d.card}`} />
+                                                </div>
+                                                <div className="px-3 py-2 bg-white dark:bg-slate-900">
+                                                    <div className="text-sm font-bold text-slate-800 dark:text-slate-100">{d.name}</div>
+                                                    <div className="text-xs text-slate-500 dark:text-slate-400">{d.desc}</div>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
                                 <div>
                                     <label className="block text-sm font-bold text-slate-600 dark:text-slate-400 mb-2">Farbmodus</label>
                                     <div className="flex gap-2">
@@ -1155,7 +1185,7 @@ const AdminSettings: React.FC = () => {
                             {/* KIDS MANAGEMENT */}
                             <section>
                                 <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Kinder verwalten</h3>
-                                <div className="bg-white/40 dark:bg-slate-900/40 rounded-xl border border-slate-300/50 dark:border-slate-700/50 p-4 space-y-4">
+                                <div className="widget-card bg-white/40 dark:bg-slate-900/40 rounded-xl border border-slate-300/50 dark:border-slate-700/50 p-4 space-y-4">
                                     <div className="space-y-2">
                                         {(config.chores?.kids || []).map((kid) => (
                                             <div key={kid.id} className="flex items-center justify-between bg-slate-200 dark:bg-slate-800 p-3 rounded-lg border border-slate-300 dark:border-slate-700">
@@ -1227,7 +1257,7 @@ const AdminSettings: React.FC = () => {
                             {/* TASKS MANAGEMENT */}
                             <section>
                                 <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Aufgaben (Chore Loop)</h3>
-                                <div className="bg-white/40 dark:bg-slate-900/40 rounded-xl border border-slate-300/50 dark:border-slate-700/50 p-4 space-y-4">
+                                <div className="widget-card bg-white/40 dark:bg-slate-900/40 rounded-xl border border-slate-300/50 dark:border-slate-700/50 p-4 space-y-4">
                                     <div className="space-y-2">
                                         {(config.chores?.tasks || []).map((task) => {
                                             const isEditing = editingTaskId === task.id;
@@ -1461,7 +1491,7 @@ const AdminSettings: React.FC = () => {
                         {/* Mode Selection */}
                         <section>
                             <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Belohnungsmodus</h3>
-                            <div className="bg-white/40 dark:bg-slate-900/40 rounded-xl border border-slate-300/50 dark:border-slate-700/50 p-4">
+                            <div className="widget-card bg-white/40 dark:bg-slate-900/40 rounded-xl border border-slate-300/50 dark:border-slate-700/50 p-4">
                                 <div className="flex gap-4">
                                     <button
                                         onClick={() => updateConfig({ rewards: { ...config.rewards!, mode: 'individual' } })}
@@ -1492,7 +1522,7 @@ const AdminSettings: React.FC = () => {
                         {/* Target Stars */}
                         <section>
                             <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Ziel-Sterne</h3>
-                            <div className="bg-white/40 dark:bg-slate-900/40 rounded-xl border border-slate-300/50 dark:border-slate-700/50 p-4 flex items-center gap-3">
+                            <div className="widget-card bg-white/40 dark:bg-slate-900/40 rounded-xl border border-slate-300/50 dark:border-slate-700/50 p-4 flex items-center gap-3">
                                 <input
                                     type="number"
                                     min="5"
@@ -1510,7 +1540,7 @@ const AdminSettings: React.FC = () => {
                         {/* Current Reward */}
                         <section>
                             <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Aktuelle Belohnung</h3>
-                            <div className="bg-white/40 dark:bg-slate-900/40 rounded-xl border border-slate-300/50 dark:border-slate-700/50 p-4 space-y-4">
+                            <div className="widget-card bg-white/40 dark:bg-slate-900/40 rounded-xl border border-slate-300/50 dark:border-slate-700/50 p-4 space-y-4">
                                 <input
                                     type="text"
                                     value={config.rewards?.currentReward || ''}
@@ -1556,7 +1586,7 @@ const AdminSettings: React.FC = () => {
                         {/* Current Stars Overview */}
                         <section>
                             <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Aktueller Stand</h3>
-                            <div className="bg-white/40 dark:bg-slate-900/40 rounded-xl border border-slate-300/50 dark:border-slate-700/50 p-4 space-y-3">
+                            <div className="widget-card bg-white/40 dark:bg-slate-900/40 rounded-xl border border-slate-300/50 dark:border-slate-700/50 p-4 space-y-3">
                                 {config.rewards?.mode === 'shared' ? (
                                     <div className="text-lg text-slate-900 dark:text-white">
                                         Gemeinsam: <span className="text-yellow-400 font-bold">{config.rewards?.sharedStars || 0}</span> / {config.rewards?.targetStars || 20} Sterne
@@ -1598,7 +1628,7 @@ const AdminSettings: React.FC = () => {
                                 <Star className="w-5 h-5 text-yellow-400" />
                                 Bonus-Sterne vergeben
                             </h3>
-                            <div className="bg-white/40 dark:bg-slate-900/40 rounded-xl border border-slate-300/50 dark:border-slate-700/50 p-4 space-y-4">
+                            <div className="widget-card bg-white/40 dark:bg-slate-900/40 rounded-xl border border-slate-300/50 dark:border-slate-700/50 p-4 space-y-4">
                                 <p className="text-sm text-slate-500 dark:text-slate-400">
                                     Vergib Sterne für außergewöhnliche Leistungen, die nicht als reguläre Aufgabe hinterlegt sind.
                                 </p>

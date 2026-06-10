@@ -117,7 +117,7 @@ const WeekView: React.FC = () => {
     };
 
     return (
-        <div className="h-full flex flex-col bg-white/50 dark:bg-slate-900/50 text-slate-700 dark:text-slate-200">
+        <div className="widget-card h-full flex flex-col bg-white/50 dark:bg-slate-900/50 text-slate-700 dark:text-slate-200">
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur">
                 <div className="flex items-center space-x-4">

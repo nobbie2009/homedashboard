@@ -13,7 +13,7 @@ export const WeekWidget: React.FC = () => {
     const nextDays = Array.from({ length: 5 }, (_, i) => addDays(new Date(), i)); // Today + 4 days
 
     return (
-        <div className="flex flex-col p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl backdrop-blur-sm shadow-lg w-full h-full border border-slate-300 dark:border-slate-700 overflow-hidden">
+        <div className="widget-card flex flex-col p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl backdrop-blur-sm shadow-lg w-full h-full border border-slate-300 dark:border-slate-700 overflow-hidden">
             <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-3 uppercase tracking-wider">Wochenübersicht</h3>
             <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4">
                 {nextDays.map(day => {

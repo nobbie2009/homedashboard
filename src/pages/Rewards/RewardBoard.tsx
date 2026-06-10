@@ -219,7 +219,7 @@ const RewardBoard: React.FC = () => {
                 {rewards?.mode === 'shared' ? (
                     /* ─ Shared Mode ─ */
                     <div className="space-y-3">
-                        <div className="bg-white/80 dark:bg-slate-800/50 rounded-2xl border border-slate-200/60 dark:border-slate-700/40 p-6 shadow-sm">
+                        <div className="widget-card bg-white/80 dark:bg-slate-800/50 rounded-2xl border border-slate-200/60 dark:border-slate-700/40 p-6 shadow-sm">
                             <div className="flex items-center gap-3 mb-4">
                                 <Sparkles className="w-6 h-6 text-yellow-400" />
                                 <h2 className="text-xl font-bold text-slate-800 dark:text-white">Gemeinsamer Fortschritt</h2>
@@ -263,7 +263,7 @@ const RewardBoard: React.FC = () => {
                             return (
                                 <div
                                     key={kid.id}
-                                    className={`rounded-2xl border overflow-hidden transition-all shadow-sm ${
+                                    className={`widget-card rounded-2xl border overflow-hidden transition-all shadow-sm ${
                                         reached
                                             ? 'border-yellow-400/50 dark:border-yellow-500/50 shadow-lg shadow-yellow-500/10'
                                             : 'border-slate-200/60 dark:border-slate-700/40'
@@ -331,7 +331,7 @@ const RewardBoard: React.FC = () => {
 
                 {/* ── Recent History ── */}
                 {history.length > 0 && (
-                    <div className="bg-white/80 dark:bg-slate-800/30 rounded-2xl border border-slate-200/60 dark:border-slate-700/30 overflow-hidden shadow-sm">
+                    <div className="widget-card bg-white/80 dark:bg-slate-800/30 rounded-2xl border border-slate-200/60 dark:border-slate-700/30 overflow-hidden shadow-sm">
                         <div className="px-5 py-3 border-b border-slate-200/60 dark:border-slate-700/30 flex items-center gap-2">
                             <Clock className="w-4 h-4 text-slate-400 dark:text-slate-500" />
                             <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">

@@ -29,7 +29,7 @@ export const TrashWidget: React.FC = () => {
     const events = [...mockTrash].sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, 3);
 
     return (
-        <div className="flex flex-col p-4 bg-slate-800/50 rounded-xl backdrop-blur-sm shadow-lg w-full h-full border border-slate-700">
+        <div className="widget-card flex flex-col p-4 bg-slate-800/50 rounded-xl backdrop-blur-sm shadow-lg w-full h-full border border-slate-700">
             <h3 className="text-lg font-semibold text-slate-300 mb-3 uppercase tracking-wider">Müllabfuhr</h3>
             <div className="space-y-2 flex-1">
                 {events.map(event => {

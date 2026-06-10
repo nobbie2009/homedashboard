@@ -108,7 +108,7 @@ const HouseholdView: React.FC = () => {
     const memberById = new Map(data.members.map(m => [m.id, m]));
 
     return (
-        <div className="h-full w-full p-6 bg-white dark:bg-slate-900 overflow-y-auto relative">
+        <div className="widget-card h-full w-full p-6 bg-white dark:bg-slate-900 overflow-y-auto relative">
             <header className="mb-6 flex items-center gap-3">
                 <Wrench className="w-7 h-7 text-blue-500" />
                 <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Haushalt</h1>

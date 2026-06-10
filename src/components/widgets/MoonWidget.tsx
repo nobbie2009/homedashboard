@@ -73,7 +73,7 @@ export const MoonWidget: React.FC = () => {
     const daysUntilNew = Math.ceil((nextNew.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
     return (
-        <div className="flex flex-col p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full items-center justify-center">
+        <div className="widget-card flex flex-col p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full items-center justify-center">
             <div className="text-5xl mb-2">{phase.emoji}</div>
             <div className="text-lg font-bold text-slate-900 dark:text-white">{phase.name}</div>
             <div className="text-sm text-slate-500 dark:text-slate-400">{phase.illumination}% beleuchtet</div>

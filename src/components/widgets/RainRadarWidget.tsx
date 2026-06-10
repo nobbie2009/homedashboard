@@ -137,7 +137,7 @@ export const RainRadarWidget: React.FC = () => {
     }
 
     return (
-        <div className="h-full w-full rounded-xl overflow-hidden relative border border-slate-200/50 dark:border-slate-700/50 shadow-lg">
+        <div className="widget-card h-full w-full rounded-xl overflow-hidden relative border border-slate-200/50 dark:border-slate-700/50 shadow-lg">
             {/* Leaflet Map */}
             <MapContainer
                 center={coords}

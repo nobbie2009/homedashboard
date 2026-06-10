@@ -199,7 +199,7 @@ export const MainLayout: React.FC = () => {
     }, [deviceId]);
 
     return (
-        <div className="flex flex-col h-screen w-full bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 overflow-hidden relative transition-colors duration-200">
+        <div className="app-shell flex flex-col h-screen w-full bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 overflow-hidden relative transition-colors duration-200">
             <DoorbellOverlay
                 active={doorbellActive}
                 eventTimestamp={doorbellTs}
@@ -215,7 +215,7 @@ export const MainLayout: React.FC = () => {
             {keyboardActive && <OnScreenKeyboard onClose={() => setKeyboardActive(false)} />}
 
             {/* Header / Status Bar */}
-            <header className="flex-none h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 transition-colors duration-200">
+            <header className="app-header flex-none h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 transition-colors duration-200">
                 <div className="flex items-center gap-4 flex-1 min-w-0">
                     <div className="text-xl font-bold bg-gradient-to-r from-blue-500 to-teal-500 dark:from-blue-400 dark:to-teal-400 bg-clip-text text-transparent flex-shrink-0">
                         FamilyHub
@@ -280,7 +280,7 @@ export const MainLayout: React.FC = () => {
             </main>
 
             {/* Bottom Navigation */}
-            <nav className="flex-none h-20 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex transition-colors duration-200">
+            <nav className="app-nav flex-none h-20 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex transition-colors duration-200">
                 {navItems.map((item) => (
                     <NavLink
                         key={item.path}

@@ -168,6 +168,8 @@ export interface AppConfig {
         darkStart: string; // HH:mm, e.g. "20:00"
         darkEnd: string;   // HH:mm, e.g. "07:00"
     };
+    /** Visueller Designstil des Dashboards (unabhängig von Hell/Dunkel). */
+    design?: 'classic' | 'glass' | 'family';
 }
 
 export type CalendarScope = 'today' | 'weekWidget' | 'nextEvent' | 'weekView';
@@ -239,6 +241,7 @@ const defaultConfig: AppConfig = {
         darkStart: '20:00',
         darkEnd: '07:00'
     },
+    design: 'classic',
     catCare: {
         enabled: false,
         feedingTimes: ['07:00', '18:00'],
@@ -345,7 +348,8 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
                             updatedAt: data.note?.updatedAt ?? prev.note?.updatedAt ?? 0,
                             author: data.note?.author ?? prev.note?.author
                         },
-                        theme: data.theme || prev.theme || 'dark'
+                        theme: data.theme || prev.theme || 'dark',
+                        design: data.design || prev.design || 'classic'
                     };
 
                     // Check for Chore Rotation - MOVED TO SERVER

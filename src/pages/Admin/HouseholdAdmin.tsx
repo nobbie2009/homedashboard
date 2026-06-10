@@ -64,7 +64,7 @@ export const HouseholdAdmin: React.FC = () => {
 
     return (
         <div className="space-y-8 text-slate-900 dark:text-white">
-            <section className="bg-slate-200/30 dark:bg-slate-800/30 p-6 rounded-xl border border-slate-300 dark:border-slate-700 space-y-3">
+            <section className="widget-card bg-slate-200/30 dark:bg-slate-800/30 p-6 rounded-xl border border-slate-300 dark:border-slate-700 space-y-3">
                 <div className="flex items-center justify-between">
                     <h3 className="text-lg font-bold">Haushaltsmitglieder</h3>
                     <button onClick={addMember} className="flex items-center gap-1 bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded text-sm">
@@ -97,7 +97,7 @@ export const HouseholdAdmin: React.FC = () => {
                 </div>
             </section>
 
-            <section className="bg-slate-200/30 dark:bg-slate-800/30 p-6 rounded-xl border border-slate-300 dark:border-slate-700 space-y-3">
+            <section className="widget-card bg-slate-200/30 dark:bg-slate-800/30 p-6 rounded-xl border border-slate-300 dark:border-slate-700 space-y-3">
                 <div className="flex items-center justify-between">
                     <h3 className="text-lg font-bold">Aufgaben</h3>
                     <button onClick={addTask} className="flex items-center gap-1 bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded text-sm">
