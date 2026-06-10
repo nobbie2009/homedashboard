@@ -20,7 +20,7 @@ export const CountdownWidget: React.FC = () => {
 
     const katWarnView = (
         <div
-            className="flex flex-col p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full items-center justify-center relative overflow-hidden cursor-pointer select-none"
+            className="widget-card flex flex-col p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full items-center justify-center relative overflow-hidden cursor-pointer select-none"
             onClick={() => setShowKatWarn(false)}
         >
             <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-widest">KatWarn</h3>
@@ -39,7 +39,7 @@ export const CountdownWidget: React.FC = () => {
     if (loading && !nextEvent) {
         return (
             <div
-                className="flex flex-col items-center justify-center p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full text-slate-400 dark:text-slate-500 animate-pulse cursor-pointer select-none"
+                className="widget-card flex flex-col items-center justify-center p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full text-slate-400 dark:text-slate-500 animate-pulse cursor-pointer select-none"
                 onClick={() => setShowKatWarn(true)}
             >
                 <span className="text-lg">Lade Termine...</span>
@@ -50,7 +50,7 @@ export const CountdownWidget: React.FC = () => {
     if (!nextEvent) {
         return (
             <div
-                className="flex flex-col items-center justify-center p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full text-slate-400 dark:text-slate-500 cursor-pointer select-none"
+                className="widget-card flex flex-col items-center justify-center p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full text-slate-400 dark:text-slate-500 cursor-pointer select-none"
                 onClick={() => setShowKatWarn(true)}
             >
                 <span className="text-lg">Keine weiteren Termine</span>
@@ -68,7 +68,7 @@ export const CountdownWidget: React.FC = () => {
 
     return (
         <div
-            className="flex flex-col p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full items-center justify-center relative overflow-hidden group cursor-pointer select-none"
+            className="widget-card flex flex-col p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full items-center justify-center relative overflow-hidden group cursor-pointer select-none"
             onClick={() => setShowKatWarn(true)}
         >
             {/* Background progress or glow could go here */}

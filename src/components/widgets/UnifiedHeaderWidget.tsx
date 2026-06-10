@@ -161,7 +161,7 @@ export const UnifiedHeaderWidget: React.FC = () => {
     }
 
     return (
-        <div className={`${gridClass} items-center bg-slate-200/60 dark:bg-slate-800/60 rounded-xl backdrop-blur-md shadow-lg w-full h-full border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white relative transition-all duration-500`}>
+        <div className={`widget-card ${gridClass} items-center bg-slate-200/60 dark:bg-slate-800/60 rounded-xl backdrop-blur-md shadow-lg w-full h-full border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white relative transition-all duration-500`}>
 
             {/* LEFT: Clock */}
             <div className="flex flex-row items-center justify-start pl-8 h-full">

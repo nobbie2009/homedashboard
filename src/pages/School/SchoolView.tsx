@@ -177,7 +177,7 @@ export const SchoolView: React.FC = () => {
     return (
         <div className="h-full w-full p-4 flex flex-col gap-4">
             {/* Global Week Navigation (Applying to all students for simplicity) */}
-            <div className="flex items-center justify-between bg-slate-200/50 dark:bg-slate-800/50 p-2 rounded-lg border border-slate-300 dark:border-slate-700">
+            <div className="widget-card flex items-center justify-between bg-slate-200/50 dark:bg-slate-800/50 p-2 rounded-lg border border-slate-300 dark:border-slate-700">
                 <button onClick={handlePrevWeek} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-600 dark:text-slate-300 transition-colors flex items-center gap-2">
                     <Clock className="w-5 h-5 rotate-180" />
                     <span className="hidden sm:inline">&lt; Woche</span>
@@ -205,7 +205,7 @@ export const SchoolView: React.FC = () => {
                     const currentTab = getActiveTab(idx);
 
                     return (
-                        <div key={idx} className="bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 flex flex-col overflow-hidden shadow-lg backdrop-blur-sm h-full">
+                        <div key={idx} className="widget-card bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 flex flex-col overflow-hidden shadow-lg backdrop-blur-sm h-full">
                             {/* Header */}
                             <div className="p-4 border-b border-slate-300 dark:border-slate-700 bg-white/60 dark:bg-slate-900/60 flex items-center justify-between">
                                 <div className="flex items-center space-x-3">

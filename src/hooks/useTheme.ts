@@ -46,6 +46,19 @@ export function useTheme() {
         }
     }, [resolvedDark]);
 
+    // Apply the selected design style (classic/glass/family). The CSS in
+    // index.css scopes all design overrides to html[data-design='...'], so
+    // classic simply means "no attribute".
+    useEffect(() => {
+        const root = document.documentElement;
+        const design = config.design || 'classic';
+        if (design === 'classic') {
+            root.removeAttribute('data-design');
+        } else {
+            root.setAttribute('data-design', design);
+        }
+    }, [config.design]);
+
     const toggleTheme = useCallback(() => {
         // Cycle: dark -> light -> auto -> dark
         const next = config.theme === 'dark' ? 'light' : config.theme === 'light' ? 'auto' : 'dark';

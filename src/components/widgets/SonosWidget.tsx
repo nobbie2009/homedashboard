@@ -102,7 +102,7 @@ export const SonosWidget: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-3 h-full flex items-center justify-center border border-slate-200 dark:border-slate-800">
+            <div className="widget-card bg-white dark:bg-slate-900 rounded-2xl p-3 h-full flex items-center justify-center border border-slate-200 dark:border-slate-800">
                 <div className="animate-pulse text-slate-400 text-sm">Sonos laden...</div>
             </div>
         );
@@ -110,7 +110,7 @@ export const SonosWidget: React.FC = () => {
 
     if (error || !activeSpeaker) {
         return (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-3 h-full flex items-center justify-center border border-slate-200 dark:border-slate-800">
+            <div className="widget-card bg-white dark:bg-slate-900 rounded-2xl p-3 h-full flex items-center justify-center border border-slate-200 dark:border-slate-800">
                 <div className="text-center">
                     <Music className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-1" />
                     <div className="text-xs text-slate-400">Kein Sonos gefunden</div>
@@ -120,7 +120,7 @@ export const SonosWidget: React.FC = () => {
     }
 
     return (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-3 h-full flex flex-col border border-slate-200 dark:border-slate-800 overflow-hidden">
+        <div className="widget-card bg-white dark:bg-slate-900 rounded-2xl p-3 h-full flex flex-col border border-slate-200 dark:border-slate-800 overflow-hidden">
             {/* Header with speaker name */}
             <div className="flex items-center justify-between mb-1 flex-none">
                 <div className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">

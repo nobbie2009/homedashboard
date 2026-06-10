@@ -1178,6 +1178,19 @@ app.get('/api/camera/stream', (req, res) => {
     const JPEG_START = Buffer.from([0xFF, 0xD8]);
     const JPEG_END = Buffer.from([0xFF, 0xD9]);
 
+    // Watchdog: if the camera reboots (e.g. nightly), the RTSP socket stalls
+    // and ffmpeg hangs forever without producing frames — the client keeps
+    // showing the last (night) frame. Kill the stalled process so the
+    // response ends and the client can reconnect.
+    let lastFrameTs = Date.now();
+    const STALL_TIMEOUT = 15000;
+    const stallWatchdog = setInterval(() => {
+        if (Date.now() - lastFrameTs > STALL_TIMEOUT) {
+            console.warn(`Camera stream stalled (no frames for ${STALL_TIMEOUT / 1000}s), killing ffmpeg`);
+            ffmpeg.kill('SIGKILL');
+        }
+    }, 5000);
+
     ffmpeg.stdout.on('data', (chunk) => {
         buffer = Buffer.concat([buffer, chunk]);
 
@@ -1197,6 +1210,7 @@ app.get('/api/camera/stream', (req, res) => {
             try {
                 res.write(`\r\n--${BOUNDARY}\r\nContent-Type: image/jpeg\r\nContent-Length: ${frame.length}\r\n\r\n`);
                 res.write(frame);
+                lastFrameTs = Date.now();
             } catch (e) {
                 // Client disconnected
                 break;
@@ -1222,11 +1236,13 @@ app.get('/api/camera/stream', (req, res) => {
 
     ffmpeg.on('close', (code) => {
         console.log(`FFMPEG stream process exited with code ${code}`);
+        clearInterval(stallWatchdog);
         try { res.end(); } catch (e) { /* already closed */ }
     });
 
     req.on('close', () => {
         console.log("Client disconnected, killing ffmpeg");
+        clearInterval(stallWatchdog);
         ffmpeg.kill('SIGKILL');
     });
 });
@@ -1253,6 +1269,21 @@ app.get('/api/camera/snapshot', (req, res) => {
         'Expires': '0'
     });
     ffmpeg.stdout.pipe(res);
+
+    // A snapshot must never hang: if the camera is unreachable, kill ffmpeg
+    // after 10s so the response ends and the client can retry.
+    const killTimer = setTimeout(() => {
+        console.warn('Camera snapshot timed out, killing ffmpeg');
+        ffmpeg.kill('SIGKILL');
+    }, 10000);
+    ffmpeg.on('close', () => {
+        clearTimeout(killTimer);
+        try { res.end(); } catch (e) { /* already closed */ }
+    });
+    req.on('close', () => {
+        clearTimeout(killTimer);
+        ffmpeg.kill('SIGKILL');
+    });
 });
 
 // --- Doorbell Camera ---

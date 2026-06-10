@@ -9,7 +9,7 @@ export const ChoresWidget: React.FC = () => {
     // Group tasks by kid
     // Only show "active" tasks (assuming all configured tasks are active for now)
     return (
-        <div className="flex flex-col p-4 bg-slate-200/60 dark:bg-slate-800/60 rounded-xl backdrop-blur-md shadow-lg w-full h-full border border-slate-300 dark:border-slate-700 overflow-hidden">
+        <div className="widget-card flex flex-col p-4 bg-slate-200/60 dark:bg-slate-800/60 rounded-xl backdrop-blur-md shadow-lg w-full h-full border border-slate-300 dark:border-slate-700 overflow-hidden">
             <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-2 uppercase tracking-wider">Aufgaben</h3>
             <div className="flex-1 flex flex-col justify-around space-y-2">
                 {kids.map(kid => {

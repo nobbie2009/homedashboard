@@ -62,7 +62,7 @@ const ChoresView: React.FC = () => {
     };
 
     return (
-        <div className="h-full w-full p-6 bg-white dark:bg-slate-900 text-slate-900 dark:text-white overflow-y-auto">
+        <div className="widget-card h-full w-full p-6 bg-white dark:bg-slate-900 text-slate-900 dark:text-white overflow-y-auto">
             <header className="mb-8 text-center flex items-center justify-center gap-3">
                 <Star className="w-8 h-8 text-yellow-400 fill-yellow-400" />
                 <h1 className="text-4xl font-bold text-yellow-500 drop-shadow-md tracking-wider">Eure Aufgaben</h1>

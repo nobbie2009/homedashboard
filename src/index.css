@@ -1,3 +1,7 @@
+/* Schriften für das Familien-Design (display=swap: bei Offline-Kiosk greift
+   die System-Schrift als Fallback, nichts blockiert). */
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Varela+Round&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -9,4 +13,122 @@
   .dark body {
     @apply bg-slate-950 text-slate-50;
   }
+}
+
+/* ============================================================
+   Design-System
+   Drei umschaltbare Designs (Auswahl im Admin → Design):
+     • Klassisch  – Standard, keine Overrides (html ohne data-design)
+     • Glas       – Glassmorphism: Verlaufshintergrund + Blur-Karten
+     • Familie    – warm, rund, freundlich (eigener Entwurf)
+   Die Komponenten tragen semantische Klassen (.app-shell, .app-header,
+   .app-nav, .widget-card, .media-card); die Designs überschreiben nur
+   Oberfläche, Rand, Radius und Schatten — Inhalte und Layout bleiben
+   unangetastet, alle Informationen bleiben erhalten.
+   ============================================================ */
+
+/* ----------------------- Design „Glas" ----------------------- */
+
+html[data-design='glass'] .app-shell {
+  background: linear-gradient(135deg, #bfdbfe 0%, #e0e7ff 30%, #fbcfe8 65%, #bae6fd 100%);
+  background-attachment: fixed;
+}
+html.dark[data-design='glass'] .app-shell {
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 40%, #312e81 75%, #0c4a6e 100%);
+  background-attachment: fixed;
+}
+
+html[data-design='glass'] .widget-card {
+  background: rgba(255, 255, 255, 0.55);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border-radius: 1.25rem;
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.12);
+}
+html.dark[data-design='glass'] .widget-card {
+  background: rgba(15, 23, 42, 0.5);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+/* Rahmenfarbe nur bei neutralen Karten umfärben — farbige Status-Rahmen
+   (rot = überfällig, gelb = Ziel erreicht, …) müssen sichtbar bleiben. */
+html[data-design='glass'] .widget-card:not([class*='border-red']):not([class*='border-yellow']):not([class*='border-amber']):not([class*='border-orange']):not([class*='border-green']) {
+  border-color: rgba(255, 255, 255, 0.55);
+}
+html.dark[data-design='glass'] .widget-card:not([class*='border-red']):not([class*='border-yellow']):not([class*='border-amber']):not([class*='border-orange']):not([class*='border-green']) {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+html[data-design='glass'] .app-header,
+html[data-design='glass'] .app-nav {
+  background: rgba(255, 255, 255, 0.6);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+html.dark[data-design='glass'] .app-header,
+html.dark[data-design='glass'] .app-nav {
+  background: rgba(15, 23, 42, 0.6);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+html[data-design='glass'] .media-card {
+  border-radius: 1.25rem;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* --------------------- Design „Familie" ---------------------- */
+/* Eigener Entwurf: warmes Creme, stark gerundete weiße Karten mit
+   weichen Schatten, runde freundliche Schrift. Dunkelmodus in warmen
+   Stein-Tönen statt kühlem Slate. */
+
+html[data-design='family'] body {
+  font-family: 'Nunito', ui-sans-serif, system-ui, sans-serif;
+}
+html[data-design='family'] h1,
+html[data-design='family'] h2,
+html[data-design='family'] h3 {
+  font-family: 'Varela Round', 'Nunito', ui-sans-serif, system-ui, sans-serif;
+}
+
+html[data-design='family'] .app-shell {
+  background: #faf5ec;
+}
+html.dark[data-design='family'] .app-shell {
+  background: #1c1917;
+}
+
+html[data-design='family'] .widget-card {
+  background: #ffffff;
+  border-radius: 1.5rem;
+  box-shadow: 0 10px 25px -10px rgba(146, 104, 41, 0.18);
+}
+html.dark[data-design='family'] .widget-card {
+  background: #292524;
+  box-shadow: 0 10px 25px -10px rgba(0, 0, 0, 0.5);
+}
+/* Rahmenfarbe nur bei neutralen Karten umfärben (Status-Rahmen bleiben). */
+html[data-design='family'] .widget-card:not([class*='border-red']):not([class*='border-yellow']):not([class*='border-amber']):not([class*='border-orange']):not([class*='border-green']) {
+  border-color: #f0e7d8;
+}
+html.dark[data-design='family'] .widget-card:not([class*='border-red']):not([class*='border-yellow']):not([class*='border-amber']):not([class*='border-orange']):not([class*='border-green']) {
+  border-color: #44403c;
+}
+
+html[data-design='family'] .app-header,
+html[data-design='family'] .app-nav {
+  background: #fffdf8;
+  border-color: #f0e7d8;
+}
+html.dark[data-design='family'] .app-header,
+html.dark[data-design='family'] .app-nav {
+  background: #231f1c;
+  border-color: #44403c;
+}
+
+html[data-design='family'] .media-card {
+  border-radius: 1.5rem;
+  border-color: #f0e7d8;
+}
+html.dark[data-design='family'] .media-card {
+  border-color: #44403c;
 }

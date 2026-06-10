@@ -318,7 +318,7 @@ const SonosView: React.FC = () => {
             {/* Main content area */}
             <div className="flex-1 grid grid-cols-[1fr_2fr] gap-4 min-h-0">
                 {/* Left: Now Playing + Controls */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 flex flex-col overflow-y-auto">
+                <div className="widget-card bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 flex flex-col overflow-y-auto">
                     {/* Album Art */}
                     <div className="flex-none mb-4">
                         {track?.albumArtURI ? (
@@ -419,7 +419,7 @@ const SonosView: React.FC = () => {
                 </div>
 
                 {/* Right: Tabbed content */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden min-h-0">
+                <div className="widget-card bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden min-h-0">
                     {/* Tab bar */}
                     <div className="flex border-b border-slate-200 dark:border-slate-800 flex-none">
                         {tabs.map(tab => (

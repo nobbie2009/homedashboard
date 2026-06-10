@@ -91,7 +91,7 @@ export const BathroomAdmin: React.FC = () => {
     return (
         <div className="space-y-8 text-slate-900 dark:text-white">
             {/* Schedule */}
-            <section className="bg-slate-200/30 dark:bg-slate-800/30 p-6 rounded-xl border border-slate-300 dark:border-slate-700 space-y-3">
+            <section className="widget-card bg-slate-200/30 dark:bg-slate-800/30 p-6 rounded-xl border border-slate-300 dark:border-slate-700 space-y-3">
                 <h3 className="text-lg font-bold">Zeitfenster</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {([
@@ -121,7 +121,7 @@ export const BathroomAdmin: React.FC = () => {
             </section>
 
             {/* Items */}
-            <section className="bg-slate-200/30 dark:bg-slate-800/30 p-6 rounded-xl border border-slate-300 dark:border-slate-700 space-y-3">
+            <section className="widget-card bg-slate-200/30 dark:bg-slate-800/30 p-6 rounded-xl border border-slate-300 dark:border-slate-700 space-y-3">
                 <div className="flex items-center justify-between">
                     <h3 className="text-lg font-bold">Aufgaben</h3>
                     <button onClick={addItem} className="flex items-center gap-1 bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded text-sm">
@@ -190,7 +190,7 @@ export const BathroomAdmin: React.FC = () => {
             </section>
 
             {/* Reset */}
-            <section className="bg-slate-200/30 dark:bg-slate-800/30 p-6 rounded-xl border border-slate-300 dark:border-slate-700 space-y-3">
+            <section className="widget-card bg-slate-200/30 dark:bg-slate-800/30 p-6 rounded-xl border border-slate-300 dark:border-slate-700 space-y-3">
                 <h3 className="text-lg font-bold">Aktuelles Zeitfenster zurücksetzen</h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
                     Setzt die erledigten Aufgaben im aktuellen Zeitfenster zurück. Bereits vergebene Sterne bleiben erhalten.

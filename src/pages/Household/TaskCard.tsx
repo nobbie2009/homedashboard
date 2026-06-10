@@ -38,7 +38,7 @@ export const TaskCard: React.FC<Props> = ({ task, member, lastMember, now, onCom
         : 'border-slate-300 dark:border-slate-700';
 
     return (
-        <div className={`bg-white dark:bg-slate-800 rounded-xl border-2 ${borderClass} p-4 flex items-center gap-4 shadow-sm`}>
+        <div className={`widget-card bg-white dark:bg-slate-800 rounded-xl border-2 ${borderClass} p-4 flex items-center gap-4 shadow-sm`}>
             <div className="flex-1 min-w-0 space-y-1">
                 <div className="flex items-center gap-2">
                     {overdue && <AlertTriangle className="w-4 h-4 text-red-500 flex-none" />}
