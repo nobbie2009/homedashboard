@@ -16,6 +16,42 @@
 }
 
 /* ============================================================
+   Scroll-Verhalten (Touch / iPhone)
+   ------------------------------------------------------------
+   `.custom-scrollbar` markiert alle scrollbaren Boxen (Wochen-,
+   Aufgaben-, Sterne-, Sonos-Bereiche …). Bis hier war die Klasse
+   ohne Wirkung – jetzt liefert sie:
+     • -webkit-overflow-scrolling: touch  → flüssiges Momentum-
+       Scrolling per Wischgeste auf iPhone/iPad (iOS Safari/PWA)
+     • overscroll-behavior: contain       → kein „Durchscrollen"
+       auf die darunterliegende Seite, kein Gummiband-Effekt
+     • touch-action: pan-x pan-y          → Wischgesten in beide
+       Richtungen erlaubt (vertikale Listen wie horizontale Pills)
+   Dazu ein dezenter, schlanker Scrollbar-Stil.
+   ============================================================ */
+.custom-scrollbar {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-x pan-y;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.5);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.8);
+}
+
+/* ============================================================
    Design-System
    Drei umschaltbare Designs (Auswahl im Admin → Design):
      • Klassisch  – Standard, keine Overrides (html ohne data-design)

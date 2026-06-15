@@ -143,7 +143,7 @@ const RewardBoard: React.FC = () => {
     };
 
     return (
-        <div className="h-full w-full overflow-y-auto relative bg-slate-50 dark:bg-transparent">
+        <div className="h-full w-full overflow-y-auto custom-scrollbar relative bg-slate-50 dark:bg-transparent">
             {/* Ambient floating stars */}
             {[0, 1, 2, 3, 4, 5, 6].map(i => (
                 <FloatingStar key={i} delay={i * 0.7} left={`${8 + i * 13}%`} />
@@ -338,7 +338,7 @@ const RewardBoard: React.FC = () => {
                                 Letzte Aktivitäten
                             </h3>
                         </div>
-                        <div className="divide-y divide-slate-100 dark:divide-slate-800/60 max-h-64 overflow-y-auto">
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800/60 max-h-64 overflow-y-auto custom-scrollbar">
                             {history.map(entry => {
                                 const kid = kids.find(k => k.id === entry.kidId);
                                 return (

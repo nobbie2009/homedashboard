@@ -288,7 +288,7 @@ const SonosView: React.FC = () => {
             {/* Speaker selector + tabs */}
             <div className="flex items-center gap-4 flex-none">
                 {/* Speaker pills */}
-                <div className="flex gap-2 flex-1 overflow-x-auto">
+                <div className="flex gap-2 flex-1 overflow-x-auto custom-scrollbar">
                     {speakers.map(sp => (
                         <button
                             key={sp.ip}
@@ -318,7 +318,7 @@ const SonosView: React.FC = () => {
             {/* Main content area */}
             <div className="flex-1 grid grid-cols-[1fr_2fr] gap-4 min-h-0">
                 {/* Left: Now Playing + Controls */}
-                <div className="widget-card bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 flex flex-col overflow-y-auto">
+                <div className="widget-card bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 flex flex-col overflow-y-auto custom-scrollbar">
                     {/* Album Art */}
                     <div className="flex-none mb-4">
                         {track?.albumArtURI ? (
@@ -439,7 +439,7 @@ const SonosView: React.FC = () => {
                     </div>
 
                     {/* Tab content */}
-                    <div className="flex-1 overflow-y-auto p-4">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
                         {activeTab === 'player' && <PlayerTab speaker={selectedSpeaker} track={track ?? null} />}
                         {activeTab === 'favorites' && (
                             <FavoritesTab
