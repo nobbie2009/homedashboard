@@ -551,14 +551,60 @@ const AdminSettings: React.FC = () => {
                                     <CheckCircle className="w-4 h-4 ml-1" />
                                     Verbunden
                                 </span>
-                            ) : (
+                            ) : config.spotify?.clientId && config.spotify?.clientSecret ? (
                                 <a
                                     href={`${API_URL}/auth/spotify`}
                                     className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-green-500 transition"
                                 >
                                     Mit Spotify verbinden
                                 </a>
+                            ) : (
+                                <span className="text-xs text-slate-400 dark:text-slate-500 italic">
+                                    Credentials eingeben um zu verbinden
+                                </span>
                             )}
+                        </div>
+
+                        <div className="mt-4 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
+                                    Client ID
+                                </label>
+                                <input
+                                    type="text"
+                                    value={config.spotify?.clientId || ''}
+                                    onChange={(e) => updateConfig({ spotify: { ...config.spotify, clientId: e.target.value } })}
+                                    placeholder="z.B. a1b2c3d4e5f6..."
+                                    className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded w-full px-3 py-2 text-slate-900 dark:text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 font-mono text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
+                                    Client Secret
+                                </label>
+                                <input
+                                    type="password"
+                                    value={config.spotify?.clientSecret || ''}
+                                    onChange={(e) => updateConfig({ spotify: { ...config.spotify, clientSecret: e.target.value } })}
+                                    placeholder="z.B. x9y8z7w6v5u4..."
+                                    className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded w-full px-3 py-2 text-slate-900 dark:text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 font-mono text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
+                                    Redirect URI
+                                </label>
+                                <input
+                                    type="text"
+                                    value={config.spotify?.redirectUri || ''}
+                                    onChange={(e) => updateConfig({ spotify: { ...config.spotify, redirectUri: e.target.value } })}
+                                    placeholder="http://localhost:3001/auth/spotify/callback"
+                                    className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded w-full px-3 py-2 text-slate-900 dark:text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 font-mono text-sm"
+                                />
+                                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                                    Muss in der Spotify Developer App als Redirect URI eingetragen sein.
+                                </p>
+                            </div>
                         </div>
 
                         {isSpotifyAuth && (

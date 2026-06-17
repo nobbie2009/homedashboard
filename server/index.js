@@ -449,6 +449,7 @@ if (fs.existsSync(CONFIG_PATH)) {
         console.error("Failed to load config:", err);
     }
 }
+spotify.setConfigRef(appConfig);
 
 // Event Cache
 const eventCache = new Map();
@@ -526,6 +527,7 @@ app.post('/api/config', (req, res) => {
         }
 
         appConfig = newConfig;
+        spotify.setConfigRef(appConfig);
         fs.writeFileSync(CONFIG_PATH, JSON.stringify(appConfig, null, 2));
         console.log("Config saved.");
         // Broadcast cat care / note updates so other dashboards pick them up

@@ -19,6 +19,19 @@ const SCOPES = [
 ].join(' ');
 
 let tokens = null;
+let configRef = null;
+
+function setConfigRef(config) {
+    configRef = config;
+}
+
+function getCreds() {
+    return {
+        clientId: process.env.SPOTIFY_CLIENT_ID || configRef?.spotify?.clientId || '',
+        clientSecret: process.env.SPOTIFY_CLIENT_SECRET || configRef?.spotify?.clientSecret || '',
+        redirectUri: process.env.SPOTIFY_REDIRECT_URI || configRef?.spotify?.redirectUri || 'http://localhost:3001/auth/spotify/callback',
+    };
+}
 
 // Token Management
 
@@ -50,9 +63,9 @@ function saveTokens(newTokens) {
 }
 
 async function refreshAccessToken() {
-    const { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET } = process.env;
-    if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
-        throw new Error('SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET must be set');
+    const { clientId, clientSecret } = getCreds();
+    if (!clientId || !clientSecret) {
+        throw new Error('Spotify Client ID und Secret müssen konfiguriert sein');
     }
     if (!tokens?.refresh_token) {
         throw new Error('No refresh token available. Please re-authorize.');
@@ -67,7 +80,7 @@ async function refreshAccessToken() {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': 'Basic ' + Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64'),
+            'Authorization': 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64'),
         },
         body: params.toString(),
     });
@@ -165,38 +178,38 @@ async function spotifyFetch(endpoint, options = {}) {
 // OAuth
 
 function generateAuthUrl() {
-    const { SPOTIFY_CLIENT_ID, SPOTIFY_REDIRECT_URI } = process.env;
-    if (!SPOTIFY_CLIENT_ID || !SPOTIFY_REDIRECT_URI) {
-        throw new Error('SPOTIFY_CLIENT_ID and SPOTIFY_REDIRECT_URI must be set');
+    const { clientId, redirectUri } = getCreds();
+    if (!clientId || !redirectUri) {
+        throw new Error('Spotify Client ID und Redirect URI müssen konfiguriert sein');
     }
 
     const params = new URLSearchParams({
         response_type: 'code',
-        client_id: SPOTIFY_CLIENT_ID,
+        client_id: clientId,
         scope: SCOPES,
-        redirect_uri: SPOTIFY_REDIRECT_URI,
+        redirect_uri: redirectUri,
     });
 
     return `${AUTH_URL}?${params.toString()}`;
 }
 
 async function exchangeCode(code) {
-    const { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI } = process.env;
-    if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET || !SPOTIFY_REDIRECT_URI) {
-        throw new Error('SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, and SPOTIFY_REDIRECT_URI must be set');
+    const { clientId, clientSecret, redirectUri } = getCreds();
+    if (!clientId || !clientSecret || !redirectUri) {
+        throw new Error('Spotify Client ID, Secret und Redirect URI müssen konfiguriert sein');
     }
 
     const params = new URLSearchParams({
         grant_type: 'authorization_code',
         code,
-        redirect_uri: SPOTIFY_REDIRECT_URI,
+        redirect_uri: redirectUri,
     });
 
     const response = await fetch(TOKEN_URL, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': 'Basic ' + Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64'),
+            'Authorization': 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64'),
         },
         body: params.toString(),
     });
@@ -309,6 +322,7 @@ async function getQueue() {
 loadTokens();
 
 export default {
+    setConfigRef,
     loadTokens,
     saveTokens,
     getValidToken,
