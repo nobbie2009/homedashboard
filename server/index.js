@@ -829,11 +829,31 @@ app.get('/api/spotify/playlist/:id/tracks', async (req, res) => {
 
 app.get('/api/spotify/devices', async (req, res) => {
     try {
-        const data = await spotify.getDevices();
-        res.json(data);
+        const [spotifyData, sonosSpeakers] = await Promise.allSettled([
+            spotify.getDevices(),
+            sonos.getSpeakersWithState(),
+        ]);
+
+        const spotifyDevices = spotifyData.status === 'fulfilled'
+            ? (spotifyData.value?.devices || []).map(d => ({ ...d, source: 'spotify' }))
+            : [];
+
+        const sonosDevices = sonosSpeakers.status === 'fulfilled'
+            ? sonosSpeakers.value.map(s => ({
+                id: `sonos:${s.ip}`,
+                name: s.name,
+                type: s.model || 'Speaker',
+                is_active: false,
+                volume_percent: s.volume || 0,
+                source: 'sonos',
+                ip: s.ip,
+            }))
+            : [];
+
+        res.json({ devices: [...spotifyDevices, ...sonosDevices] });
     } catch (error) {
         console.error('[Spotify] Devices error:', error.message);
-        res.status(error.message.includes('No Spotify tokens') ? 401 : 500).json({ error: error.message });
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -953,6 +973,83 @@ app.put('/api/spotify/repeat', async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('[Spotify] Repeat error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Sonos-routed Spotify playback endpoints
+app.put('/api/spotify/sonos/play', async (req, res) => {
+    try {
+        const { ip, uri, uris, context_uri } = req.body;
+        if (!ip) return res.status(400).json({ error: 'Missing ip' });
+
+        if (uris && uris.length > 0) {
+            await sonos.clearQueue(ip);
+            for (const u of uris) {
+                await sonos.addToQueue(ip, u);
+            }
+            await sonos.playFromQueue(ip, 0);
+        } else if (context_uri) {
+            await sonos.clearQueue(ip);
+            await sonos.addToQueue(ip, context_uri);
+            await sonos.playFromQueue(ip, 0);
+        } else if (uri) {
+            await sonos.play(ip, uri);
+        } else {
+            await sonos.play(ip);
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[Spotify/Sonos] Play error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/api/spotify/sonos/pause', async (req, res) => {
+    try {
+        const { ip } = req.body;
+        if (!ip) return res.status(400).json({ error: 'Missing ip' });
+        await sonos.pause(ip);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[Spotify/Sonos] Pause error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/spotify/sonos/next', async (req, res) => {
+    try {
+        const { ip } = req.body;
+        if (!ip) return res.status(400).json({ error: 'Missing ip' });
+        await sonos.next(ip);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[Spotify/Sonos] Next error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/spotify/sonos/previous', async (req, res) => {
+    try {
+        const { ip } = req.body;
+        if (!ip) return res.status(400).json({ error: 'Missing ip' });
+        await sonos.previous(ip);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[Spotify/Sonos] Previous error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/api/spotify/sonos/volume', async (req, res) => {
+    try {
+        const { ip, volume_percent } = req.body;
+        if (!ip) return res.status(400).json({ error: 'Missing ip' });
+        if (volume_percent === undefined) return res.status(400).json({ error: 'Missing volume_percent' });
+        await sonos.setVolume(ip, volume_percent);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[Spotify/Sonos] Volume error:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
