@@ -28,7 +28,18 @@ function readCachedStatus(): Device['status'] {
 }
 
 export function SecurityProvider({ children }: { children: React.ReactNode }) {
-    const [deviceId, setDeviceId] = useState<string>('');
+    // Resolve the device id synchronously on first render. Doing this in a
+    // useEffect left deviceId empty for the initial paint, so every component
+    // that fetched on mount (system/ip, SSE, spotify/devices, ...) sent an
+    // empty x-device-id header and got a 401 until the id arrived.
+    const [deviceId] = useState<string>(() => {
+        let id = localStorage.getItem(STORAGE_KEY);
+        if (!id) {
+            id = uuidv4();
+            localStorage.setItem(STORAGE_KEY, id);
+        }
+        return id;
+    });
     const [deviceStatus, setDeviceStatus] = useState<Device['status']>(() => readCachedStatus());
     const [device, setDevice] = useState<Device | null>(null);
     // Block the UI on first ever load. If a previous approval is cached we render
@@ -36,16 +47,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const [isChecking, setIsChecking] = useState(() => readCachedStatus() !== 'approved');
 
     const API_URL = getApiUrl();
-
-    // Initialize Device ID
-    useEffect(() => {
-        let id = localStorage.getItem(STORAGE_KEY);
-        if (!id) {
-            id = uuidv4();
-            localStorage.setItem(STORAGE_KEY, id);
-        }
-        setDeviceId(id!);
-    }, []);
 
     const checkStatus = async () => {
         if (!deviceId) return;
