@@ -795,7 +795,7 @@ const DevicesTab: React.FC<{
     activeDeviceId?: string;
     onTransfer: (deviceId: string) => void;
     onRefresh: () => void;
-}> = ({ devices, activeDeviceId, onTransfer, onRefresh }) => (
+}> = ({ devices, onTransfer, onRefresh }) => (
     <div>
         <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
