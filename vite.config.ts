@@ -51,6 +51,11 @@ export default defineConfig({
         // Pull in the push / notificationclick handlers (see public/push-sw.js).
         importScripts: ['/push-sw.js'],
         cleanupOutdatedCaches: true,
+        // Server-side routes (OAuth redirects, API) must hit the network and
+        // never be served the SPA shell. Without this, the navigation fallback
+        // returns index.html for e.g. /auth/spotify, the router can't match it,
+        // and the catch-all bounces the user back to the Home screen.
+        navigateFallbackDenylist: [/^\/auth\//, /^\/api\//],
         // The SPA shell is reachable offline, but we always try the network
         // first so the wall kiosk picks up new deploys and never gets stuck on
         // a stale HTML referencing missing chunks.
