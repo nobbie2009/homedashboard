@@ -1,4 +1,4 @@
-import { DeviceDiscovery, Sonos } from 'sonos';
+import { DeviceDiscovery, Sonos, SpotifyRegion } from 'sonos';
 
 // Persistent speaker list (IPs + names discovered)
 let knownSpeakers = []; // { ip, port, name, model, modelNumber }
@@ -9,7 +9,12 @@ const speakerInstances = new Map();
 
 function getSpeaker(ip) {
     if (!speakerInstances.has(ip)) {
-        speakerInstances.set(ip, new Sonos(ip));
+        const speaker = new Sonos(ip);
+        // The sonos library generates Spotify DIDL-Lite metadata based on the
+        // configured region. The default is US, which produces URIs the EU
+        // Spotify backend rejects (playback silently fails). Force EU.
+        speaker.setSpotifyRegion(SpotifyRegion.EU);
+        speakerInstances.set(ip, speaker);
     }
     return speakerInstances.get(ip);
 }
@@ -136,6 +141,40 @@ async function getSpeakerState(ip) {
     } catch (e) { /* no track */ }
 
     return { ip, state, volume, muted, currentTrack };
+}
+
+// Play Spotify content on a Sonos speaker.
+// Spotify URIs (spotify:track:/spotify:playlist:/spotify:album:...) must be
+// passed to the sonos library as STRINGS so it runs GenerateMetadata and
+// converts them into the x-sonos-spotify / x-rincon-cpcontainer URIs plus the
+// required DIDL-Lite metadata. Passing an object with empty metadata (as the
+// generic addToQueue helper does) makes playback fail silently.
+async function playSpotify(ip, { uri, uris, contextUri } = {}) {
+    const sonos = getSpeaker(ip);
+
+    // Playlist / album / artist container: queue the container and play it.
+    if (contextUri) {
+        await sonos.flush();
+        await sonos.queue(contextUri);
+        await sonos.selectQueue();
+        return sonos.play();
+    }
+
+    const list = (uris && uris.length) ? uris : (uri ? [uri] : []);
+
+    // No URI -> resume current playback.
+    if (list.length === 0) {
+        return sonos.play();
+    }
+
+    // Replace the queue with the requested track(s) and start from the top.
+    await sonos.flush();
+    for (const u of list) {
+        await sonos.queue(u);
+    }
+    await sonos.selectQueue();
+    await sonos.selectTrack(1);
+    return sonos.play();
 }
 
 // Transport controls
@@ -388,6 +427,7 @@ export default {
     runDiscovery,
     getSpeakersWithState,
     getSpeakerState,
+    playSpotify,
     play,
     pause,
     stop,

@@ -983,21 +983,7 @@ app.put('/api/spotify/sonos/play', async (req, res) => {
         const { ip, uri, uris, context_uri } = req.body;
         if (!ip) return res.status(400).json({ error: 'Missing ip' });
 
-        if (uris && uris.length > 0) {
-            await sonos.clearQueue(ip);
-            for (const u of uris) {
-                await sonos.addToQueue(ip, u);
-            }
-            await sonos.playFromQueue(ip, 0);
-        } else if (context_uri) {
-            await sonos.clearQueue(ip);
-            await sonos.addToQueue(ip, context_uri);
-            await sonos.playFromQueue(ip, 0);
-        } else if (uri) {
-            await sonos.play(ip, uri);
-        } else {
-            await sonos.play(ip);
-        }
+        await sonos.playSpotify(ip, { uri, uris, contextUri: context_uri });
         res.json({ success: true });
     } catch (error) {
         console.error('[Spotify/Sonos] Play error:', error.message);
