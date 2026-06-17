@@ -12,6 +12,7 @@ import {
     RewardBoard,
     SmartHomeView,
     SonosView,
+    SpotifyView,
     AdminSettings,
     BathroomView,
     HouseholdView,
@@ -60,6 +61,7 @@ function App() {
                                     <Route path="rewards" element={<RewardBoard />} />
                                     <Route path="smarthome" element={<SmartHomeView />} />
                                     <Route path="sonos" element={<SonosView />} />
+                                    <Route path="spotify" element={<SpotifyView />} />
                                     <Route path="bathroom" element={<BathroomView />} />
                                     <Route path="household" element={<HouseholdView />} />
                                     <Route path="admin" element={<AdminSettings />} />

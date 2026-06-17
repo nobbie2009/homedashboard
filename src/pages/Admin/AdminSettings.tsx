@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useKiosk } from '../../contexts/KioskContext';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useSecurity } from '../../contexts/SecurityContext';
-import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download, Smartphone, Trash2, Shield, ShieldAlert, ClipboardCheck, Plus, Cake, RefreshCw, Server, GitBranch, Database, Keyboard, Trophy, Star, Image, Cat, StickyNote, X, Droplets, Wrench } from 'lucide-react';
+import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download, Smartphone, Trash2, Shield, ShieldAlert, ClipboardCheck, Plus, Cake, RefreshCw, Server, GitBranch, Database, Keyboard, Trophy, Star, Image, Cat, StickyNote, X, Droplets, Wrench, Music } from 'lucide-react';
 import { IconMap, ChoreIcon } from '../../components/ChoreIcon';
 import BathroomAdmin from './BathroomAdmin';
 import HouseholdAdmin from './HouseholdAdmin';
@@ -91,6 +91,8 @@ const AdminSettings: React.FC = () => {
     const [error, setError] = useState('');
     const [remoteCalendars, setRemoteCalendars] = useState<any[]>([]);
     const [isGoogleAuth, setIsGoogleAuth] = useState(false);
+    const [isSpotifyAuth, setIsSpotifyAuth] = useState(false);
+    const [spotifyDevices, setSpotifyDevices] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState('kalender');
     const [newTaskIcon, setNewTaskIcon] = useState('clean');
     const [newTaskDifficulty, setNewTaskDifficulty] = useState<1 | 2 | 3>(1);
@@ -129,6 +131,7 @@ const AdminSettings: React.FC = () => {
 
     const tabs = [
         { id: 'kalender', label: 'Kalender', icon: CalendarIcon },
+        { id: 'spotify', label: 'Spotify', icon: Music },
         { id: 'aufgaben', label: 'Aufgaben', icon: ClipboardCheck },
         { id: 'belohnungen', label: 'Belohnungen', icon: Trophy },
         { id: 'bad', label: 'Bad', icon: Droplets },
@@ -152,6 +155,10 @@ const AdminSettings: React.FC = () => {
             setIsGoogleAuth(true);
             window.history.replaceState({}, '', window.location.pathname);
         }
+        if (params.get('spotifyAuth') === 'success') {
+            setIsSpotifyAuth(true);
+            window.history.replaceState({}, '', window.location.pathname);
+        }
 
         // Fetch remote calendars
         fetch(`${API_URL}/api/google/calendars`, {
@@ -168,6 +175,21 @@ const AdminSettings: React.FC = () => {
                 if (Array.isArray(data)) setRemoteCalendars(data);
             })
             .catch(() => setIsGoogleAuth(false));
+
+        fetch(`${API_URL}/api/spotify/devices`, {
+            headers: { 'x-device-id': deviceId }
+        })
+            .then(res => {
+                if (res.ok) {
+                    setIsSpotifyAuth(true);
+                    return res.json();
+                }
+                throw new Error("Not authenticated");
+            })
+            .then(data => {
+                if (data?.devices) setSpotifyDevices(data.devices);
+            })
+            .catch(() => setIsSpotifyAuth(false));
     }, [deviceId]);
 
     const handleUnlock = () => {
@@ -513,6 +535,125 @@ const AdminSettings: React.FC = () => {
                                 Achtung: Zu häufige Updates können zu einer temporären Sperre durch Google führen.
                             </p>
                         </div>
+                    </section>
+                )}
+
+                {/* SPOTIFY TAB */}
+                {activeTab === 'spotify' && (
+                    <section className="bg-slate-200/30 dark:bg-slate-800/30 p-6 rounded-xl border border-slate-300 dark:border-slate-700">
+                        <div className="flex justify-between items-start mb-4">
+                            <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                                <Music className="w-5 h-5" />
+                                Spotify
+                            </h3>
+                            {isSpotifyAuth ? (
+                                <span className="flex items-center gap-1 text-green-400 text-sm font-medium bg-green-400/10 px-3 py-1 rounded-full">
+                                    <CheckCircle className="w-4 h-4 ml-1" />
+                                    Verbunden
+                                </span>
+                            ) : config.spotify?.clientId && config.spotify?.clientSecret ? (
+                                <a
+                                    href={`${API_URL}/auth/spotify`}
+                                    className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-green-500 transition"
+                                >
+                                    Mit Spotify verbinden
+                                </a>
+                            ) : (
+                                <span className="text-xs text-slate-400 dark:text-slate-500 italic">
+                                    Credentials eingeben um zu verbinden
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="mt-4 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
+                                    Client ID
+                                </label>
+                                <input
+                                    type="text"
+                                    value={config.spotify?.clientId || ''}
+                                    onChange={(e) => updateConfig({ spotify: { ...config.spotify, clientId: e.target.value } })}
+                                    placeholder="z.B. a1b2c3d4e5f6..."
+                                    className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded w-full px-3 py-2 text-slate-900 dark:text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 font-mono text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
+                                    Client Secret
+                                </label>
+                                <input
+                                    type="password"
+                                    value={config.spotify?.clientSecret || ''}
+                                    onChange={(e) => updateConfig({ spotify: { ...config.spotify, clientSecret: e.target.value } })}
+                                    placeholder="z.B. x9y8z7w6v5u4..."
+                                    className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded w-full px-3 py-2 text-slate-900 dark:text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 font-mono text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
+                                    Redirect URI
+                                </label>
+                                <input
+                                    type="text"
+                                    value={config.spotify?.redirectUri || ''}
+                                    onChange={(e) => updateConfig({ spotify: { ...config.spotify, redirectUri: e.target.value } })}
+                                    placeholder="http://localhost:3001/auth/spotify/callback"
+                                    className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded w-full px-3 py-2 text-slate-900 dark:text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 font-mono text-sm"
+                                />
+                                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                                    Muss in der Spotify Developer App als Redirect URI eingetragen sein.
+                                </p>
+                            </div>
+                        </div>
+
+                        {isSpotifyAuth && (
+                            <div className="mt-4 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
+                                        Standard-Abspielgerät
+                                    </label>
+                                    <select
+                                        value={config.spotify?.defaultDeviceId || ''}
+                                        onChange={(e) => {
+                                            const device = spotifyDevices.find(d => d.id === e.target.value);
+                                            updateConfig({
+                                                spotify: {
+                                                    ...config.spotify,
+                                                    defaultDeviceId: e.target.value,
+                                                    defaultDeviceName: device?.name || ''
+                                                }
+                                            });
+                                        }}
+                                        className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                                    >
+                                        <option value="">Kein Standardgerät</option>
+                                        {spotifyDevices.map((d: any) => (
+                                            <option key={d.id} value={d.id}>
+                                                {d.name} ({d.type})
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                                        Auf diesem Gerät wird standardmäßig abgespielt (z.B. Sonos).
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        fetch(`${API_URL}/api/spotify/devices`, {
+                                            headers: { 'x-device-id': deviceId }
+                                        })
+                                            .then(res => res.json())
+                                            .then(data => { if (data?.devices) setSpotifyDevices(data.devices); })
+                                            .catch(() => {});
+                                    }}
+                                    className="text-sm text-blue-400 hover:text-blue-300 transition flex items-center gap-1"
+                                >
+                                    <RefreshCw className="w-3 h-3" />
+                                    Geräteliste aktualisieren
+                                </button>
+                            </div>
+                        )}
                     </section>
                 )}
 
