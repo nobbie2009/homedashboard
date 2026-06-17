@@ -105,6 +105,39 @@ const SpotifyView: React.FC = () => {
 
     const fetchPlayerState = useCallback(async () => {
         try {
+            // When a Sonos speaker is the active target, Spotify Connect knows
+            // nothing about the playback. Read the live state straight from the
+            // Sonos speaker and map it into the player-state shape the UI uses.
+            if (activeSonos) {
+                const res = await fetch(`${apiUrl}/api/sonos/state?ip=${encodeURIComponent(activeSonos.ip)}`, { headers });
+                if (res.ok) {
+                    const s = await res.json();
+                    const t = s.currentTrack;
+                    let art: string | null = t?.albumArtURI || null;
+                    if (art && art.startsWith('/')) {
+                        art = `http://${activeSonos.ip}:1400${art}`;
+                    }
+                    const mapped: SpotifyPlayerState = {
+                        is_playing: s.state === 'playing',
+                        item: t ? {
+                            id: t.uri || 'sonos',
+                            name: t.title || '',
+                            uri: t.uri || '',
+                            artists: t.artist ? [{ name: t.artist }] : [],
+                            album: { name: t.album || '', images: art ? [{ url: art }] : [] },
+                            duration_ms: (t.duration || 0) * 1000,
+                        } : null,
+                        progress_ms: (t?.position || 0) * 1000,
+                        device: { id: activeSonos.id, name: activeSonos.name, volume_percent: s.volume ?? 0 },
+                        shuffle_state: false,
+                        repeat_state: 'off',
+                    };
+                    setPlayerState(mapped);
+                    if (localVolume === null) setLocalVolume(s.volume ?? 0);
+                }
+                return;
+            }
+
             const res = await fetch(`${apiUrl}/api/spotify/player`, { headers });
             if (res.ok) {
                 const data: SpotifyPlayerState = await res.json();
@@ -117,7 +150,7 @@ const SpotifyView: React.FC = () => {
         finally {
             setLoading(false);
         }
-    }, [apiUrl, deviceId]);
+    }, [apiUrl, deviceId, activeSonos]);
 
     const fetchDevices = useCallback(async () => {
         try {
@@ -187,6 +220,7 @@ const SpotifyView: React.FC = () => {
                 headers,
                 body: JSON.stringify(body),
             });
+            setTimeout(fetchPlayerState, 600);
         } catch { /* ignore */ }
     };
 
@@ -197,6 +231,7 @@ const SpotifyView: React.FC = () => {
                 headers,
                 body: JSON.stringify(body),
             });
+            setTimeout(fetchPlayerState, 600);
         } catch { /* ignore */ }
     };
 
@@ -285,11 +320,13 @@ const SpotifyView: React.FC = () => {
     };
 
     const selectSonosDevice = (device: SpotifyDevice) => {
+        // Reset the local volume so the slider re-syncs to the new target's
+        // live volume on the next poll.
+        setLocalVolume(null);
         if (activeSonos?.id === device.id) {
             setActiveSonos(null);
         } else {
             setActiveSonos({ ip: device.ip!, id: device.id, name: device.name });
-            setLocalVolume(device.volume_percent);
         }
     };
 
