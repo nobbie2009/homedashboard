@@ -19,6 +19,7 @@ const __dirname = path.dirname(__filename);
 import { security } from './security.js';
 import { push } from './push.js';
 import sonos from './sonos.js';
+import spotify from './spotify.js';
 import { getSharedAlbumPhotos, clearAlbumCache, debugSharedAlbum } from './icloud.js';
 
 const app = express();
@@ -760,6 +761,197 @@ app.get('/auth/google/callback', async (req, res) => {
     } catch (error) {
         console.error("Error retrieving access token", error);
         res.redirect('/admin?googleAuth=error');
+    }
+});
+
+// --- SPOTIFY AUTH ROUTES ---
+
+app.get('/auth/spotify', (req, res) => {
+    try {
+        const url = spotify.generateAuthUrl();
+        res.redirect(url);
+    } catch (error) {
+        console.error('[Spotify] Auth URL generation failed:', error.message);
+        res.redirect('/admin?spotifyAuth=error_missing_creds');
+    }
+});
+
+app.get('/auth/spotify/callback', async (req, res) => {
+    const { code } = req.query;
+    if (!code) {
+        return res.redirect('/admin?spotifyAuth=error');
+    }
+    try {
+        await spotify.exchangeCode(code);
+        console.log('[Spotify] Tokens acquired and saved.');
+        res.redirect('/admin?spotifyAuth=success');
+    } catch (error) {
+        console.error('[Spotify] Token exchange failed:', error.message);
+        res.redirect('/admin?spotifyAuth=error');
+    }
+});
+
+// --- SPOTIFY API ROUTES ---
+
+app.get('/api/spotify/search', async (req, res) => {
+    try {
+        const { q, type = 'track', limit = 20 } = req.query;
+        if (!q) return res.status(400).json({ error: 'Missing query parameter q' });
+        const data = await spotify.search(q, type, limit);
+        res.json(data);
+    } catch (error) {
+        console.error('[Spotify] Search error:', error.message);
+        res.status(error.message.includes('No Spotify tokens') ? 401 : 500).json({ error: error.message });
+    }
+});
+
+app.get('/api/spotify/playlists', async (req, res) => {
+    try {
+        const data = await spotify.getPlaylists();
+        res.json(data);
+    } catch (error) {
+        console.error('[Spotify] Playlists error:', error.message);
+        res.status(error.message.includes('No Spotify tokens') ? 401 : 500).json({ error: error.message });
+    }
+});
+
+app.get('/api/spotify/playlist/:id/tracks', async (req, res) => {
+    try {
+        const data = await spotify.getPlaylistTracks(req.params.id);
+        res.json(data);
+    } catch (error) {
+        console.error('[Spotify] Playlist tracks error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/spotify/devices', async (req, res) => {
+    try {
+        const data = await spotify.getDevices();
+        res.json(data);
+    } catch (error) {
+        console.error('[Spotify] Devices error:', error.message);
+        res.status(error.message.includes('No Spotify tokens') ? 401 : 500).json({ error: error.message });
+    }
+});
+
+app.get('/api/spotify/player', async (req, res) => {
+    try {
+        const data = await spotify.getPlayerState();
+        res.json(data || {});
+    } catch (error) {
+        console.error('[Spotify] Player state error:', error.message);
+        res.status(error.message.includes('No Spotify tokens') ? 401 : 500).json({ error: error.message });
+    }
+});
+
+app.get('/api/spotify/queue', async (req, res) => {
+    try {
+        const data = await spotify.getQueue();
+        res.json(data);
+    } catch (error) {
+        console.error('[Spotify] Queue error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/api/spotify/play', async (req, res) => {
+    try {
+        await spotify.play(req.body || {});
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[Spotify] Play error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/api/spotify/pause', async (req, res) => {
+    try {
+        await spotify.pause(req.body?.device_id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[Spotify] Pause error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/spotify/next', async (req, res) => {
+    try {
+        await spotify.next(req.body?.device_id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[Spotify] Next error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/spotify/previous', async (req, res) => {
+    try {
+        await spotify.previous(req.body?.device_id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[Spotify] Previous error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/spotify/queue', async (req, res) => {
+    try {
+        const { uri } = req.body;
+        if (!uri) return res.status(400).json({ error: 'Missing uri' });
+        await spotify.addToQueue(uri, req.body.device_id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[Spotify] Add to queue error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/api/spotify/volume', async (req, res) => {
+    try {
+        const { volume_percent } = req.body;
+        if (volume_percent === undefined) return res.status(400).json({ error: 'Missing volume_percent' });
+        await spotify.setVolume(volume_percent, req.body.device_id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[Spotify] Volume error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/api/spotify/transfer', async (req, res) => {
+    try {
+        const { device_id, play } = req.body;
+        if (!device_id) return res.status(400).json({ error: 'Missing device_id' });
+        await spotify.transferPlayback(device_id, play || false);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[Spotify] Transfer error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/api/spotify/shuffle', async (req, res) => {
+    try {
+        const { state } = req.body;
+        if (state === undefined) return res.status(400).json({ error: 'Missing state' });
+        await spotify.setShuffle(state, req.body.device_id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[Spotify] Shuffle error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/api/spotify/repeat', async (req, res) => {
+    try {
+        const { state } = req.body;
+        if (!state) return res.status(400).json({ error: 'Missing state' });
+        await spotify.setRepeat(state, req.body.device_id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[Spotify] Repeat error:', error.message);
+        res.status(500).json({ error: error.message });
     }
 });
 

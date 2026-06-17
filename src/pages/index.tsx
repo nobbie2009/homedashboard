@@ -6,6 +6,7 @@ export { default as ChoresView } from './Chores/ChoresView';
 export { default as SmartHomeView } from './SmartHome/SmartHomeView';
 export { default as RewardBoard } from './Rewards/RewardBoard';
 export { default as SonosView } from './Sonos/SonosView';
+export { default as SpotifyView } from './Spotify/SpotifyView';
 export { default as AdminSettings } from './Admin/AdminSettings';
 export { default as BathroomView } from './Bathroom/BathroomView';
 export { default as HouseholdView } from './Household/HouseholdView';
