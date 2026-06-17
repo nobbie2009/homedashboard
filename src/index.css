@@ -51,6 +51,23 @@
   background-color: rgba(148, 163, 184, 0.8);
 }
 
+/* ------------------------------------------------------------
+   Touchscreen-Kiosk: Wischgesten sollen scrollen, nicht Text
+   markieren. Daher Textauswahl im Dashboard unterdrücken –
+   Eingabefelder bleiben bewusst selektierbar. Die PWA (kein
+   .app-shell) ist davon nicht betroffen.
+   ------------------------------------------------------------ */
+.app-shell {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.app-shell input,
+.app-shell textarea,
+.app-shell [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 /* ============================================================
    Design-System
    Drei umschaltbare Designs (Auswahl im Admin → Design):

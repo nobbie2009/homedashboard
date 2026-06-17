@@ -6,6 +6,7 @@ import { getApiUrl } from '../../utils/api';
 import { useSecurity } from '../../contexts/SecurityContext';
 import clsx from 'clsx';
 import { useIdleRedirect } from '../../hooks/useIdleRedirect';
+import { useDragScroll } from '../../hooks/useDragScroll';
 import { useTheme } from '../../hooks/useTheme';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import pkg from '../../../package.json';
@@ -130,6 +131,9 @@ export const MainLayout: React.FC = () => {
 
 
     useIdleRedirect(IDLE_REDIRECT_MS, '/');
+
+    // Wisch-/Zieh-Scrollen mit Schwung für den Touchscreen-Kiosk.
+    useDragScroll();
 
     const navItems = [
         { path: '/', icon: LayoutDashboard, label: 'Heute' },
