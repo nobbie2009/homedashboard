@@ -136,6 +136,13 @@ export interface AppConfig {
         calendarSettings?: Record<string, CalendarSettings>;
         pollInterval?: number; // Milliseconds
     };
+    spotify?: {
+        clientId?: string;
+        clientSecret?: string;
+        redirectUri?: string;
+        defaultDeviceId?: string;
+        defaultDeviceName?: string;
+    };
     notionKey?: string;
     notionDatabaseId?: string;
     notionRefreshInterval?: number; // Minutes
