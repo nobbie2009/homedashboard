@@ -741,7 +741,7 @@ app.get('/auth/google', (req, res) => {
 
 app.get('/auth/google/callback', async (req, res) => {
     if (!oauth2Client) {
-        return res.redirect('/admin/settings?googleAuth=error_missing_creds');
+        return res.redirect('/admin?googleAuth=error_missing_creds');
     }
     const { code } = req.query;
     try {
@@ -756,10 +756,10 @@ app.get('/auth/google/callback', async (req, res) => {
         console.log("Google tokens acquired and saved to file.");
 
         // Redirect back to Frontend Admin Settings (Relative path works because of Nginx proxy)
-        res.redirect('/admin/settings?googleAuth=success');
+        res.redirect('/admin?googleAuth=success');
     } catch (error) {
         console.error("Error retrieving access token", error);
-        res.redirect('/admin/settings?googleAuth=error');
+        res.redirect('/admin?googleAuth=error');
     }
 });
 
