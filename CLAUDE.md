@@ -7,3 +7,9 @@
   commits to the same branch will reach `main` automatically — once a PR is
   merged it is closed, and follow-up commits on that branch need their own
   PR. Check `git log origin/main..<branch>` before deciding.
+
+- **Fertige Arbeit wird ohne Rückfrage gemergt.** Wenn eine Änderung fertig
+  und getestet ist: Branch pushen, PR anlegen und den PR direkt mergen
+  (Squash). Nicht nachfragen, ob gemergt werden soll — der Nutzer hat das
+  dauerhaft freigegeben. Danach kurz mitteilen, was gemergt wurde und was auf
+  dem Server noch ausgerollt werden muss.
