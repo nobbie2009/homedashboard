@@ -21,6 +21,7 @@ import { push } from './push.js';
 import sonos from './sonos.js';
 import spotify from './spotify.js';
 import { getSharedAlbumPhotos, clearAlbumCache, debugSharedAlbum } from './icloud.js';
+import { getFlights, geocode as geocodePlace, availableSources as flightSources } from './flights.js';
 
 const app = express();
 app.use(cors());
@@ -2161,6 +2162,51 @@ const sseHandler = (req, res) => {
         sseClients.delete(res);
     });
 };
+
+// --- Flugradar ---
+// Live-Flugpositionen rund um den Dashboard-Standort. Der Abruf läuft bewusst
+// über den Server: so teilen sich alle Tablets einen Cache und der freie
+// ADS-B-Feed sieht nur einen Client statt eines pro Gerät.
+app.get('/api/flights', async (req, res) => {
+    const cfg = appConfig.flights || {};
+
+    try {
+        let lat = parseFloat(req.query.lat ?? cfg.lat);
+        let lon = parseFloat(req.query.lon ?? cfg.lon);
+
+        // No explicit coordinates configured: fall back to the weather location.
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+            const place = await geocodePlace(appConfig.weatherLocation);
+            if (!place) {
+                return res.status(400).json({
+                    error: 'Kein Standort für den Flugradar gefunden.',
+                    hint: 'Wetter-Standort setzen oder Koordinaten unter Einstellungen → Flugradar eintragen.'
+                });
+            }
+            lat = place.lat;
+            lon = place.lon;
+        }
+
+        const radiusKm = parseFloat(req.query.radius ?? cfg.radiusKm) || 60;
+        const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 50));
+
+        const result = await getFlights({ lat, lon, radiusKm, source: cfg.source });
+
+        res.json({
+            ...result,
+            flights: result.flights.slice(0, limit),
+            total: result.flights.length,
+        });
+    } catch (e) {
+        console.error('[Flights] Endpoint-Fehler:', e.message);
+        res.status(502).json({ error: 'Flugdaten nicht verfügbar', details: e.message });
+    }
+});
+
+// Auswahlliste für die Admin-Oberfläche
+app.get('/api/flights/sources', (req, res) => {
+    res.json(flightSources);
+});
 
 app.get('/api/stream/events', sseHandler);
 // Path-based variant: /api/stream/events/<deviceId>

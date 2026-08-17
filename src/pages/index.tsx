@@ -10,4 +10,5 @@ export { default as SpotifyView } from './Spotify/SpotifyView';
 export { default as AdminSettings } from './Admin/AdminSettings';
 export { default as BathroomView } from './Bathroom/BathroomView';
 export { default as HouseholdView } from './Household/HouseholdView';
+export { default as FlightsView } from './Flights/FlightsView';
 export { default as PwaApp } from './Pwa/PwaApp';

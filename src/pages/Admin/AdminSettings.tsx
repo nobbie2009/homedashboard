@@ -810,6 +810,84 @@ const AdminSettings: React.FC = () => {
                         </section>
 
                         <section>
+                            <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Flugradar</h3>
+                            <div className="space-y-4">
+                                <label className="flex items-center space-x-3">
+                                    <input
+                                        type="checkbox"
+                                        checked={config.flights?.showOnDashboard !== false}
+                                        onChange={(e) => updateConfig({ flights: { ...config.flights, showOnDashboard: e.target.checked } })}
+                                        className="w-5 h-5 rounded border-slate-600 text-blue-600 focus:ring-blue-500 focus:ring-offset-slate-900"
+                                    />
+                                    <span>Flugradar-Kachel auf dem Dashboard anzeigen</span>
+                                </label>
+
+                                <p className="text-sm text-slate-500 dark:text-slate-400 max-w-2xl">
+                                    Die Seite „Flugradar" ist unabhängig davon immer über die Navigation erreichbar.
+                                    Ohne eigene Koordinaten wird der Wetter-Standort verwendet.
+                                </p>
+
+                                <div className="grid grid-cols-2 gap-4 max-w-md">
+                                    <div>
+                                        <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">Breitengrad (optional)</label>
+                                        <input
+                                            type="number"
+                                            step="0.0001"
+                                            value={config.flights?.lat ?? ''}
+                                            onChange={(e) => updateConfig({ flights: { ...config.flights, lat: e.target.value === '' ? undefined : parseFloat(e.target.value) } })}
+                                            placeholder="z.B. 51.2277"
+                                            className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 w-full focus:outline-none focus:border-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">Längengrad (optional)</label>
+                                        <input
+                                            type="number"
+                                            step="0.0001"
+                                            value={config.flights?.lon ?? ''}
+                                            onChange={(e) => updateConfig({ flights: { ...config.flights, lon: e.target.value === '' ? undefined : parseFloat(e.target.value) } })}
+                                            placeholder="z.B. 6.7735"
+                                            className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 w-full focus:outline-none focus:border-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">Umkreis (km)</label>
+                                        <input
+                                            type="number"
+                                            min={5}
+                                            max={400}
+                                            value={config.flights?.radiusKm ?? 60}
+                                            onChange={(e) => updateConfig({ flights: { ...config.flights, radiusKm: parseInt(e.target.value, 10) || 60 } })}
+                                            className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 w-full focus:outline-none focus:border-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">Aktualisierung (Sek.)</label>
+                                        <input
+                                            type="number"
+                                            min={10}
+                                            max={300}
+                                            value={config.flights?.refreshSeconds ?? 20}
+                                            onChange={(e) => updateConfig({ flights: { ...config.flights, refreshSeconds: parseInt(e.target.value, 10) || 20 } })}
+                                            className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 w-full focus:outline-none focus:border-blue-500"
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="block text-sm text-slate-500 dark:text-slate-400 mb-1">Datenquelle</label>
+                                        <select
+                                            value={config.flights?.source || 'adsb.lol'}
+                                            onChange={(e) => updateConfig({ flights: { ...config.flights, source: e.target.value } })}
+                                            className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 w-full focus:outline-none focus:border-blue-500"
+                                        >
+                                            <option value="adsb.lol">adsb.lol (Standard)</option>
+                                            <option value="airplanes.live">airplanes.live</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section>
                             <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Anzeigeoptionen</h3>
                             <div className="space-y-4">
                                 <label className="flex items-center space-x-3">

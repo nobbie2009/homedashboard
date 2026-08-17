@@ -1,4 +1,6 @@
 import React from 'react';
+import { useConfig } from '../../contexts/ConfigContext';
+import { FlightRadarWidget } from '../../components/widgets/FlightRadarWidget';
 import { UnifiedHeaderWidget } from '../../components/widgets/UnifiedHeaderWidget';
 import { AgendaWidget } from '../../components/widgets/AgendaWidget';
 import { CameraWidget } from '../../components/widgets/CameraWidget';
@@ -11,6 +13,10 @@ import { WeekWidget } from '../../components/widgets/WeekWidget';
 import { SonosWidget } from '../../components/widgets/SonosWidget';
 
 export const Home: React.FC = () => {
+    const { config } = useConfig();
+    // Optional sixth tile in the bottom row — off means the row keeps its old widths.
+    const showFlights = config.flights?.showOnDashboard !== false;
+
     return (
         <div className="grid grid-cols-2 grid-rows-[auto_1fr_auto] gap-4 h-full">
             {/* Top Row: Unified Header */}
@@ -48,7 +54,13 @@ export const Home: React.FC = () => {
                 Previous was Camera (Left) | Countdown (Right) in a 2-col grid.
             */}
             {/* Bottom Row: Camera | Countdown | Chores */}
-            <div className="col-span-2 h-48 grid grid-cols-[2fr_1fr_1fr_2fr_2fr] gap-4">
+            <div
+                className={`col-span-2 h-48 grid gap-4 ${
+                    showFlights
+                        ? 'grid-cols-[2fr_1fr_1fr_2fr_2fr_2fr]'
+                        : 'grid-cols-[2fr_1fr_1fr_2fr_2fr]'
+                }`}
+            >
                 <div className="overflow-hidden h-full">
                     <CameraWidget />
                 </div>
@@ -64,6 +76,11 @@ export const Home: React.FC = () => {
                 <div className="overflow-hidden h-full">
                     <SonosWidget />
                 </div>
+                {showFlights && (
+                    <div className="overflow-hidden h-full">
+                        <FlightRadarWidget />
+                    </div>
+                )}
             </div>
         </div>
     );

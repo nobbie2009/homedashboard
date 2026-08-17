@@ -155,6 +155,17 @@ export interface AppConfig {
     household?: HouseholdConfig;
     santaRouteEnabled?: boolean;
     santaRouteAddress?: string;
+    flights?: {
+        /** Kompakte Flugradar-Kachel auf dem Dashboard anzeigen */
+        showOnDashboard?: boolean;
+        /** Eigene Koordinaten; leer = Wetter-Standort wird geokodiert */
+        lat?: number;
+        lon?: number;
+        radiusKm?: number;
+        refreshSeconds?: number;
+        /** ADS-B-Quelle: 'adsb.lol' | 'airplanes.live' */
+        source?: string;
+    };
     screensaver?: {
         // Night mode: blackout clock screensaver between start/end
         enabled: boolean;
@@ -225,6 +236,12 @@ const defaultConfig: AppConfig = {
     household: { members: [], tasks: [] },
     santaRouteEnabled: false,
     santaRouteAddress: '',
+    flights: {
+        showOnDashboard: true,
+        radiusKm: 60,
+        refreshSeconds: 20,
+        source: 'adsb.lol',
+    },
     screensaver: {
         enabled: false,
         start: '22:00',
