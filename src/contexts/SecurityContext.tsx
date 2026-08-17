@@ -6,14 +6,17 @@ interface Device {
     id: string;
     name: string;
     status: 'pending' | 'approved' | 'rejected' | 'unknown';
+    storeBroken?: boolean;
 }
 
 interface SecurityContextType {
     deviceId: string;
     deviceStatus: Device['status'];
     device: Device | null;
+    storeBroken: boolean;
     checkStatus: () => Promise<void>;
     register: (name: string) => Promise<void>;
+    unlock: (password: string, name: string) => Promise<void>;
 }
 
 const SecurityContext = createContext<SecurityContextType | undefined>(undefined);
@@ -42,6 +45,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     });
     const [deviceStatus, setDeviceStatus] = useState<Device['status']>(() => readCachedStatus());
     const [device, setDevice] = useState<Device | null>(null);
+    const [storeBroken, setStoreBroken] = useState(false);
     // Block the UI on first ever load. If a previous approval is cached we render
     // immediately and revalidate in the background, so the app works offline.
     const [isChecking, setIsChecking] = useState(() => readCachedStatus() !== 'approved');
@@ -56,6 +60,17 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 headers: { 'x-device-id': deviceId }
             });
             const data = await res.json();
+
+            setStoreBroken(Boolean(data.storeBroken));
+
+            // A broken device store on the server reports every device as
+            // 'unknown'. Show the lock screen (every API call would 403 anyway)
+            // but keep the cached approval in localStorage, so the device is
+            // back to normal as soon as the server can read its list again.
+            if (data.storeBroken && data.status === 'unknown') {
+                setDeviceStatus('unknown');
+                return;
+            }
 
             if (data.status) {
                 setDeviceStatus(data.status);
@@ -93,12 +108,36 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         await checkStatus();
     };
 
+    // Self-service unlock with the admin password. Needed whenever no approved
+    // device is left to approve this one from.
+    const unlock = async (password: string, name: string) => {
+        const res = await fetch(`${API_URL}/api/auth/unlock`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-device-id': deviceId
+            },
+            body: JSON.stringify({ password, id: deviceId, name })
+        });
+
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(
+                res.status === 401
+                    ? 'Falsches Admin-Passwort.'
+                    : data.error || `Freischalten fehlgeschlagen (${res.status}).`
+            );
+        }
+
+        await checkStatus();
+    };
+
     if (isChecking) {
         return <div className="flex items-center justify-center h-screen bg-slate-900 text-white">Lade Sicherheitsstatus...</div>;
     }
 
     return (
-        <SecurityContext.Provider value={{ deviceId, deviceStatus, device, checkStatus, register }}>
+        <SecurityContext.Provider value={{ deviceId, deviceStatus, device, storeBroken, checkStatus, register, unlock }}>
             {children}
         </SecurityContext.Provider>
     );

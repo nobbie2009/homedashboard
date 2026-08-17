@@ -187,21 +187,51 @@ app.get('/api/auth/status', (req, res) => {
     const deviceId = req.headers['x-device-id'];
     if (!deviceId) return res.status(400).json({ error: "Missing ID" });
     const device = security.getDevice(deviceId);
-    res.json(device || { status: 'unknown' });
+    // storeBroken tells the lock screen that this is a server-side problem
+    // (unreadable devices.json), not a withdrawn approval.
+    const storeBroken = security.isStoreBroken();
+    res.json({ ...(device || { status: 'unknown' }), storeBroken });
 });
+
+// VERY BASIC AUTH for now - matches config.adminPassword or fallback
+// In a real app, hash this!
+const getAdminPassword = () => appConfig.adminPassword || process.env.ADMIN_PASSWORD || "1234";
 
 // 3. Admin Login (To approve devices)
 app.post('/api/auth/login', (req, res) => {
     const { password } = req.body;
-    // VERY BASIC AUTH for now - matches config.adminPassword or fallback
-    // In a real app, hash this!
-    const adminPass = appConfig.adminPassword || "1234";
 
-    if (password === adminPass) {
+    if (password === getAdminPassword()) {
         res.json({ success: true });
     } else {
         res.status(401).json({ error: "Wrong password" });
     }
+});
+
+// 3b. Self-unlock with the admin password.
+// Without this there is a dead end: if no approved device is left (devices.json
+// lost/reset, or every device set back to pending) nobody can approve anything,
+// because approving requires a device that is already approved.
+app.post('/api/auth/unlock', (req, res) => {
+    const { password, id, name } = req.body || {};
+    const deviceId = id || req.headers['x-device-id'];
+
+    if (!deviceId) return res.status(400).json({ error: "Missing ID" });
+
+    if (password !== getAdminPassword()) {
+        console.warn(`[Security] Fehlgeschlagener Unlock-Versuch von ${req.ip} (${deviceId})`);
+        return res.status(401).json({ error: "Wrong password" });
+    }
+
+    if (security.isStoreBroken()) {
+        return res.status(503).json({
+            error: "Geräteliste auf dem Server ist defekt und kann nicht geschrieben werden.",
+            hint: "server/data/devices.json prüfen (siehe devices.json.corrupt / devices.json.bak)."
+        });
+    }
+
+    const device = security.forceApprove(deviceId, name, req.ip, req.headers['user-agent']);
+    res.json({ success: true, device });
 });
 
 // 4. Admin: List Devices (Protected by Admin check? For now, we trust the approved device/admin login flow context)
@@ -2460,6 +2490,21 @@ app.post('/api/bathroom/reset', (req, res) => {
 // --- EXECUTE ---
 app.listen(PORT, '0.0.0.0', () => { // Bind to 0.0.0.0 for external access
     console.log(`Server running on http://0.0.0.0:${PORT}`);
+
+    // Lockout warning: without an approved device the dashboard is unreachable
+    // from every client, so point at the way out right in the log.
+    try {
+        if (security.isStoreBroken()) {
+            console.error('[Security] ACHTUNG: Geräteliste defekt — niemand kann sich anmelden.');
+            console.error('[Security] Reparatur: server/data/devices.json prüfen (Backup: devices.json.bak).');
+        } else if (security.countApproved() === 0) {
+            console.warn('[Security] ACHTUNG: Kein einziges Gerät ist freigegeben — alle Clients sehen "Zugriff verweigert".');
+            console.warn('[Security] Entsperren: auf dem Sperrbildschirm "Mit Admin-Passwort freischalten" nutzen,');
+            console.warn('[Security] oder auf dem Server: node server/approve-device.js');
+        }
+    } catch (e) {
+        console.error('[Security] Startup-Check fehlgeschlagen:', e.message);
+    }
 
     // Run Sonos discovery at boot (non-blocking)
     sonos.runDiscovery().catch(err => {

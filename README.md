@@ -134,6 +134,51 @@ rest_command:
 
 ---
 
+## 🔓 Ausgesperrt? Gerät wieder freischalten
+
+Wenn **alle** Geräte plötzlich „Zugriff verweigert" zeigen, ist die Geräteliste
+(`server/data/devices.json`) verloren gegangen oder beschädigt. Ohne ein
+freigegebenes Gerät kann kein anderes freigegeben werden — dafür gibt es drei Wege:
+
+**1. Direkt am Sperrbildschirm (einfachster Weg)**
+
+Unten auf „**Mit Admin-Passwort freischalten**" tippen, Gerätenamen und
+Admin-Passwort eingeben. Das Gerät schaltet sich damit selbst frei.
+Das Passwort ist `adminPassword` aus `server/data/config.json`
+(alternativ `ADMIN_PASSWORD`, Standard: `1234`).
+
+**2. Per CLI auf dem Server**
+
+```bash
+node server/approve-device.js
+# im Docker-Container:
+docker compose exec backend node /app/server/approve-device.js
+```
+
+**3. Per curl (Geräte-ID steht auf dem Sperrbildschirm)**
+
+```bash
+curl -X POST http://<server>:3001/api/auth/unlock \
+  -H 'Content-Type: application/json' \
+  -d '{"password":"<admin-passwort>","id":"<geraete-id>","name":"Tablet Küche"}'
+```
+
+### Beschädigte Geräteliste
+
+Der Server schreibt `devices.json` atomar und legt vor jedem Schreibvorgang
+`devices.json.bak` an. Ist die Datei beim Start unlesbar, wird automatisch aus
+dem Backup wiederhergestellt; die kaputte Datei bleibt als `devices.json.corrupt`
+liegen. Lässt sich gar nichts lesen, verweigert der Server **jeden Schreibzugriff**
+auf die Datei (damit vorhandene Freigaben nicht überschrieben werden) und meldet
+das auf dem Sperrbildschirm. In dem Fall Backup prüfen:
+
+```bash
+ls -l server/data/devices.json*
+cp server/data/devices.json.bak server/data/devices.json   # ggf. wiederherstellen
+```
+
+---
+
 ## 📶 WLAN-Watchdog (Auto-Reconnect)
 
 Wenn der Raspberry Pi zeitweise die WLAN-Verbindung verliert und sich nicht von alleine neu verbindet, kann der mitgelieferte Watchdog die Verbindung automatisch wiederherstellen.
