@@ -16,6 +16,7 @@ import {
     AdminSettings,
     BathroomView,
     HouseholdView,
+    FlightsView,
     PwaApp
 } from './pages';
 
@@ -64,6 +65,7 @@ function App() {
                                     <Route path="spotify" element={<SpotifyView />} />
                                     <Route path="bathroom" element={<BathroomView />} />
                                     <Route path="household" element={<HouseholdView />} />
+                                    <Route path="flights" element={<FlightsView />} />
                                     <Route path="admin" element={<AdminSettings />} />
                                     <Route path="*" element={<Navigate to="/" replace />} />
                                 </Route>

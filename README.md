@@ -134,6 +134,39 @@ rest_command:
 
 ---
 
+## ✈️ Flugradar
+
+Zeigt Flugzeuge im Umkreis des Dashboard-Standorts — als kompakte Kachel auf dem
+Dashboard und als eigene Seite mit Karte (Navigation → „Flugradar").
+
+**Datenquelle:** Flightradar24 hat keine frei nutzbare API (nur kostenpflichtige
+Business-Pläne), das Auslesen der Website ist per Nutzungsbedingungen untersagt.
+Die Positionen kommen deshalb aus einem freien ADS-B-Community-Feed
+(`adsb.lol`, alternativ `airplanes.live`) — kein API-Key, keine Kosten. Für
+Detailinfos verlinkt die Seite pro Flugzeug direkt auf flightradar24.com.
+
+**Einstellungen** (Admin → Ansicht → Flugradar):
+
+| Option | Bedeutung |
+| --- | --- |
+| Kachel anzeigen | Blendet die Flugradar-Kachel auf dem Dashboard ein/aus (Seite bleibt immer erreichbar) |
+| Breiten-/Längengrad | Optional. Leer = der Wetter-Standort wird automatisch geokodiert |
+| Umkreis | Radius in km (5–400, Standard 60) |
+| Aktualisierung | Poll-Intervall der Anzeige in Sekunden (min. 10, Standard 20) |
+| Datenquelle | `adsb.lol` oder `airplanes.live` |
+
+Der Abruf läuft über das Backend (`GET /api/flights`) und wird dort 15 Sekunden
+gecached. Egal wie viele Tablets die Anzeige offen haben, der Feed sieht nur
+einen Client — die Community-Feeds bitten um maximal einen Request pro Sekunde.
+Fällt der Feed aus, zeigt das Dashboard die letzten bekannten Positionen mit dem
+Hinweis „veraltet".
+
+Abdeckung und Aktualität hängen von den ADS-B-Empfängern in der Umgebung ab. In
+Deutschland ist die Abdeckung gut, sehr niedrig fliegende Maschinen und Flugzeuge
+ohne ADS-B-Transponder (z.B. viele Segel- und Kleinflugzeuge) fehlen aber.
+
+---
+
 ## 🔓 Ausgesperrt? Gerät wieder freischalten
 
 Wenn **alle** Geräte plötzlich „Zugriff verweigert" zeigen, ist die Geräteliste
