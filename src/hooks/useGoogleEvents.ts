@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { isSameDay, startOfDay } from 'date-fns';
 import { useConfig, CalendarScope } from '../contexts/ConfigContext';
 import { useSecurity } from '../contexts/SecurityContext'; // Import useSecurity
 import { getApiUrl, fetchWithTimeout } from '../utils/api';
@@ -15,6 +16,30 @@ export interface CalendarEvent {
     color?: string;
     calendarName?: string; // Alias or ID
     isBirthday?: boolean;
+    /** Ganztägiger Termin (Google liefert `date` statt `dateTime`). */
+    allDay?: boolean;
+}
+
+/**
+ * Ganztägige Termine liefert Google als reines Datum ("2025-09-14").
+ * `new Date("2025-09-14")` wird als UTC-Mitternacht gelesen und landet in
+ * unserer Zeitzone bei 01:00/02:00 — die Widgets zeigten dann eine erfundene
+ * Uhrzeit an. Deshalb hier bewusst als lokale Mitternacht parsen.
+ */
+function parseCalendarDate(value: string, allDay: boolean): Date {
+    if (!allDay) return new Date(value);
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, (month || 1) - 1, day || 1);
+}
+
+/**
+ * Läuft der Termin an diesem Tag? Berücksichtigt mehrtägige ganztägige
+ * Termine (Urlaub, Ferien), deren Enddatum bei Google exklusiv ist.
+ */
+export function occursOnDay(event: CalendarEvent, day: Date): boolean {
+    if (!event.allDay) return isSameDay(event.start, day);
+    const dayStart = startOfDay(day).getTime();
+    return dayStart >= startOfDay(event.start).getTime() && dayStart < event.end.getTime();
 }
 
 export interface UseGoogleEventsOptions {
@@ -151,11 +176,14 @@ export const useGoogleEvents = (options: UseGoogleEventsOptions = {}) => {
                 const alias = settings?.alias || calId;
                 const isBirthday = settings?.isBirthday || false;
 
+                const allDay = !e.start?.dateTime && !!e.start?.date;
+
                 return {
                     id: e.id,
                     title: e.summary || "Kein Titel",
-                    start: new Date(e.start.dateTime || e.start.date),
-                    end: new Date(e.end.dateTime || e.end.date),
+                    start: parseCalendarDate(e.start.dateTime || e.start.date, allDay),
+                    end: parseCalendarDate(e.end.dateTime || e.end.date, allDay),
+                    allDay,
                     calendarId: calId,
                     description: e.description,
                     location: e.location,

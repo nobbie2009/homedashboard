@@ -166,6 +166,21 @@ export interface AppConfig {
         /** ADS-B-Quelle: 'adsb.lol' | 'airplanes.live' */
         source?: string;
     };
+    /**
+     * Sichtbarkeit der Kacheln in der unteren Dashboard-Reihe. Nicht gesetzt
+     * = sichtbar, damit bestehende Installationen unverändert aussehen.
+     * Die Flugradar-Kachel bleibt aus Kompatibilitätsgründen unter
+     * `flights.showOnDashboard`.
+     */
+    dashboard?: {
+        widgets?: {
+            camera?: boolean;
+            countdown?: boolean;
+            moon?: boolean;
+            chores?: boolean;
+            sonos?: boolean;
+        };
+    };
     screensaver?: {
         // Night mode: blackout clock screensaver between start/end
         enabled: boolean;

@@ -7,22 +7,15 @@ import { Skeleton } from '../../components/Skeleton';
 const DAY_MS = 86400000;
 const HORIZON_DAYS = 21;
 
-// Google all-day events arrive as date-only -> midnight UTC with a duration
-// that's a whole number of days. Detect that to avoid showing a bogus "02:00".
+// Ganztägige Termine markiert der Hook (`allDay`) und parst sie als lokale
+// Mitternacht — die frühere UTC-Heuristik hier ist damit überflüssig.
 function isAllDay(e: CalendarEvent): boolean {
-    return (
-        e.start.getUTCHours() === 0 &&
-        e.start.getUTCMinutes() === 0 &&
-        e.end.getTime() > e.start.getTime() &&
-        (e.end.getTime() - e.start.getTime()) % DAY_MS === 0
-    );
+    return !!e.allDay;
 }
 
-// Day bucket the event belongs to (UTC components for all-day, local otherwise).
+// Day bucket the event belongs to.
 function dayStart(e: CalendarEvent): Date {
-    return isAllDay(e)
-        ? new Date(e.start.getUTCFullYear(), e.start.getUTCMonth(), e.start.getUTCDate())
-        : new Date(e.start.getFullYear(), e.start.getMonth(), e.start.getDate());
+    return new Date(e.start.getFullYear(), e.start.getMonth(), e.start.getDate());
 }
 
 function dayLabel(date: Date, today: Date, tomorrow: Date): string {

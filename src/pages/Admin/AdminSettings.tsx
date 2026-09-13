@@ -770,6 +770,54 @@ const AdminSettings: React.FC = () => {
                 {activeTab === 'ansicht' && (
                     <div className="space-y-8">
                         <section>
+                            <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-2">Dashboard-Kacheln</h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 max-w-2xl mb-4">
+                                Weniger Kacheln in der unteren Reihe = mehr Platz für die übrigen.
+                                Abgeschaltete Kacheln bleiben über die Navigation erreichbar.
+                            </p>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-2xl">
+                                {[
+                                    { id: 'camera', label: 'Kamera' },
+                                    { id: 'countdown', label: 'Nächstes Event' },
+                                    { id: 'moon', label: 'Mondphase' },
+                                    { id: 'chores', label: 'Aufgaben' },
+                                    { id: 'sonos', label: 'Sonos' },
+                                ].map(widget => {
+                                    const widgets = config.dashboard?.widgets || {};
+                                    const checked = (widgets as Record<string, boolean | undefined>)[widget.id] !== false;
+                                    return (
+                                        <label
+                                            key={widget.id}
+                                            className="flex items-center space-x-3 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3 cursor-pointer"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={checked}
+                                                onChange={(e) => updateConfig({
+                                                    dashboard: {
+                                                        ...config.dashboard,
+                                                        widgets: { ...widgets, [widget.id]: e.target.checked }
+                                                    }
+                                                })}
+                                                className="w-5 h-5 rounded border-slate-600 text-blue-600 focus:ring-blue-500 focus:ring-offset-slate-900"
+                                            />
+                                            <span>{widget.label}</span>
+                                        </label>
+                                    );
+                                })}
+                                <label className="flex items-center space-x-3 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={config.flights?.showOnDashboard !== false}
+                                        onChange={(e) => updateConfig({ flights: { ...config.flights, showOnDashboard: e.target.checked } })}
+                                        className="w-5 h-5 rounded border-slate-600 text-blue-600 focus:ring-blue-500 focus:ring-offset-slate-900"
+                                    />
+                                    <span>Flugradar</span>
+                                </label>
+                            </div>
+                        </section>
+
+                        <section>
                             <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Wetter Standort</h3>
                             <input
                                 type="text"
