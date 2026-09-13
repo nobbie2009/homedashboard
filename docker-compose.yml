@@ -20,8 +20,6 @@ services:
     environment:
       - PORT=3001
       - TZ=Europe/Berlin
-      # - EDUPAGE_USER=your_user  # Can be set here or in .env
-      # - EDUPAGE_PASSWORD=your_pass
     volumes:
       - ./server:/app/server
       - ./.git:/app/.git

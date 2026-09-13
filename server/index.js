@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
-import { execFile, exec } from 'child_process';
+import { exec } from 'child_process';
 import http from 'http';
 import https from 'https';
 import { Client } from '@notionhq/client';
@@ -160,15 +160,10 @@ app.post('/api/system/update', (req, res) => {
     }
 });
 
-// Edupage Cache (declared early so clearcache can reference it)
-const edupageCache = new Map();
-const EDUPAGE_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
-
 // Maintenance: Clear Cache (Force Reload Content)
 app.post('/api/system/clearcache', (req, res) => {
     console.log("System Cache cleared manually.");
     eventCache.clear();
-    edupageCache.clear();
     res.json({ success: true });
 });
 
@@ -476,6 +471,21 @@ if (fs.existsSync(CONFIG_PATH)) {
     try {
         appConfig = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
         console.log("Loaded AppConfig from file.");
+
+        // Die Edupage-Anbindung wurde entfernt. Bestehende Installationen
+        // haben dort noch Benutzername und Passwort der Schule liegen —
+        // einmalig aus der Konfiguration löschen, statt sie ungenutzt
+        // aufzubewahren.
+        if (appConfig.edupage || appConfig.schoolNames) {
+            delete appConfig.edupage;
+            delete appConfig.schoolNames;
+            try {
+                fs.writeFileSync(CONFIG_PATH, JSON.stringify(appConfig, null, 2));
+                console.log("Removed obsolete Edupage credentials from config.");
+            } catch (err) {
+                console.error("Failed to strip Edupage config:", err);
+            }
+        }
     } catch (err) {
         console.error("Failed to load config:", err);
     }
@@ -1762,72 +1772,6 @@ app.get('/api/doorbell/stream', (req, res) => {
 
     ffmpeg.on('close', () => { try { res.end(); } catch {} });
     req.on('close', () => { try { ffmpeg.kill('SIGKILL'); } catch {} });
-});
-
-// --- Edupage Proxy (with cache) ---
-app.get('/api/edupage', (req, res) => {
-    const username = req.headers['username'];
-    const password = req.headers['password'];
-    // Default to "login1" if not provided header (though bridge script also defaults)
-    const subdomain = req.headers['subdomain'] || 'login1';
-    const date = req.query.date; // Optional date YYYY-MM-DD
-
-    // Validate credentials presence
-    if (!username || !password) {
-        return res.status(400).send("Missing credentials");
-    }
-
-    // Check cache
-    const cacheKey = `${username}:${subdomain}:${date || 'today'}`;
-    const cached = edupageCache.get(cacheKey);
-    if (cached && (Date.now() - cached.timestamp < EDUPAGE_CACHE_TTL)) {
-        console.log(`Serving Edupage data from cache (key: ${cacheKey})`);
-        return res.json(cached.data);
-    }
-
-    const scriptPath = path.join(__dirname, 'edupage_bridge_v2.py');
-    console.log(`DEBUG: Executing Python script at: ${scriptPath} with subdomain: ${subdomain} and date: ${date}`);
-
-    const args = [scriptPath, username, password, subdomain];
-    if (date) {
-        args.push(date);
-    }
-
-    // Execute python script
-    execFile('python', args, (error, stdout, stderr) => {
-        // Always log stderr for debugging
-        if (stderr) {
-            console.error('Wrapper Stderr:', stderr);
-        }
-
-        // Parse output regardless of error code, as script might print JSON error then exit 1
-        let data = null;
-        try {
-            if (stdout) {
-                data = JSON.parse(stdout);
-            }
-        } catch (e) {
-            console.error('Failed to parse script output', e);
-        }
-
-        if (error && !data) {
-            console.error('Edupage Script Error:', error);
-            return res.status(500).send("Failed to execute Edupage script");
-        }
-
-        if (data && data.error) {
-            console.error("Edupage Logic Error:", data.error);
-            return res.status(401).send(data.error);
-        }
-
-        if (data) {
-            // Store in cache
-            edupageCache.set(cacheKey, { timestamp: Date.now(), data });
-            res.json(data);
-        } else {
-            res.status(500).send("No data returned from Edupage script");
-        }
-    });
 });
 
 // --- SONOS ROUTES ---
