@@ -7,6 +7,7 @@ import {
     Dashboard,
     NotesBoard,
     StatusView,
+    SchoolView,
     ChoresView,
     RewardBoard,
     SmartHomeView,
@@ -51,6 +52,7 @@ function App() {
                                     <Route index element={<Dashboard />} />
                                     <Route path="notes" element={<NotesBoard />} />
                                     <Route path="status" element={<StatusView />} />
+                                    <Route path="school" element={<SchoolView />} />
                                     <Route path="chores" element={<ChoresView />} />
                                     <Route path="rewards" element={<RewardBoard />} />
                                     <Route path="smarthome" element={<SmartHomeView />} />

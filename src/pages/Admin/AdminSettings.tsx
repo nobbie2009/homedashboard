@@ -405,6 +405,7 @@ const AdminSettings: React.FC = () => {
                                         <span title="Wochen Widget">Woche</span>
                                         <span title="Nächstes Event">Next</span>
                                         <span title="Wochenansicht">View</span>
+                                        <span title="Stundenplan-Seite">Schule</span>
                                     </div>
                                 </div>
 
@@ -415,7 +416,9 @@ const AdminSettings: React.FC = () => {
                                         color: config.google?.calendarColors?.[cal.id] || '#3b82f6',
                                         alias: cal.summary,
                                         isBirthday: false,
-                                        scopes: { today: true, weekWidget: true, nextEvent: true, weekView: true }
+                                        // `school` ist opt-in: die Stundenplan-Seite soll nur
+                                        // ausdrücklich markierte Kalender zeigen.
+                                        scopes: { today: true, weekWidget: true, nextEvent: true, weekView: true, school: false }
                                     };
 
                                     const updateSettings = (partial: Partial<typeof settings>) => {
@@ -489,6 +492,7 @@ const AdminSettings: React.FC = () => {
                                                     { key: 'weekWidget', label: 'W' },
                                                     { key: 'nextEvent', label: 'N' },
                                                     { key: 'weekView', label: 'V' },
+                                                    { key: 'school', label: 'S' },
                                                 ].map((s) => (
                                                     <button
                                                         key={s.key}

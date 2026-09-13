@@ -199,13 +199,18 @@ export interface AppConfig {
     design?: 'classic' | 'glass' | 'family';
 }
 
-export type CalendarScope = 'today' | 'weekWidget' | 'nextEvent' | 'weekView';
+export type CalendarScope = 'today' | 'weekWidget' | 'nextEvent' | 'weekView' | 'school';
 
 export interface CalendarSettings {
     id: string;
     color: string;
     alias: string;
     isBirthday?: boolean;
+    /**
+     * Sichtbarkeit pro Ansicht. Achtung, `school` verhält sich umgekehrt zu
+     * den übrigen Scopes: die sind opt-out (nicht gesetzt = sichtbar), die
+     * Stundenplan-Seite zeigt dagegen nur ausdrücklich markierte Kalender.
+     */
     scopes: Record<CalendarScope, boolean>;
 }
 
