@@ -14,7 +14,7 @@ import {
 import { de } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
 import clsx from 'clsx';
-import { useGoogleEvents, CalendarEvent } from '../../hooks/useGoogleEvents';
+import { useGoogleEvents, occursOnDay, CalendarEvent } from '../../hooks/useGoogleEvents';
 
 // Constants for layout
 const HOUR_HEIGHT = 60; // pixels per hour
@@ -91,6 +91,8 @@ const WeekView: React.FC = () => {
         timeMax: addDays(weekStart, 7).toISOString(),
         scope: 'weekView'
     });
+
+    const allDayByDay = weekDays.map(day => events.filter(e => e.allDay && occursOnDay(e, day)));
 
     // Initial scroll
     useEffect(() => {
@@ -174,6 +176,32 @@ const WeekView: React.FC = () => {
                     </div>
                 </div>
 
+                {/* Ganztägige Termine: eigenes Band über der Zeitachse, damit sie
+                    das Raster nicht über 24 Stunden hinweg zudecken. */}
+                {allDayByDay.some(dayEvents => dayEvents.length > 0) && (
+                    <div className="grid grid-cols-[60px_1fr] border-b border-slate-300 dark:border-slate-700 bg-white/60 dark:bg-slate-900/60 shrink-0">
+                        <div className="border-r border-slate-300 dark:border-slate-700 flex items-center justify-center px-1 text-[9px] leading-tight uppercase text-center text-slate-400 dark:text-slate-500">
+                            Ganztägig
+                        </div>
+                        <div className="grid grid-cols-7 divide-x divide-slate-300 dark:divide-slate-700">
+                            {allDayByDay.map((dayEvents, idx) => (
+                                <div key={weekDays[idx].toString()} className="p-1 space-y-1 min-h-[28px]">
+                                    {dayEvents.map(event => (
+                                        <div
+                                            key={event.id}
+                                            className="rounded px-1.5 py-0.5 text-[11px] font-semibold text-white truncate shadow-sm"
+                                            style={{ backgroundColor: event.color || '#3b82f6' }}
+                                            title={event.title}
+                                        >
+                                            {event.title}
+                                        </div>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* Scrollable Body */}
                 <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden relative custom-scrollbar">
                     <div className="grid grid-cols-[60px_1fr] min-h-[1440px]"> {/* 24 * 60px */}
@@ -194,8 +222,9 @@ const WeekView: React.FC = () => {
                         {/* Events Grid */}
                         <div className="grid grid-cols-7 relative divide-x divide-slate-300/50 dark:divide-slate-700/50 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSI2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMCA2MEwxMDAwMCA2MCIgc3Ryb2tlPSJyZ2JhKDc1LDg1LDEwMSwwLjEpIiBmaWxsPSJub25lIi8+PC9zdmc+')]" style={{ backgroundSize: `100% ${HOUR_HEIGHT}px` }}>
                             {weekDays.map((day) => {
-                                // Filter events for this day
-                                const dayEventsRaw = events.filter(e => isSameDay(e.start, day));
+                                // Nur Termine mit Uhrzeit gehören in die Zeitachse —
+                                // ganztägige stehen im Band über dem Raster.
+                                const dayEventsRaw = events.filter(e => !e.allDay && isSameDay(e.start, day));
                                 // Calculate layout (avoid overlaps)
                                 const layoutedEvents = layoutEvents(dayEventsRaw);
 

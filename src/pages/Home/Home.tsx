@@ -12,76 +12,80 @@ import { MoonWidget } from '../../components/widgets/MoonWidget';
 import { WeekWidget } from '../../components/widgets/WeekWidget';
 import { SonosWidget } from '../../components/widgets/SonosWidget';
 
+/**
+ * Untere Kachelreihe. `weight` steuert die Spaltenbreite relativ zueinander —
+ * inhaltsreiche Kacheln (Aufgaben, Kamera) bekommen mehr Platz als schmale
+ * Statusanzeigen. Abgeschaltete Kacheln fallen komplett heraus, die
+ * verbleibenden verteilen die Breite neu; so wird die Reihe nie enger als
+ * nötig.
+ */
+const BOTTOM_WIDGETS = [
+    // Kamera ~16:9 bei 12rem Zeilenhöhe; Countdown breit genug für drei
+    // Zifferngruppen, Mondphase als schmalste Kachel.
+    { key: 'camera', weight: 1.9, render: () => <CameraWidget /> },
+    { key: 'countdown', weight: 1.4, render: () => <CountdownWidget /> },
+    { key: 'moon', weight: 1.0, render: () => <MoonWidget /> },
+    { key: 'chores', weight: 2.1, render: () => <ChoresWidget /> },
+    { key: 'sonos', weight: 1.8, render: () => <SonosWidget /> },
+    { key: 'flights', weight: 1.8, render: () => <FlightRadarWidget /> },
+] as const;
+
 export const Home: React.FC = () => {
     const { config } = useConfig();
-    // Optional sixth tile in the bottom row — off means the row keeps its old widths.
-    const showFlights = config.flights?.showOnDashboard !== false;
+    // Ohne Termine heute wäre ein Drittel der Fläche leer — dann darf die
+    // Wochenübersicht den Platz übernehmen.
+    const [todayEmpty, setTodayEmpty] = React.useState(false);
+    const handleTodayEmpty = React.useCallback((empty: boolean) => setTodayEmpty(empty), []);
+
+    const visibility: Record<string, boolean> = {
+        camera: config.dashboard?.widgets?.camera !== false,
+        countdown: config.dashboard?.widgets?.countdown !== false,
+        moon: config.dashboard?.widgets?.moon !== false,
+        chores: config.dashboard?.widgets?.chores !== false,
+        sonos: config.dashboard?.widgets?.sonos !== false,
+        // Bestehender Schalter im Flugradar-Abschnitt bleibt maßgeblich.
+        flights: config.flights?.showOnDashboard !== false,
+    };
+
+    const bottomWidgets = BOTTOM_WIDGETS.filter(w => visibility[w.key]);
+    const bottomColumns = bottomWidgets.map(w => `${w.weight}fr`).join(' ');
 
     return (
-        <div className="grid grid-cols-2 grid-rows-[auto_1fr_auto] gap-4 h-full">
-            {/* Top Row: Unified Header */}
-            <div className="col-span-2 h-40">
+        <div className="grid grid-cols-1 grid-rows-[auto_1fr_auto] gap-4 h-full">
+            {/* Kopfzeile: Uhr, Wetter, Warnungen, Datum */}
+            <div className="h-40">
                 <UnifiedHeaderWidget />
             </div>
 
-            {/* Middle Row: Agenda (Left) | Week (Center) | Radar (Right) */}
-            {/* We need a 3-column grid nested or change the main grid to 3 columns? 
-                The main grid is 2 cols. Let's change main grid to 3 cols or use a nested grid spanning 2 cols?
-                If we change main to 3 cols, we need to adjust bottom row.
-                Let's change main grid to 12 cols for flexibility or just 3 cols.
-            */}
-
-            <div className="col-span-2 row-span-1 grid grid-cols-3 gap-4 overflow-hidden h-full">
-                {/* Left: Agenda (Today) */}
+            {/* Hauptreihe: Heute | Woche | Regenradar */}
+            <div
+                className="grid gap-4 overflow-hidden h-full transition-[grid-template-columns] duration-500"
+                style={{ gridTemplateColumns: todayEmpty ? '0.65fr 1.6fr 1fr' : '1fr 1.15fr 1fr' }}
+            >
                 <div className="overflow-hidden">
-                    <AgendaWidget />
+                    <AgendaWidget onEmptyChange={handleTodayEmpty} />
                 </div>
-
-                {/* Center: Week Overview */}
                 <div className="overflow-hidden">
                     <WeekWidget />
                 </div>
-
-                {/* Right: Rain Radar */}
                 <div className="overflow-hidden">
                     <RainRadarWidget />
                 </div>
             </div>
 
-            {/* Bottom Row: Camera & Countdown */}
-            {/* They should share the width. Camera is usually wider? 
-                Let's just split them 50/50 for now or Keep existing relative sizes?
-                Previous was Camera (Left) | Countdown (Right) in a 2-col grid.
-            */}
-            {/* Bottom Row: Camera | Countdown | Chores */}
-            <div
-                className={`col-span-2 h-48 grid gap-4 ${
-                    showFlights
-                        ? 'grid-cols-[2fr_1fr_1fr_2fr_2fr_2fr]'
-                        : 'grid-cols-[2fr_1fr_1fr_2fr_2fr]'
-                }`}
-            >
-                <div className="overflow-hidden h-full">
-                    <CameraWidget />
+            {/* Untere Reihe: konfigurierbare Kacheln */}
+            {bottomWidgets.length > 0 && (
+                <div
+                    className="h-48 grid gap-4"
+                    style={{ gridTemplateColumns: bottomColumns }}
+                >
+                    {bottomWidgets.map(widget => (
+                        <div key={widget.key} className="overflow-hidden h-full">
+                            {widget.render()}
+                        </div>
+                    ))}
                 </div>
-                <div className="overflow-hidden h-full">
-                    <CountdownWidget />
-                </div>
-                <div className="overflow-hidden h-full">
-                    <MoonWidget />
-                </div>
-                <div className="overflow-hidden h-full">
-                    <ChoresWidget />
-                </div>
-                <div className="overflow-hidden h-full">
-                    <SonosWidget />
-                </div>
-                {showFlights && (
-                    <div className="overflow-hidden h-full">
-                        <FlightRadarWidget />
-                    </div>
-                )}
-            </div>
+            )}
         </div>
     );
 };

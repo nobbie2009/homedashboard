@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { differenceInSeconds } from 'date-fns';
+import { differenceInSeconds, format } from 'date-fns';
+import { de } from 'date-fns/locale';
 import { useGoogleEvents } from '../../hooks/useGoogleEvents';
 
 export const CountdownWidget: React.FC = () => {
@@ -14,8 +15,10 @@ export const CountdownWidget: React.FC = () => {
 
     const nextEvent = useMemo(() => {
         if (!events || events.length === 0) return null;
-        // Events are already sorted by start time in the hook
-        return events.find(e => e.start > now);
+        // Events are already sorted by start time in the hook.
+        // Ganztägige Termine haben keine Startzeit — ein Sekunden-Countdown
+        // auf deren (künstliche) Mitternacht wäre irreführend.
+        return events.find(e => !e.allDay && e.start > now);
     }, [events, now]);
 
     const katWarnView = (
@@ -59,45 +62,61 @@ export const CountdownWidget: React.FC = () => {
     }
 
     const diffSeconds = differenceInSeconds(nextEvent.start, now);
-    const hours = Math.floor(diffSeconds / 3600);
-    const minutes = Math.floor((diffSeconds % 3600) / 60);
-    const seconds = diffSeconds % 60;
 
     // Safety check for negative countdowns (should happen rarely due to find logic)
     if (diffSeconds < 0) return null;
 
+    const days = Math.floor(diffSeconds / 86400);
+    const hours = Math.floor((diffSeconds % 86400) / 3600);
+    const minutes = Math.floor((diffSeconds % 3600) / 60);
+    const seconds = diffSeconds % 60;
+
+    // Immer genau drei Einheiten, damit die Kachel nie umbricht: ab einem Tag
+    // Restzeit zählt Tag/Std/Min, darunter die gewohnte Uhrzeit-Zählung.
+    const segments = days > 0
+        ? [
+            { value: days, label: days === 1 ? 'Tag' : 'Tage', accent: false },
+            { value: hours, label: 'Std', accent: false },
+            { value: minutes, label: 'Min', accent: true }
+        ]
+        : [
+            { value: hours, label: 'Std', accent: false },
+            { value: minutes, label: 'Min', accent: false },
+            { value: seconds, label: 'Sek', accent: true }
+        ];
+
     return (
         <div
-            className="widget-card flex flex-col p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full items-center justify-center relative overflow-hidden group cursor-pointer select-none"
+            className="widget-card flex flex-col p-3 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl border border-slate-300 dark:border-slate-700 h-full items-center justify-center relative overflow-hidden group cursor-pointer select-none"
             onClick={() => setShowKatWarn(true)}
         >
-            {/* Background progress or glow could go here */}
+            <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-widest">Nächstes Event</h3>
 
-            <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-widest">Nächstes Event</h3>
-
-            <div className="flex items-baseline space-x-2">
-                <div className="flex flex-col items-center">
-                    <span className="text-5xl font-black text-slate-900 dark:text-white tabular-nums leading-none">{String(hours).padStart(2, '0')}</span>
-                    <span className="text-xs text-slate-400 dark:text-slate-500 uppercase mt-1">Std</span>
-                </div>
-                <span className="text-3xl text-slate-400 dark:text-slate-600 font-light -mt-4">:</span>
-                <div className="flex flex-col items-center">
-                    <span className="text-5xl font-black text-slate-900 dark:text-white tabular-nums leading-none">{String(minutes).padStart(2, '0')}</span>
-                    <span className="text-xs text-slate-400 dark:text-slate-500 uppercase mt-1">Min</span>
-                </div>
-                <span className="text-3xl text-slate-400 dark:text-slate-600 font-light -mt-4">:</span>
-                <div className="flex flex-col items-center">
-                    <span className="text-5xl font-black text-blue-400 tabular-nums leading-none">{String(seconds).padStart(2, '0')}</span>
-                    <span className="text-xs text-slate-400 dark:text-slate-500 uppercase mt-1">Sek</span>
-                </div>
+            <div className="flex items-start justify-center gap-1.5">
+                {segments.map((seg, idx) => (
+                    <React.Fragment key={seg.label}>
+                        {idx > 0 && (
+                            <span className="text-2xl text-slate-400 dark:text-slate-600 font-light leading-none">:</span>
+                        )}
+                        <div className="flex flex-col items-center">
+                            <span className={`text-4xl font-black tabular-nums leading-none ${seg.accent ? 'text-blue-400' : 'text-slate-900 dark:text-white'}`}>
+                                {String(seg.value).padStart(2, '0')}
+                            </span>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase mt-1 tracking-wide">{seg.label}</span>
+                        </div>
+                    </React.Fragment>
+                ))}
             </div>
 
-            <div className="mt-4 text-center max-w-full px-4">
-                <div className="text-xl font-bold text-slate-900 dark:text-white truncate leading-tight" style={{ color: nextEvent.color || undefined }}>
+            <div className="mt-3 text-center w-full px-1">
+                <div className="text-base font-bold text-slate-900 dark:text-white truncate leading-tight" style={{ color: nextEvent.color || undefined }}>
                     {nextEvent.title}
                 </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                    {format(nextEvent.start, days > 0 ? 'EEEE, HH:mm' : "'um' HH:mm", { locale: de })}
+                </div>
                 {nextEvent.location && (
-                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate max-w-[200px] mx-auto">
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
                         📍 {nextEvent.location}
                     </div>
                 )}
