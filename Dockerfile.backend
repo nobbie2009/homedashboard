@@ -1,13 +1,9 @@
 FROM node:20-alpine
 
-RUN apk add --no-cache ffmpeg python3 py3-pip git tzdata
+# git wird für das Update-Kommando des Servers (git pull) gebraucht.
+RUN apk add --no-cache ffmpeg git tzdata
 
 ENV TZ=Europe/Berlin
-
-# Setup Python Virtual Environment and Install Edupage API
-RUN python3 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-RUN pip install edupage-api requests
 
 WORKDIR /app
 

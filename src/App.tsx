@@ -7,7 +7,6 @@ import {
     Dashboard,
     NotesBoard,
     StatusView,
-    SchoolView,
     ChoresView,
     RewardBoard,
     SmartHomeView,
@@ -19,11 +18,6 @@ import {
     FlightsView,
     PwaApp
 } from './pages';
-
-// Task List:
-// - [x] Create SmartHome view for Home Assistant <!-- id: 5 -->
-// - [/] Implement Edupage display in SchoolView <!-- id: 6 -->
-// - [/] Update Navigation/Routing <!-- id: 7 -->
 
 import { SecurityProvider, useSecurity } from './contexts/SecurityContext';
 import AccessDenied from './pages/AccessDenied';
@@ -57,7 +51,6 @@ function App() {
                                     <Route index element={<Dashboard />} />
                                     <Route path="notes" element={<NotesBoard />} />
                                     <Route path="status" element={<StatusView />} />
-                                    <Route path="school" element={<SchoolView />} />
                                     <Route path="chores" element={<ChoresView />} />
                                     <Route path="rewards" element={<RewardBoard />} />
                                     <Route path="smarthome" element={<SmartHomeView />} />

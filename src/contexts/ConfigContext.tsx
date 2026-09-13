@@ -122,14 +122,8 @@ export interface AppConfig {
     haUrl?: string; // Home Assistant Dashboard URL
     enabledCalendars: string[];
     showSeconds: boolean;
-    schoolNames: string[];
     catCare?: CatCareConfig;
     note?: NoteConfig;
-    edupage?: {
-        username?: string;
-        password?: string;
-        subdomain?: string;
-    };
     google?: {
         selectedCalendars: string[];
         calendarColors?: Record<string, string>;
@@ -225,8 +219,6 @@ const defaultConfig: AppConfig = {
     weatherLocation: 'Berlin',
     enabledCalendars: ['family', 'school', 'garbage'],
     showSeconds: false,
-    schoolNames: ['Max', 'Moritz'],
-    edupage: { username: '', password: '', subdomain: 'login1' },
     google: { selectedCalendars: [], calendarColors: {}, calendarSettings: {} },
     notionKey: '',
     notionDatabaseId: '',
@@ -336,7 +328,6 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
                     const merged = {
                         ...prev,
                         ...data,
-                        edupage: { ...prev.edupage, ...(data.edupage || {}) },
                         google: { ...prev.google, ...(data.google || {}) },
                         chores: {
                             kids: data.chores?.kids || prev.chores?.kids || [],

@@ -22,11 +22,6 @@ Ein modernes, webbasiertes Dashboard für die ganze Familie, optimiert für Touc
 - **Konfigurierbar**: Aufgaben, Intervalle und Belohnungen (Sterne) sind einstellbar.
 - **Eigene Ansicht**: Kindgerechte Oberfläche mit Avatar-Bildern.
 
-### 🏫 Schule (EduPage)
-- **Stundenplan**: Anzeige des aktuellen Stundenplans.
-- **Hausaufgaben**: Übersicht über offene Hausaufgaben.
-- **Multi-User**: Unterstützung für mehrere Kinder.
-
 ### 📝 Notizen (Notion)
 - **Notion Integration**: Anzeige von Notizen oder einer Familien-Pinnwand direkt aus Notion.
 
@@ -70,7 +65,6 @@ Das Standard-Passwort für den ersten Zugriff wird in den Server-Logs angezeigt 
 ### Wichtige Einstellungen:
 - **Wetter**: Koordinaten (Latitude/Longitude) für DWD.
 - **Kalender**: Auswahl der anzuzeigenden Google Kalender.
-- **Schule**: Zugangsdaten für EduPage.
 - **Kamera**: URL zum MJPEG-Stream oder Snapshot.
 
 ---
