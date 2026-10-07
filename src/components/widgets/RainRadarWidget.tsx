@@ -150,9 +150,14 @@ export const RainRadarWidget: React.FC = () => {
                 ref={mapRef}
                 style={{ background: '#f1f5f9' }}
             >
-                {/* Light map tiles (Positron) */}
+                {/* Light map tiles (Esri Light Gray Canvas, no API key needed) */}
                 <TileLayer
-                    url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                    url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+                    maxZoom={6}
+                />
+                {/* Place names / borders */}
+                <TileLayer
+                    url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
                     maxZoom={6}
                 />
                 <MapUpdater center={coords} />

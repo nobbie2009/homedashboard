@@ -103,9 +103,11 @@ export const FlightsView: React.FC = () => {
         }
     }, [flights, selectedId, loading]);
 
+    // Esri Canvas tiles: no API key required (CARTO basemaps now need one)
     const tileUrl = isDark
-        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-        : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+        ? 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'
+        : 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+    const labelUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_${isDark ? 'Dark' : 'Light'}_Gray_Reference/MapServer/tile/{z}/{y}/{x}`;
 
     const updated = data?.updatedAt
         ? new Date(data.updatedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -124,6 +126,7 @@ export const FlightsView: React.FC = () => {
                     style={{ background: isDark ? '#0f172a' : '#f1f5f9' }}
                 >
                     <TileLayer key={isDark ? 'dark' : 'light'} url={tileUrl} maxZoom={16} />
+                    <TileLayer key={isDark ? 'dark-ref' : 'light-ref'} url={labelUrl} maxZoom={16} />
                     <MapController center={center} radiusKm={data?.radiusKm ?? 60} focus={selected} />
 
                     <Circle
