@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { ClipboardList, Lock, Unlock, Settings as SettingsIcon, Calendar, LayoutDashboard, GraduationCap, ClipboardCheck, Home, RefreshCw, WifiOff, Trophy, Sun, Moon, Clock, Music, Disc3, Droplets, Wrench, Plane } from 'lucide-react';
+import { ClipboardList, Lock, Unlock, Settings as SettingsIcon, Calendar, LayoutDashboard, GraduationCap, ClipboardCheck, Home, RefreshCw, WifiOff, Trophy, Sun, Moon, Clock, Music, Disc3, Droplets, Wrench, Plane, ShoppingCart } from 'lucide-react';
 import { useKiosk } from '../../contexts/KioskContext';
 import { getApiUrl } from '../../utils/api';
 import { useSecurity } from '../../contexts/SecurityContext';
@@ -16,10 +16,16 @@ import { OnScreenKeyboard } from '../overlays/OnScreenKeyboard';
 import { useConfig } from '../../contexts/ConfigContext';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { NoteBanner } from '../widgets/NoteBanner';
+import { PrintButton } from '../PrintButton';
 
 const SCREENSAVER_NIGHT_IDLE_MS = 180000; // 3 minutes (clock screensaver fallback)
 const SCREENSAVER_CHECK_INTERVAL = 10000; // 10 seconds
 const IDLE_REDIRECT_MS = 180000; // 3 minutes
+
+export interface LayoutOutletContext {
+    /** Ziel für `createPortal`, um Buttons in den Header zu legen. */
+    headerActions: HTMLDivElement | null;
+}
 
 export const MainLayout: React.FC = () => {
     const { isLocked, lock, lastActivity } = useKiosk();
@@ -30,6 +36,10 @@ export const MainLayout: React.FC = () => {
     const [showScreensaver, setShowScreensaver] = React.useState(false);
     const [screensaverMode, setScreensaverMode] = React.useState<ScreensaverMode>('clock');
     const isOnline = useOnlineStatus();
+    // Ablage im Header für seitenbezogene Buttons (per Portal, siehe
+    // `LayoutOutletContext`), z. B. „Termine drucken" auf der Wochenseite.
+    const [headerActions, setHeaderActions] = React.useState<HTMLDivElement | null>(null);
+    const printerEnabled = config.printer?.enabled !== false;
     const { isDark, toggleTheme } = useTheme();
 
     React.useEffect(() => {
@@ -229,6 +239,20 @@ export const MainLayout: React.FC = () => {
                     <NoteBanner />
                 </div>
                 <div className="flex items-center space-x-4">
+                    <div ref={setHeaderActions} className="flex items-center gap-2 empty:hidden" />
+
+                    {printerEnabled && (
+                        <PrintButton
+                            label="Einkaufszettel"
+                            icon={ShoppingCart}
+                            endpoint="/api/printer/einkaufszettel"
+                            successText={(d) => {
+                                const n = Array.isArray(d.gedruckt) ? d.gedruckt.length : 0;
+                                return n ? `Gedruckt: ${n} Posten` : 'Gedruckt (Liste ist leer)';
+                            }}
+                        />
+                    )}
+
                     {!isLocked && (
                         <div className="text-xs text-slate-400 dark:text-slate-500 font-mono">
                             {serverUser && <>{serverUser}@</>}{serverIp}
@@ -281,7 +305,7 @@ export const MainLayout: React.FC = () => {
             {/* Main Content Area */}
             <main className="flex-1 overflow-auto p-4 relative">
                 <ErrorBoundary>
-                    <Outlet />
+                    <Outlet context={{ headerActions } satisfies LayoutOutletContext} />
                 </ErrorBoundary>
             </main>
 

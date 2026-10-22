@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useKiosk } from '../../contexts/KioskContext';
-import { useConfig } from '../../contexts/ConfigContext';
+import { useConfig, CalendarScope, CalendarSettings } from '../../contexts/ConfigContext';
 import { useSecurity } from '../../contexts/SecurityContext';
 import { Lock, Save, Calendar as CalendarIcon, CheckCircle, Upload, Download, Smartphone, Trash2, Shield, ShieldAlert, ClipboardCheck, Plus, Cake, RefreshCw, Server, GitBranch, Database, Keyboard, Trophy, Star, Image, Cat, StickyNote, X, Droplets, Wrench, Music } from 'lucide-react';
 import { IconMap, ChoreIcon } from '../../components/ChoreIcon';
 import BathroomAdmin from './BathroomAdmin';
 import HouseholdAdmin from './HouseholdAdmin';
+import PrinterAdmin from './PrinterAdmin';
 // import clsx from 'clsx';
 
 import { getApiUrl } from '../../utils/api';
@@ -406,12 +407,13 @@ const AdminSettings: React.FC = () => {
                                         <span title="Nächstes Event">Next</span>
                                         <span title="Wochenansicht">View</span>
                                         <span title="Stundenplan-Seite">Schule</span>
+                                        <span title="Terminliste für den Küchendrucker">Druck</span>
                                     </div>
                                 </div>
 
                                 {remoteCalendars.map(cal => {
                                     const isSelected = (config.google?.selectedCalendars || []).includes(cal.id);
-                                    const settings = config.google?.calendarSettings?.[cal.id] || {
+                                    const settings: CalendarSettings = config.google?.calendarSettings?.[cal.id] || {
                                         id: cal.id,
                                         color: config.google?.calendarColors?.[cal.id] || '#3b82f6',
                                         alias: cal.summary,
@@ -438,9 +440,15 @@ const AdminSettings: React.FC = () => {
                                         });
                                     };
 
-                                    const toggleScope = (scope: keyof typeof settings.scopes) => {
+                                    // `print` folgt der Wochenansicht, solange es nicht gesetzt ist.
+                                    const scopeActive = (scope: CalendarScope) =>
+                                        scope === 'print'
+                                            ? settings.scopes.print ?? settings.scopes.weekView !== false
+                                            : !!settings.scopes[scope];
+
+                                    const toggleScope = (scope: CalendarScope) => {
                                         updateSettings({
-                                            scopes: { ...settings.scopes, [scope]: !settings.scopes[scope] }
+                                            scopes: { ...settings.scopes, [scope]: !scopeActive(scope) }
                                         });
                                     };
 
@@ -493,12 +501,13 @@ const AdminSettings: React.FC = () => {
                                                     { key: 'nextEvent', label: 'N' },
                                                     { key: 'weekView', label: 'V' },
                                                     { key: 'school', label: 'S' },
+                                                    { key: 'print', label: 'D' },
                                                 ].map((s) => (
                                                     <button
                                                         key={s.key}
-                                                        onClick={() => toggleScope(s.key as import('../../contexts/ConfigContext').CalendarScope)}
+                                                        onClick={() => toggleScope(s.key as CalendarScope)}
                                                         disabled={!isSelected}
-                                                        className={`w-8 h-8 rounded text-xs font-bold transition-all ${settings.scopes[s.key as import('../../contexts/ConfigContext').CalendarScope]
+                                                        className={`w-8 h-8 rounded text-xs font-bold transition-all ${scopeActive(s.key as CalendarScope)
                                                             ? 'bg-blue-600 text-white'
                                                             : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500'
                                                             } ${!isSelected ? 'opacity-30 cursor-not-allowed' : 'hover:scale-105'}`}
@@ -938,6 +947,8 @@ const AdminSettings: React.FC = () => {
                                 </div>
                             </div>
                         </section>
+
+                        <PrinterAdmin />
 
                         <section>
                             <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Anzeigeoptionen</h3>

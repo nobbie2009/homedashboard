@@ -161,6 +161,48 @@ ohne ADS-B-Transponder (z.B. viele Segel- und Kleinflugzeuge) fehlen aber.
 
 ---
 
+## 🖨️ Küchendrucker
+
+Druckt Einkaufszettel und Terminliste auf dem Bluetooth-Thermodrucker
+(Fichero 3561, 384 Punkte) am Küchen-Pi. Dort läuft `pocket-printer.service`
+mit einer kleinen HTTP-API; das Backend reicht die Aufträge nur weiter.
+
+**Buttons im Header:**
+
+- **Einkaufszettel** (immer sichtbar) → `POST /api/printer/einkaufszettel` →
+  Pi `POST /einkaufszettel` (HA-Todo-Liste, Vorgabe des Pi: EDEKA).
+- **Termine drucken** (nur auf der Seite „Woche") → `POST /api/printer/termine`.
+  In der laufenden Woche ab heute sieben Tage, sonst die angezeigte Woche Mo–So.
+  Das Backend holt die Termine selbst aus Google, gruppiert sie nach Tag und
+  schickt sie an den Pi.
+
+Erfolg oder Fehler (Drucker aus, Bluetooth weg, …) erscheinen direkt unter dem
+Button.
+
+**Datenschutz:** Der Zettel liegt offen in der Küche, gedruckt werden nur
+Uhrzeit, Titel und Kalendername – keine Beschreibung, kein Ort.
+
+**Welche Kalender?** Admin → Kalender, Spalte **D**. Solange dort nichts gesetzt
+ist, gilt die Sichtbarkeit in der Wochenansicht (Spalte V).
+
+**Einstellungen** (Admin → Ansicht → Küchendrucker): Drucker-URL (Standard
+`http://192.168.178.178:8765`, alternativ Umgebungsvariable `PRINTER_URL`),
+HA-Todo-Entity, Überschrift, Buttons ein/aus, „Status prüfen".
+
+**Pi-Endpunkt `/zettel`:** Die Terminliste geht an
+
+```
+POST /zettel  {"title": "Termine", "untertitel": "Mo 26.10. – So 01.11.",
+               "zeilen": ["Mo 26.10.", "  09:30 Zahnarzt (Johanna)", "", ...],
+               "kaestchen": false}
+```
+
+Gerendert werden soll sie wie `render_shopping_list()` (Kopf, Datum, Linie,
+Zeilen mit Umbruch). Solange der Pi `/zettel` nicht kennt (HTTP 404), schickt das
+Backend denselben Inhalt als vorab umbrochenen Text an `/text`.
+
+---
+
 ## 🔓 Ausgesperrt? Gerät wieder freischalten
 
 Wenn **alle** Geräte plötzlich „Zugriff verweigert" zeigen, ist die Geräteliste
