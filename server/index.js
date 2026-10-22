@@ -22,6 +22,7 @@ import sonos from './sonos.js';
 import spotify from './spotify.js';
 import { getSharedAlbumPhotos, clearAlbumCache, debugSharedAlbum } from './icloud.js';
 import { getFlights, geocode as geocodePlace, availableSources as flightSources } from './flights.js';
+import * as printer from './printer.js';
 
 const app = express();
 app.use(cors());
@@ -1096,6 +1097,44 @@ app.get('/api/google/calendars', async (req, res) => {
     }
 });
 
+/**
+ * Holt Termine mehrerer Kalender. Fehler einzelner Kalender werden geloggt
+ * und übersprungen; ein Auth-Fehler wird zurückgemeldet.
+ */
+async function fetchCalendarEvents(calendarIds, timeMin, timeMax) {
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+    let events = [];
+    let authError = null;
+
+    for (const calId of calendarIds) {
+        try {
+            const response = await calendar.events.list({
+                calendarId: calId,
+                timeMin,
+                timeMax,
+                singleEvents: true,
+                orderBy: 'startTime',
+            });
+
+            events = [...events, ...response.data.items.map(event => ({
+                id: event.id,
+                summary: event.summary,
+                start: event.start,
+                end: event.end,
+                calendarId: calId, // Tag with source calendar
+                description: event.description,
+                location: event.location
+            }))];
+        } catch (err) {
+            console.error(`Failed to fetch for ${calId}:`, err.message);
+            if (err.message && (err.message.includes('No refresh token') || err.message.includes('invalid_grant'))) {
+                authError = err;
+            }
+        }
+    }
+    return { events, authError };
+}
+
 app.post('/api/google/events', async (req, res) => {
     if (!userTokens) {
         return res.status(401).json({ error: "Not authenticated with Google" });
@@ -1131,40 +1170,7 @@ app.post('/api/google/events', async (req, res) => {
     const tMax = timeMax || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     try {
-        const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
-
-        let allEvents = [];
-
-        let authError = null;
-
-        for (const calId of calendarIds) {
-            try {
-                const response = await calendar.events.list({
-                    calendarId: calId,
-                    timeMin: tMin,
-                    timeMax: tMax,
-                    singleEvents: true,
-                    orderBy: 'startTime',
-                });
-
-                const events = response.data.items.map(event => ({
-                    id: event.id,
-                    summary: event.summary,
-                    start: event.start,
-                    end: event.end,
-                    calendarId: calId, // Tag with source calendar
-                    description: event.description,
-                    location: event.location
-                }));
-
-                allEvents = [...allEvents, ...events];
-            } catch (err) {
-                console.error(`Failed to fetch for ${calId}:`, err.message);
-                if (err.message && (err.message.includes('No refresh token') || err.message.includes('invalid_grant'))) {
-                    authError = err;
-                }
-            }
-        }
+        const { events: allEvents, authError } = await fetchCalendarEvents(calendarIds, tMin, tMax);
 
         // If we faced an auth error and got no events (or even if we did?), report it.
         // Prioritize reporting the auth error if the result implies total failure.
@@ -2150,6 +2156,69 @@ app.get('/api/flights', async (req, res) => {
 // Auswahlliste für die Admin-Oberfläche
 app.get('/api/flights/sources', (req, res) => {
     res.json(flightSources);
+});
+
+// --- Küchendrucker ---
+// Der Bluetooth-Thermodrucker hängt am Küchen-Pi (pocket-printer.service).
+// Die Tablets sprechen nur mit uns, wir reichen an den Pi weiter.
+const sendPrinterError = (res, e) => {
+    console.error('[Drucker]', e.message);
+    res.status(502).json({ error: e.message });
+};
+
+app.get('/api/printer/status', async (req, res) => {
+    try {
+        res.json(await printer.getStatus(appConfig));
+    } catch (e) {
+        sendPrinterError(res, e);
+    }
+});
+
+app.post('/api/printer/einkaufszettel', async (req, res) => {
+    try {
+        const result = await printer.printShoppingList(appConfig);
+        const gedruckt = Array.isArray(result.gedruckt) ? result.gedruckt : [];
+        console.log(`[Drucker] Einkaufszettel gedruckt (${gedruckt.length} Posten)`);
+        res.json({ success: true, gedruckt });
+    } catch (e) {
+        sendPrinterError(res, e);
+    }
+});
+
+// Terminliste: {from?: 'YYYY-MM-DD', days?: 1..14}. Ohne Angabe heute + 6 Tage.
+app.post('/api/printer/termine', async (req, res) => {
+    if (!userTokens || !oauth2Client) {
+        return res.status(401).json({ error: 'Google-Kalender ist nicht verbunden.' });
+    }
+    const from = /^\d{4}-\d{2}-\d{2}$/.test(req.body?.from || '') ? req.body.from : printer.todayKey();
+    const days = Math.min(14, Math.max(1, parseInt(req.body?.days, 10) || 7));
+    const calendarIds = printer.printableCalendars(appConfig);
+    if (calendarIds.length === 0) {
+        return res.status(400).json({ error: 'Kein Kalender für den Druck ausgewählt.' });
+    }
+
+    try {
+        const timeMin = printer.berlinMidnightIso(from);
+        const timeMax = new Date(new Date(timeMin).getTime() + (days + 1) * 24 * 60 * 60 * 1000).toISOString();
+        const { events, authError } = await fetchCalendarEvents(calendarIds, timeMin, timeMax);
+        if (authError && events.length === 0) {
+            return res.status(401).json({ error: 'Google-Anmeldung abgelaufen.' });
+        }
+
+        const zeilen = printer.buildAgendaLines(events, appConfig, from, days);
+        const zettel = {
+            title: 'Termine',
+            untertitel: printer.rangeLabel(from, days),
+            zeilen: zeilen.length ? zeilen : ['Keine Termine.'],
+            kaestchen: false,
+        };
+        await printer.printSlip(appConfig, zettel);
+        const anzahl = zeilen.filter(z => z.startsWith('  ')).length;
+        console.log(`[Drucker] Terminliste gedruckt (${zettel.untertitel}, ${anzahl} Termine)`);
+        res.json({ success: true, termine: anzahl });
+    } catch (e) {
+        sendPrinterError(res, e);
+    }
 });
 
 app.get('/api/stream/events', sseHandler);

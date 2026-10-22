@@ -197,9 +197,20 @@ export interface AppConfig {
     };
     /** Visueller Designstil des Dashboards (unabhängig von Hell/Dunkel). */
     design?: 'classic' | 'glass' | 'family';
+    /** Bluetooth-Küchendrucker am Pi (pocket-printer.service). */
+    printer?: {
+        /** Basis-URL der Pi-API; leer = http://192.168.178.178:8765 */
+        url?: string;
+        /** HA-Todo-Liste für den Einkaufszettel; leer = Vorgabe des Pi */
+        todoEntity?: string;
+        /** Überschrift des Einkaufszettels; leer = Vorgabe des Pi */
+        shoppingTitle?: string;
+        /** Druck-Buttons im Header anzeigen (Standard: an) */
+        enabled?: boolean;
+    };
 }
 
-export type CalendarScope = 'today' | 'weekWidget' | 'nextEvent' | 'weekView' | 'school';
+export type CalendarScope = 'today' | 'weekWidget' | 'nextEvent' | 'weekView' | 'school' | 'print';
 
 export interface CalendarSettings {
     id: string;
@@ -210,8 +221,10 @@ export interface CalendarSettings {
      * Sichtbarkeit pro Ansicht. Achtung, `school` verhält sich umgekehrt zu
      * den übrigen Scopes: die sind opt-out (nicht gesetzt = sichtbar), die
      * Stundenplan-Seite zeigt dagegen nur ausdrücklich markierte Kalender.
+     * `print` (Terminliste für den Küchendrucker) folgt, solange nicht
+     * gesetzt, der Wochenansicht.
      */
-    scopes: Record<CalendarScope, boolean>;
+    scopes: Partial<Record<CalendarScope, boolean>>;
 }
 
 interface ConfigContextType {

@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { useOutletContext } from 'react-router-dom';
 import {
     format,
     startOfWeek,
@@ -15,6 +17,9 @@ import { de } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
 import clsx from 'clsx';
 import { useGoogleEvents, occursOnDay, CalendarEvent } from '../../hooks/useGoogleEvents';
+import { useConfig } from '../../contexts/ConfigContext';
+import { PrintButton } from '../../components/PrintButton';
+import type { LayoutOutletContext } from '../../components/layout/MainLayout';
 
 // Constants for layout
 const HOUR_HEIGHT = 60; // pixels per hour
@@ -92,6 +97,16 @@ const WeekView: React.FC = () => {
         scope: 'weekView'
     });
 
+    const { headerActions } = useOutletContext<LayoutOutletContext>() || {};
+    const { config } = useConfig();
+
+    // Terminliste: in der laufenden Woche ab heute sieben Tage, sonst die
+    // angezeigte Woche Mo–So.
+    const printRange = () => {
+        const showsToday = weekDays.some(d => isToday(d));
+        return { from: format(showsToday ? new Date() : weekStart, 'yyyy-MM-dd'), days: 7 };
+    };
+
     const allDayByDay = weekDays.map(day => events.filter(e => e.allDay && occursOnDay(e, day)));
 
     // Initial scroll
@@ -119,6 +134,16 @@ const WeekView: React.FC = () => {
     };
 
     return (
+        <>
+        {headerActions && config.printer?.enabled !== false && createPortal(
+            <PrintButton
+                label="Termine drucken"
+                endpoint="/api/printer/termine"
+                body={printRange}
+                successText={(d) => `Gedruckt: ${d.termine ?? 0} Termine`}
+            />,
+            headerActions
+        )}
         <div className="widget-card h-full flex flex-col bg-white/50 dark:bg-slate-900/50 text-slate-700 dark:text-slate-200">
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur">
@@ -272,6 +297,7 @@ const WeekView: React.FC = () => {
                 </div>
             </div>
         </div>
+        </>
     );
 };
 
