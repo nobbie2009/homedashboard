@@ -7,6 +7,7 @@ import { IconMap, ChoreIcon } from '../../components/ChoreIcon';
 import BathroomAdmin from './BathroomAdmin';
 import HouseholdAdmin from './HouseholdAdmin';
 import PrinterAdmin from './PrinterAdmin';
+import LageAdmin from './LageAdmin';
 // import clsx from 'clsx';
 
 import { getApiUrl } from '../../utils/api';
@@ -138,6 +139,7 @@ const AdminSettings: React.FC = () => {
         { id: 'bad', label: 'Bad', icon: Droplets },
         { id: 'haushalt', label: 'Haushalt', icon: Wrench },
         { id: 'katze', label: 'Katze & Notiz', icon: Cat },
+        { id: 'lage', label: 'Lage-Index', icon: ShieldAlert },
         { id: 'zugangsdaten', label: 'Zugangsdaten', icon: Lock },
         { id: 'ansicht', label: 'Ansicht', icon: CheckCircle }, // Reusing CheckCircle as generic icon for View
         { id: 'extern', label: 'Externe Daten', icon: Upload }, // Reusing Upload/Download/Server equivalent
@@ -1968,6 +1970,11 @@ const AdminSettings: React.FC = () => {
                 {/* BATHROOM TAB */}
                 {activeTab === 'bad' && (
                     <BathroomAdmin />
+                )}
+
+                {/* LAGE-INDEX TAB */}
+                {activeTab === 'lage' && (
+                    <LageAdmin />
                 )}
 
                 {/* HAUSHALT TAB */}

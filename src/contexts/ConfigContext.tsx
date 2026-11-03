@@ -198,6 +198,8 @@ export interface AppConfig {
     /** Visueller Designstil des Dashboards (unabhängig von Hell/Dunkel). */
     design?: 'classic' | 'glass' | 'family';
     /** Bluetooth-Küchendrucker am Pi (pocket-printer.service). */
+    /** LAGE-Index (eigener Lage-Indikator, siehe server/lage.js) */
+    lage?: LageConfig;
     printer?: {
         /** Basis-URL der Pi-API; leer = http://192.168.178.178:8765 */
         url?: string;
@@ -207,6 +209,46 @@ export interface AppConfig {
         shoppingTitle?: string;
         /** Druck-Buttons im Header anzeigen (Standard: an) */
         enabled?: boolean;
+    };
+}
+
+export interface LageHaAction {
+    id: string;
+    label: string;
+    enabled: boolean;
+    /** 'service' = beliebiger HA-Dienst, 'blink' = Licht rot blinken lassen */
+    type: 'service' | 'blink';
+    /** z. B. "script.fritzfonturklingwlruf" */
+    service?: string;
+    /** JSON-Text mit Platzhaltern {titel} {text} {ansage} {stufe} */
+    data?: string;
+    /** nur bei type 'blink' */
+    entity?: string;
+    seconds?: number;
+}
+
+export interface LageConfig {
+    enabled?: boolean;
+    /** Kachel ersetzt die Wochenübersicht auf dem Dashboard */
+    showOnDashboard?: boolean;
+    /** Amtlicher Regionalschlüssel des Landkreises (NINA) */
+    ars?: string;
+    lat?: number;
+    lon?: number;
+    radiationRadiusKm?: number;
+    radiationWarn?: number;
+    radiationAlarm?: number;
+    wikiArticles?: string[];
+    kontext?: { id: string; label: string; from: string; to: string }[];
+    manualLevel?: number | null;
+    manualNote?: string;
+    alarm?: {
+        enabled?: boolean;
+        minLevel?: number;
+        cooldownHours?: number;
+        popup?: boolean;
+        push?: boolean;
+        ha?: { enabled?: boolean; actions?: LageHaAction[] };
     };
 }
 

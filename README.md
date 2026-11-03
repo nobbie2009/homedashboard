@@ -69,6 +69,18 @@ Das Standard-Passwort für den ersten Zugriff wird in den Server-Logs angezeigt 
 
 ---
 
+## 🛡️ Lage-Index
+
+Eigener, **inoffizieller** Indikator für die Gefahr von außen (LAGE 5 normal … LAGE 1 akut). Ersetzt auf dem Dashboard die Wochenübersicht.
+
+- **Amtliche Untergrenzen:** NINA für den Landkreis (ohne DWD/Hochwasser), MoWaS bundesweit, BfS-Strahlungsmessnetz. LAGE 1 ist nur hierüber erreichbar.
+- **Indikatoren (je 0–3 Punkte):** Luft (Flugbereitschaft, AWACS/Tanker/Aufklärer über Europa via adsb.lol, Luftraum, Drohnen), Politik (Sondersitzungen, Krisenstab, NATO Art. 4, Gipfel), Öffentlichkeit (Wikipedia-Abrufzahlen, Tagesschau-Eilmeldungen).
+- **Alarm** (Standard ab LAGE 2): Popup auf allen Dashboards; bei aktivierter Alarmierung zusätzlich Web-Push und Home-Assistant-Aktionen (Jarvis-Ansage, LED blinkt rot, FritzFon-Rundruf, kritische Benachrichtigung).
+- Einstellungen unter **Admin → Lage-Index**. Der Home-Assistant-Token liegt nur auf dem Server (`server/data/ha_credentials.json` oder `HOMEASSISTANT_URL`/`HOMEASSISTANT_TOKEN` in `.env`).
+- Berechnung im Detail: `docs/superpowers/plans/2026-11-03-lage-index.md`, Tests: `node server/test/lage.test.js`.
+
+---
+
 ## 🔔 API & Webhooks
 
 Das Dashboard bietet Schnittstellen für die Integration in Smart Home Systeme (z.B. Home Assistant).

@@ -23,6 +23,7 @@ import spotify from './spotify.js';
 import { getSharedAlbumPhotos, clearAlbumCache, debugSharedAlbum } from './icloud.js';
 import { getFlights, geocode as geocodePlace, availableSources as flightSources } from './flights.js';
 import * as printer from './printer.js';
+import * as lage from './lageService.js';
 
 const app = express();
 app.use(cors());
@@ -575,6 +576,9 @@ app.post('/api/config', (req, res) => {
         // Broadcast cat care / note updates so other dashboards pick them up
         try { broadcastEvent('catcare', computeCatCareStatus()); } catch {}
         try { broadcastEvent('note', appConfig.note || { text: '', updatedAt: 0 }); } catch {}
+        if (req.body && 'lage' in req.body) {
+            lage.reevaluate().catch(err => console.warn('[Lage] Neubewertung fehlgeschlagen:', err.message));
+        }
         res.json({ success: true, config: appConfig });
     } catch (err) {
         console.error("Failed to save config:", err);
@@ -2303,6 +2307,76 @@ const handleDoorbell = (req, res) => {
 app.post('/api/webhook/doorbell', handleDoorbell);
 app.get('/api/webhook/doorbell', handleDoorbell);
 
+// --- LAGE-Index ---
+// Eigener, inoffizieller Lage-Indikator (siehe server/lage.js). Alle Routen
+// liegen hinter der Geräte-Freigabe.
+app.get('/api/lage', (req, res) => {
+    res.json(lage.getSnapshot());
+});
+
+app.post('/api/lage/refresh', async (req, res) => {
+    res.json(await lage.runCycle(true));
+});
+
+// Nur das Popup auf den Dashboards – keine Geräte, kein Push, kein HA.
+app.post('/api/lage/test-popup', async (req, res) => {
+    const r = await lage.testAlarm(['popup']);
+    res.json({ success: true, results: r.results });
+});
+
+// Vollständige Alarmkette als TEST (Push + aktivierte HA-Aktionen).
+// Löst echte Geräte aus – nur bewusst aus dem Adminbereich aufrufen.
+app.post('/api/lage/test-alarm', async (req, res) => {
+    if (req.body?.confirm !== true) return res.status(400).json({ error: 'Bestätigung fehlt' });
+    const r = await lage.testAlarm(['popup', 'push', 'ha']);
+    res.json({ success: true, results: r.results });
+});
+
+app.post('/api/lage/test-action', async (req, res) => {
+    const action = req.body?.action;
+    if (!action || req.body?.confirm !== true) return res.status(400).json({ error: 'Aktion oder Bestätigung fehlt' });
+    try {
+        const info = await lage.testHaAction(action);
+        res.json({ success: true, info });
+    } catch (e) {
+        res.status(502).json({ error: e.message });
+    }
+});
+
+// Home-Assistant-Zugang: Token wird nie zurückgegeben.
+app.get('/api/lage/ha', (req, res) => {
+    res.json(lage.ha.credentialStatus());
+});
+
+app.post('/api/lage/ha', (req, res) => {
+    try {
+        lage.ha.saveCredentials({ url: req.body?.url, token: req.body?.token });
+        res.json(lage.ha.credentialStatus());
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Nur lesend: Verbindung prüfen und Entities nachschlagen – löst nichts aus.
+app.post('/api/lage/ha/check', async (req, res) => {
+    try {
+        const message = await lage.ha.checkConnection();
+        const entities = Array.isArray(req.body?.entities) ? req.body.entities.slice(0, 20) : [];
+        const found = {};
+        for (const id of entities) {
+            try {
+                const s = await lage.ha.getState(id);
+                found[id] = { ok: true, state: s.state, name: s.attributes?.friendly_name || null };
+            } catch (e) {
+                found[id] = { ok: false, error: e.message };
+            }
+        }
+        res.json({ success: true, message, entities: found });
+    } catch (e) {
+        res.status(502).json({ success: false, error: e.message });
+    }
+});
+
 // --- KEYBOARD REMOTE CONTROL ---
 let isKeyboardActive = false;
 
@@ -2564,6 +2638,15 @@ app.listen(PORT, '0.0.0.0', () => { // Bind to 0.0.0.0 for external access
     } catch (e) {
         console.error('[Security] Startup-Check fehlgeschlagen:', e.message);
     }
+
+    // LAGE-Index: Quellen zeitgesteuert abrufen
+    lage.initLageService({
+        getConfig: () => appConfig,
+        broadcast: broadcastEvent,
+        push,
+        isAllowed: (id) => security.isAllowed(id),
+        geocode: geocodePlace,
+    });
 
     // Run Sonos discovery at boot (non-blocking)
     sonos.runDiscovery().catch(err => {

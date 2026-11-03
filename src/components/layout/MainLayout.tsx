@@ -11,6 +11,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import pkg from '../../../package.json';
 import { DoorbellOverlay } from '../overlays/DoorbellOverlay';
+import { LageAlarmOverlay } from '../overlays/LageAlarmOverlay';
 import { Screensaver, ScreensaverMode } from '../overlays/Screensaver';
 import { OnScreenKeyboard } from '../overlays/OnScreenKeyboard';
 import { useConfig } from '../../contexts/ConfigContext';
@@ -226,6 +227,15 @@ export const MainLayout: React.FC = () => {
                     lastActivity.current = Date.now();
                 }}
             />
+            {config.lage?.enabled !== false && (
+                <LageAlarmOverlay
+                    onShow={() => {
+                        // Bildschirmschoner weg, damit der Alarm sichtbar ist.
+                        setShowScreensaver(false);
+                        lastActivity.current = Date.now();
+                    }}
+                />
+            )}
             <Screensaver active={showScreensaver} mode={screensaverMode} onDismiss={() => setShowScreensaver(false)} />
 
             {keyboardActive && <OnScreenKeyboard onClose={() => setKeyboardActive(false)} />}
