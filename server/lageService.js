@@ -6,15 +6,17 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import {
-    LEVELS, GROUPS, INDICATORS, THRESHOLDS, zScore, pointsFromZ, matchNews,
+    LEVELS, GROUPS, INDICATORS, THRESHOLDS, zScore, pointsFromZ, NEWS_RULES,
     newsIndicatorPoints, newsFloors, ninaLocalLevel, ninaNationalLevel, ninaProvider,
     isWeatherProvider, radiationLevel, computeGroups, computeIndicatorLevel,
     combineLevels, applyHysteresis, shouldAlarm, activeKontext, fillTemplate,
-    BREAKING_PATTERN, round2,
+    BREAKING_PATTERN, round2, BUNDESTAG_RULES, NATO_RULES, matchRules, parseIcsWeeks,
+    inSitzungswoche, flightPatternPoints, berlinHour, berlinDate,
 } from './lage.js';
 import {
     fetchNinaLocal, fetchNinaNational, fetchRadiation, fetchMilitaryAircraft,
     analyseAircraft, fetchTagesschau, fetchWikiPageviews, DEFAULT_WIKI_ARTICLES, normalizeArs,
+    fetchBundestag, fetchSitzungswochenIcs, fetchNato,
 } from './lageSources.js';
 import * as ha from './homeassistant.js';
 
@@ -28,6 +30,9 @@ const INTERVALS = {
     news: 10 * 60 * 1000,
     radiation: 30 * 60 * 1000,
     wiki: 6 * 60 * 60 * 1000,
+    bundestag: 15 * 60 * 1000,
+    nato: 15 * 60 * 1000,
+    sitzungswochen: 24 * 60 * 60 * 1000,
 };
 const LEARNING_MS = 3 * 24 * 3600000;
 const SAMPLE_KEEP_MS = THRESHOLDS.baselineDays * 24 * 3600000;
@@ -143,6 +148,35 @@ function baselineEval(key, value, now) {
 // Abruf
 // ---------------------------------------------------------------------------
 
+/**
+ * Meldungen gegen Regeln prüfen und neue Treffer als Ereignis ablegen.
+ * `bonus(item, rule)` liefert Zusatzpunkte (z. B. außerhalb der Sitzungswoche).
+ */
+function addRuleEvents(items, rules, source, now, bonus = () => 0) {
+    for (const item of items) {
+        for (const rule of matchRules(item, rules)) {
+            const key = `${source}|${item.id}|${rule.id}`;
+            if (state.seenNews[key]) continue;
+            state.seenNews[key] = now;
+            const extra = bonus(item, rule);
+            state.events.push({
+                indicator: rule.indicator, ruleId: rule.id, source,
+                points: Math.min(3, rule.points + extra), floor: rule.floor || null,
+                breaking: !!item.breaking, ts: Math.min(now, item.date || now),
+                title: extra ? `${item.title} (außerhalb der Sitzungswoche)` : item.title, url: item.url,
+            });
+        }
+    }
+}
+
+function pruneEvents(now) {
+    const cutoff = now - THRESHOLDS.newsMaxAgeHours * 3600000;
+    state.events = state.events.filter(e => e.ts >= cutoff);
+    for (const [k, ts] of Object.entries(state.seenNews)) {
+        if (ts < now - 7 * 24 * 3600000) delete state.seenNews[k];
+    }
+}
+
 async function collect(force = false) {
     const cfg = lageConfig();
     const now = Date.now();
@@ -164,39 +198,56 @@ async function collect(force = false) {
             state.data.air = { ...a, at: now };
             pushSample('vip', now, a.vipCount);
             pushSample('watched', now, a.watchedCount);
+            pushSample('watchedEast', now, a.watchedEastCount);
+            pushSample('airlift', now, a.airliftCount);
         }));
     }
     if (due('news', now, force)) {
         jobs.push(runSource('news', async () => {
             const items = await fetchTagesschau();
+            addRuleEvents(items, NEWS_RULES, 'Tagesschau', now);
             for (const item of items) {
-                const rules = matchNews(item);
-                for (const rule of rules) {
-                    const key = `${item.id}|${rule.id}`;
-                    if (state.seenNews[key]) continue;
-                    state.seenNews[key] = now;
-                    state.events.push({
-                        indicator: rule.indicator, ruleId: rule.id, points: rule.points, floor: rule.floor || null,
-                        breaking: item.breaking, ts: Math.min(now, item.date || now), title: item.title, url: item.url,
-                    });
-                }
                 if (item.breaking && BREAKING_PATTERN.test(`${item.title} ${item.topline} ${item.firstSentence}`)) {
                     const key = `${item.id}|eil`;
                     if (!state.seenNews[key]) {
                         state.seenNews[key] = now;
                         state.events.push({
-                            indicator: 'eilmeldungen', ruleId: 'eilmeldung', points: 1, floor: null, breaking: false,
+                            indicator: 'eilmeldungen', ruleId: 'eilmeldung', source: 'Tagesschau', points: 1, floor: null, breaking: false,
                             ts: Math.min(now, item.date || now), title: item.title, url: item.url,
                         });
                     }
                 }
             }
-            const cutoff = now - THRESHOLDS.newsMaxAgeHours * 3600000;
-            state.events = state.events.filter(e => e.ts >= cutoff);
-            for (const [k, ts] of Object.entries(state.seenNews)) {
-                if (ts < now - 7 * 24 * 3600000) delete state.seenNews[k];
-            }
+            pruneEvents(now);
             state.data.newsCount = items.length;
+        }));
+    }
+    let kalender = Promise.resolve();
+    if (due('sitzungswochen', now, force) || !state.data.sitzungswochen?.length) {
+        jobs.push(kalender = runSource('sitzungswochen', async () => {
+            const texts = await fetchSitzungswochenIcs();
+            const weeks = texts.flatMap(parseIcsWeeks);
+            if (!weeks.length) throw new Error('Kalender ohne Sitzungswochen');
+            state.data.sitzungswochen = weeks;
+        }));
+    }
+    if (due('bundestag', now, force)) {
+        jobs.push(runSource('bundestag', async () => {
+            const items = await fetchBundestag();
+            await kalender; // Bonus „außerhalb der Sitzungswoche“ braucht den Kalender
+            const weeks = state.data.sitzungswochen || [];
+            addRuleEvents(items, BUNDESTAG_RULES, 'Bundestag', now, (item, rule) =>
+                rule.outsideWeekBonus && weeks.length && !inSitzungswoche(berlinDate(item.date || now), weeks) ? 1 : 0);
+            pruneEvents(now);
+            state.data.bundestagCount = items.length;
+        }));
+    }
+    if (due('nato', now, force)) {
+        jobs.push(runSource('nato', async () => {
+            const items = await fetchNato();
+            addRuleEvents(items, NATO_RULES, 'NATO', now);
+            pruneEvents(now);
+            state.data.natoCount = items.length;
         }));
     }
     if (due('radiation', now, force)) {
@@ -234,19 +285,37 @@ function evaluate() {
     // Luft – Flugbewegungen
     const air = state.data.air;
     if (air && state.sources.air?.ok) {
+        // Flugbereitschaft: Abweichung (Regierungsflieger bzw. Lufttransport) + Muster
         const vip = baselineEval('vip', air.vipCount, now);
-        Object.assign(indicators.flugbereitschaft, vip, {
-            detail: `${air.vipCount} Regierungsflieger in der Luft (Normal ${vip.mean} ± ${vip.std})`,
-            list: air.vip,
+        const lift = baselineEval('airlift', air.airliftCount ?? 0, now);
+        const hour = berlinHour(now);
+        const pattern = flightPatternPoints({
+            vipCount: air.vipCount,
+            vipNight: hour < 5 ? air.vipCount : 0,
+            vipEast: air.vipEastCount ?? 0,
         });
+        const fbDetail = [
+            `${air.vipCount} Regierungsflieger in der Luft (Normal ${vip.mean} ± ${vip.std})`,
+            `${air.airliftCount ?? 0} A400M/C-130J (Normal ${lift.mean} ± ${lift.std})`,
+        ];
+        if (pattern.hits.length) fbDetail.push(`Muster: ${pattern.hits.join(', ')}`);
+        Object.assign(indicators.flugbereitschaft, vip, {
+            points: Math.min(3, Math.max(vip.points, lift.points) + pattern.points),
+            z: Math.max(vip.z, lift.z),
+            detail: fbDetail.join(' · '),
+            list: [...air.vip, ...(air.airlift || [])],
+            pattern: pattern.hits,
+        });
+        // Militärluft: Europa gesamt bzw. Ostflanke – der stärkere Ausschlag zählt
         const w = baselineEval('watched', air.watchedCount, now);
-        let pts = w.points;
-        let detail = `${air.watchedCount} AWACS/Tanker/Aufklärer über Europa (Normal ${w.mean} ± ${w.std})`;
+        const e = baselineEval('watchedEast', air.watchedEastCount ?? 0, now);
+        let pts = Math.max(w.points, e.points);
+        let detail = `${air.watchedCount} AWACS/Tanker/Aufklärer über Europa (Normal ${w.mean} ± ${w.std}) · davon ${air.watchedEastCount ?? 0} an der Ostflanke (Normal ${e.mean} ± ${e.std})`;
         if (air.doomsday?.length) {
             pts = 3;
             detail += ` · ${air.doomsday.length}× E-4B/E-6B in Europa!`;
         }
-        Object.assign(indicators.militaerluft, w, { points: pts, detail, byType: air.watchedByType, list: air.doomsday });
+        Object.assign(indicators.militaerluft, w, { points: pts, z: Math.max(w.z, e.z), detail, byType: air.watchedByType, list: air.doomsday });
     }
 
     // Nachrichten
@@ -254,13 +323,14 @@ function evaluate() {
     for (const [id, r] of Object.entries(news)) {
         if (!indicators[id]) continue;
         const ind = indicators[id];
-        ind.events = r.events.slice(0, 5).map(e => ({ title: e.title, url: e.url, ts: e.ts, decayed: e.decayed, breaking: e.breaking, ruleId: e.ruleId }));
+        ind.events = r.events.slice(0, 5).map(e => ({ title: e.title, url: e.url, ts: e.ts, decayed: e.decayed, breaking: e.breaking, ruleId: e.ruleId, source: e.source || 'Tagesschau' }));
         // Flug-Indikatoren behalten ihren Messwert, Nachrichten kommen dazu
         ind.points = Math.min(3, (ind.points || 0) + r.points);
         ind.detail = ind.detail ? `${ind.detail} · ${r.events.length} Meldung(en)` : `${r.events.length} Meldung(en) in 72 h`;
     }
     for (const id of ['luftraum', 'drohnen', 'parlament', 'krisenstab', 'nato', 'diplomatie', 'eilmeldungen']) {
-        if (!indicators[id].detail) indicators[id].detail = state.sources.news?.ok ? 'keine Meldungen' : 'keine Daten';
+        const anySource = state.sources.news?.ok || state.sources.bundestag?.ok || state.sources.nato?.ok;
+        if (!indicators[id].detail) indicators[id].detail = anySource ? 'keine Meldungen' : 'keine Daten';
     }
 
     // Öffentlichkeit – Wikipedia
@@ -354,6 +424,9 @@ function evaluate() {
             ninaNational,
             radiation,
             manual: cfg.manualLevel ? { level: cfg.manualLevel, note: cfg.manualNote } : null,
+            sitzungswoche: (state.data.sitzungswochen || []).length
+                ? inSitzungswoche(berlinDate(now), state.data.sitzungswochen)
+                : null,
         },
         kontext,
         sources: Object.fromEntries(Object.entries(state.sources).map(([k, v]) => [k, { ok: v.ok, at: v.at || null, error: v.error || null }])),

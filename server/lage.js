@@ -108,11 +108,106 @@ export const NEWS_RULES = [
     { id: 'reise-abgesagt', indicator: 'diplomatie', points: 1,
         all: [/kanzler|verteidigungsminister|außenminister/i, /(?:reise|besuch)\w* (?:\S+ ){0,3}?(?:abgesagt|abgebrochen)|(?:sagt|bricht)\w*\s+(?:\S+\s+){0,2}?(?:reise|besuch)\S*(?:\s+\S+){0,4}?\s+ab\b/i] },
     // Rechtslage / Bündnisfall: zusätzlich Untergrenze Stufe 2
-    { id: 'spannungsfall', indicator: 'nato', points: 3, floor: 2,
+    { id: 'spannungsfall', indicator: 'nato', points: 3, floor: 2, none: [/anfrage|übung|würde|könnte|wenn /i],
         all: [/(?:spannungsfall|verteidigungsfall)\s+(?:wurde\s+|ist\s+)?(?:festgestellt|ausgerufen|beschlossen)|feststellung des (?:spannungs|verteidigungs)falls/i] },
-    { id: 'buendnisfall', indicator: 'nato', points: 3, floor: 2,
+    { id: 'buendnisfall', indicator: 'nato', points: 3, floor: 2, none: [/übung|würde|könnte|wenn /i],
         all: [/bündnisfall\s+(?:wurde\s+|ist\s+)?(?:ausgerufen|festgestellt|erklärt)|(?:artikel|art\.)\s*5\s+(?:wurde\s+)?(?:aktiviert|ausgelöst|ausgerufen)/i] },
 ];
+
+/**
+ * Regeln für die Bundestag-Feeds (hib, Aktuelle Themen, Pressemitteilungen).
+ * `outsideWeekBonus`: +1, wenn die Meldung außerhalb einer Sitzungswoche erscheint.
+ */
+export const BUNDESTAG_RULES = [
+    { id: 'bt-sondersitzung', indicator: 'parlament', points: 2, outsideWeekBonus: true,
+        all: [/sondersitzung|außerordentliche sitzung|zusätzliche sitzung|kurzfristig (?:einberufen|anberaumt)/i] },
+    { id: 'bt-ausschuss-sicherheit', indicator: 'parlament', points: 2, outsideWeekBonus: true,
+        all: [/verteidigungsausschuss|auswärtige[nr]? ausschuss|parlamentarische[nr]? kontrollgremium|ausschuss für inneres/i,
+            /sondersitzung|kurzfristig|dringlich|eilig|außerordentlich/i] },
+    { id: 'bt-regierungserklaerung', indicator: 'parlament', points: 1, outsideWeekBonus: true,
+        all: [/regierungserklärung/i, /lage|sicherheit|angriff|nato|bündnis|verteidigung|krieg|russland/i] },
+    { id: 'bt-feststellung', indicator: 'nato', points: 3, floor: 2,
+        all: [/(?:spannungsfall|verteidigungsfall)\s+(?:wird\s+|wurde\s+|ist\s+)?festgestellt|stellt\w* (?:den )?(?:spannungs|verteidigungs)fall fest|beschlie\w+ (?:die )?feststellung des (?:spannungs|verteidigungs)falls/i],
+        none: [/anfrage|erkundigt|fragt|frage|gesetzentwurf|übung/i] },
+];
+
+/** Regeln für NATO-News und Media Advisories (englisch). */
+export const NATO_RULES = [
+    { id: 'nato-art4', indicator: 'nato', points: 3,
+        all: [/article\s*4 consultations|consultations under article\s*4|request\w* (?:\w+ ){0,3}consultations|invok\w* article\s*4/i],
+        none: [/exercise|training/i] },
+    { id: 'nato-art5', indicator: 'nato', points: 3, floor: 2,
+        all: [/invok\w* article\s*5|article\s*5 (?:has been |was |is )?(?:invoked|activated|triggered)/i],
+        none: [/exercise|training|would|could|if /i] },
+    { id: 'nato-nac-extra', indicator: 'nato', points: 2,
+        all: [/extraordinary|emergency|urgent/i, /north atlantic council|\bnac\b|defence ministers|foreign ministers|nato leaders|summit|meeting/i] },
+    { id: 'nato-airspace', indicator: 'luftraum', points: 2,
+        all: [/airspace violation|violat\w* (?:\w+ ){0,2}airspace|incursion|shot down/i] },
+    // Abfangmanöver der Luftraumüberwachung sind Routine – nur 1 Punkt
+    { id: 'nato-intercept', indicator: 'luftraum', points: 1,
+        all: [/scrambl|intercept/i], none: [/airspace violation|violat\w* (?:\w+ ){0,2}airspace|incursion|shot down/i] },
+    { id: 'nato-readiness', indicator: 'nato', points: 1,
+        all: [/(?:heightened|increased|high(?:er)?) (?:state of )?(?:readiness|alert)|reinforce\w* (?:the )?eastern flank|deploy\w* additional forces/i] },
+];
+
+/** Regeln auf eine Meldung anwenden (Titel + Dachzeile + Anriss). */
+export function matchRules(item, rules) {
+    const text = newsText(item);
+    if (BACKGROUND_PATTERN.test(text)) return [];
+    return rules.filter(rule => rule.all.every(re => re.test(text)) && !(rule.none || []).some(re => re.test(text)));
+}
+
+// ---------------------------------------------------------------------------
+// Bundestag-Sitzungswochen (ICS)
+// ---------------------------------------------------------------------------
+
+/** Ganztägige VEVENTs → [{ from: 'YYYY-MM-DD', to: 'YYYY-MM-DD' }] (to inklusiv). */
+export function parseIcsWeeks(text) {
+    const weeks = [];
+    const blocks = String(text || '').split(/BEGIN:VEVENT/).slice(1);
+    const toIso = (d) => `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
+    for (const b of blocks) {
+        const start = b.match(/DTSTART[^:]*:(\d{8})/);
+        if (!start) continue;
+        const end = b.match(/DTEND[^:]*:(\d{8})/);
+        const from = toIso(start[1]);
+        let to = from;
+        if (end) {
+            // DTEND ist bei ganztägigen Terminen exklusiv
+            const d = new Date(`${toIso(end[1])}T12:00:00Z`);
+            d.setUTCDate(d.getUTCDate() - 1);
+            to = d.toISOString().slice(0, 10);
+        }
+        weeks.push({ from, to });
+    }
+    return weeks.sort((a, b) => a.from.localeCompare(b.from));
+}
+
+export function inSitzungswoche(dateStr, weeks = []) {
+    return weeks.some(w => w.from <= dateStr && dateStr <= w.to);
+}
+
+// ---------------------------------------------------------------------------
+// Flugmuster (zusätzlich zur Abweichung vom Normalwert)
+// ---------------------------------------------------------------------------
+
+/**
+ * Auffällige Muster der Flugbereitschaft, je +1:
+ * - Regierungsflieger nachts (0–5 Uhr) in der Luft
+ * - Regierungsflieger über der NATO-Ostflanke
+ * - drei oder mehr gleichzeitig in der Luft
+ */
+export function flightPatternPoints({ vipCount = 0, vipNight = 0, vipEast = 0 } = {}) {
+    const hits = [];
+    if (vipNight > 0) hits.push('nachts in der Luft');
+    if (vipEast > 0) hits.push('über der Ostflanke');
+    if (vipCount >= 3) hits.push(`${vipCount} gleichzeitig`);
+    return { points: hits.length, hits };
+}
+
+export function berlinHour(ts) {
+    return Number(new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', hour12: false }).format(new Date(ts)));
+}
 
 /** Allgemeine Sicherheitsthemen – nur für den Indikator „Eilmeldungen“. */
 export const BREAKING_PATTERN = /nato|russland|militär|bundeswehr|angriff|rakete|drohne|luftraum|krieg|explosion|anschlag|terror|cyber|sabotage|evakuier|strahlung|atom/i;
@@ -123,9 +218,11 @@ export function newsText(item) {
 
 /** Liefert die Treffer (Regel-IDs) für eine Nachricht. */
 export function matchNews(item) {
-    const text = newsText(item);
-    return NEWS_RULES.filter(rule => rule.all.every(re => re.test(text)));
+    return matchRules(item, NEWS_RULES);
 }
+
+/** Erklär- und Hintergrundstücke lösen keine Regel aus. */
+const BACKGROUND_PATTERN = /was bedeutet|was ist der|wie funktioniert|erklärt|hintergrund|faq|fragen und antworten|explainer|what is article|history of|anniversary|years ago/i;
 
 /** Halbwertszeit-Abklingen. */
 export function decay(points, ageHours, halfLife = THRESHOLDS.newsHalfLifeHours) {
@@ -161,7 +258,7 @@ export function newsFloors(events, now) {
     for (const ev of events) {
         if (!ev.floor) continue;
         if ((now - ev.ts) / 3600000 > THRESHOLDS.newsMaxAgeHours) continue;
-        floors.push({ level: Math.max(2, ev.floor), source: 'Nachrichten', reason: ev.title });
+        floors.push({ level: Math.max(2, ev.floor), source: ev.source || 'Nachrichten', reason: ev.title });
     }
     return floors;
 }

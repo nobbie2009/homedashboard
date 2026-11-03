@@ -1,7 +1,7 @@
 import React from 'react';
 import { formatDistanceToNowStrict, format } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { ShieldAlert, Plane, Landmark, TrendingUp, Radiation, Siren, RefreshCw, Info } from 'lucide-react';
+import { ShieldAlert, Plane, Landmark, TrendingUp, Radiation, Siren, RefreshCw, Info, CalendarDays } from 'lucide-react';
 import { useLage, LEVEL_STYLES, LageSnapshot, LageIndicator } from '../../hooks/useLage';
 
 const GROUP_ICONS: Record<string, React.ElementType> = {
@@ -14,6 +14,9 @@ const SOURCE_LABELS: Record<string, string> = {
     nina: 'NINA',
     air: 'ADS-B',
     news: 'Tagesschau',
+    bundestag: 'Bundestag',
+    sitzungswochen: 'Sitzungskalender',
+    nato: 'NATO',
     radiation: 'BfS',
     wiki: 'Wikipedia',
 };
@@ -53,6 +56,7 @@ const IndicatorRow: React.FC<{ ind: LageIndicator; color: string }> = ({ ind, co
                     <li key={i} className="text-xs text-slate-600 dark:text-slate-300 truncate">
                         {e.breaking && <span className="text-red-500 font-bold mr-1">EIL</span>}
                         <span className="text-slate-400 mr-1">{format(e.ts, 'dd.MM. HH:mm')}</span>
+                        {e.source && <span className="text-slate-400 mr-1">[{e.source}]</span>}
                         {e.title}
                         <span className="text-slate-400"> ({fmt(e.decayed)} P.)</span>
                     </li>
@@ -198,6 +202,14 @@ export const LageWidget: React.FC = () => {
                         )}
                     </span>
                 </div>
+                {typeof s.official?.sitzungswoche === 'boolean' && (
+                    <div className="flex items-start gap-2">
+                        <CalendarDays className="w-4 h-4 mt-0.5 flex-shrink-0 text-slate-400" />
+                        <span className="text-slate-600 dark:text-slate-300">
+                            Bundestag: {s.official.sitzungswoche ? 'Sitzungswoche' : 'sitzungsfreie Woche – Sitzungen gelten als außerplanmäßig'}
+                        </span>
+                    </div>
+                )}
                 {rad && (
                     <div className="flex items-start gap-2">
                         <Radiation className={`w-4 h-4 mt-0.5 flex-shrink-0 ${rad.level ? 'text-red-500' : 'text-emerald-500'}`} />
