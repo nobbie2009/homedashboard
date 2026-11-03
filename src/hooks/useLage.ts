@@ -11,6 +11,8 @@ export interface LageEvent {
     decayed: number;
     breaking?: boolean;
     ruleId?: string;
+    /** Tagesschau, Bundestag oder NATO */
+    source?: string;
 }
 
 export interface LageIndicator {
@@ -29,6 +31,7 @@ export interface LageIndicator {
     byType?: Record<string, number>;
     list?: { cs: string | null; reg: string | null; type: string | null }[];
     articles?: { article: string; views: number; mean: number; z: number }[];
+    pattern?: string[];
 }
 
 export interface LageGroup {
@@ -77,6 +80,8 @@ export interface LageSnapshot {
             count: number;
         } | null;
         manual: { level: number; note: string } | null;
+        /** Heute Sitzungswoche des Bundestags? null = Kalender nicht geladen */
+        sitzungswoche?: boolean | null;
     };
     kontext?: { label: string; from: string; to: string }[];
     sources?: Record<string, { ok?: boolean; at: number | null; error: string | null }>;

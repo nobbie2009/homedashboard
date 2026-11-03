@@ -25,6 +25,21 @@ async function getJson(url, { timeout = TIMEOUT_MS } = {}) {
     }
 }
 
+async function getText(url, { timeout = TIMEOUT_MS } = {}) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), timeout);
+    try {
+        const res = await fetch(url, { headers: { 'User-Agent': UA }, signal: controller.signal, redirect: 'follow' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.text();
+    } catch (e) {
+        if (e.name === 'AbortError') throw new Error('Zeitüberschreitung');
+        throw e;
+    } finally {
+        clearTimeout(t);
+    }
+}
+
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 const toRad = (d) => (d * Math.PI) / 180;
@@ -109,8 +124,12 @@ export const DEFAULT_AIR = {
     watchTypes: ['E3TF', 'E3CF', 'E737', 'K35R', 'K35E', 'KC46', 'A332', 'A339', 'R135', 'Q4', 'P8', 'E8'],
     // „Doomsday Planes“ – in Europa sofort 3 Punkte
     doomsdayTypes: ['E4B', 'B742', 'E6'],
+    // Lufttransport der Luftwaffe (A400M 54+…, C-130J 55+…) – Evakuierung/Verlegung
+    airliftRegPrefixes: ['54+', '55+'],
     // Europa grob
     bbox: { minLat: 34, maxLat: 72, minLon: -25, maxLon: 45 },
+    // NATO-Ostflanke: Baltikum, Polen, Slowakei, Ungarn, Rumänien, Schwarzes Meer
+    eastBox: { minLat: 43, maxLat: 60, minLon: 18, maxLon: 32 },
 };
 
 export async function fetchMilitaryAircraft() {
@@ -127,18 +146,28 @@ export async function fetchMilitaryAircraft() {
 const trimCs = (s) => String(s || '').trim();
 
 export function analyseAircraft(ac, cfg = {}) {
-    const c = { ...DEFAULT_AIR, ...cfg, bbox: { ...DEFAULT_AIR.bbox, ...(cfg.bbox || {}) } };
+    const c = {
+        ...DEFAULT_AIR, ...cfg,
+        bbox: { ...DEFAULT_AIR.bbox, ...(cfg.bbox || {}) },
+        eastBox: { ...DEFAULT_AIR.eastBox, ...(cfg.eastBox || {}) },
+    };
+    const inBox = (a, b) => a.lat >= b.minLat && a.lat <= b.maxLat && a.lon >= b.minLon && a.lon <= b.maxLon;
     const airborne = ac.filter(a => typeof a.lat === 'number' && typeof a.lon === 'number' && a.alt_baro !== 'ground');
     const inEurope = (a) => a.lat >= c.bbox.minLat && a.lat <= c.bbox.maxLat && a.lon >= c.bbox.minLon && a.lon <= c.bbox.maxLon;
     const short = (a) => ({ cs: trimCs(a.flight) || null, reg: a.r || null, type: a.t || null, lat: Math.round(a.lat * 100) / 100, lon: Math.round(a.lon * 100) / 100 });
 
+    const isAirlift = (a) => c.airliftRegPrefixes.some(p => String(a.r || '').startsWith(p));
     const vip = airborne.filter(a => {
+        if (isAirlift(a)) return false; // A400M/C-130J fliegen ebenfalls als „GAF…“
         const cs = trimCs(a.flight).toUpperCase();
         const reg = String(a.r || '');
         return c.vipCallsignPrefixes.some(p => cs.startsWith(p) && /\d/.test(cs.slice(p.length)))
             || c.vipRegPrefixes.some(p => reg.startsWith(p));
     });
     const watched = airborne.filter(a => inEurope(a) && c.watchTypes.includes(a.t));
+    const watchedEast = watched.filter(a => inBox(a, c.eastBox));
+    const vipEast = vip.filter(a => inBox(a, c.eastBox));
+    const airlift = airborne.filter(isAirlift);
     const doomsday = airborne.filter(a => inEurope(a) && c.doomsdayTypes.includes(a.t));
 
     const byType = {};
@@ -147,6 +176,10 @@ export function analyseAircraft(ac, cfg = {}) {
     return {
         vipCount: vip.length,
         vip: vip.map(short),
+        vipEastCount: vipEast.length,
+        airliftCount: airlift.length,
+        airlift: airlift.slice(0, 15).map(short),
+        watchedEastCount: watchedEast.length,
         watchedCount: watched.length,
         watchedByType: byType,
         watched: watched.slice(0, 30).map(short),
@@ -225,3 +258,109 @@ export async function fetchWikiPageviews(articles = DEFAULT_WIKI_ARTICLES) {
     if (Object.keys(result).length === 0) throw new Error(errors[0] || 'Keine Daten');
     return { series: result, errors };
 }
+
+// ---------------------------------------------------------------------------
+// Bundestag
+// ---------------------------------------------------------------------------
+
+const decodeEntities = (t) => String(t || '')
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&#(\d+);/g, (m, n) => String.fromCharCode(Number(n)))
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+/** Minimaler RSS-Parser (title, link, description, Datum). */
+export function parseRss(xml) {
+    const items = [];
+    for (const m of String(xml || '').matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+        const tag = (name) => {
+            const r = m[1].match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`));
+            return r ? decodeEntities(r[1]) : '';
+        };
+        const date = Date.parse(tag('dc:date') || tag('pubDate'));
+        items.push({
+            id: tag('guid') || tag('link') || tag('title'),
+            title: tag('title'),
+            topline: '',
+            firstSentence: tag('description').slice(0, 400),
+            date: Number.isFinite(date) ? date : Date.now(),
+            url: tag('link') || null,
+            breaking: false,
+        });
+    }
+    return items;
+}
+
+export const BUNDESTAG_FEEDS = [
+    'https://www.bundestag.de/static/appdata/includes/rss/hib.rss',
+    'https://www.bundestag.de/static/appdata/includes/rss/aktuellethemen.rss',
+    'https://www.bundestag.de/static/appdata/includes/rss/pressemitteilungen.rss',
+];
+
+export async function fetchBundestag() {
+    const seen = new Map();
+    let ok = 0;
+    for (const url of BUNDESTAG_FEEDS) {
+        try {
+            const items = parseRss(await getText(url));
+            ok++;
+            for (const it of items) if (!seen.has(it.id)) seen.set(it.id, it);
+        } catch { /* einzelner Feed darf fehlen */ }
+    }
+    if (ok === 0) throw new Error('Bundestag-Feeds nicht erreichbar');
+    return [...seen.values()];
+}
+
+/** Sitzungswochen: ICS-Links von der Sitzungskalender-Seite lesen und laden. */
+export async function fetchSitzungswochenIcs() {
+    const page = await getText('https://www.bundestag.de/parlament/plenum/sitzungskalender');
+    const links = [...new Set([...page.matchAll(/href="([^"]+\.ics)"/g)].map(m => m[1]))];
+    if (!links.length) throw new Error('Kein Sitzungskalender (.ics) gefunden');
+    const texts = [];
+    for (const l of links) {
+        const url = l.startsWith('http') ? l : `https://www.bundestag.de${l}`;
+        try { texts.push(await getText(url)); } catch { /* nächster */ }
+    }
+    if (!texts.length) throw new Error('Sitzungskalender nicht ladbar');
+    return texts;
+}
+
+// ---------------------------------------------------------------------------
+// NATO (Such-Schnittstelle der Website: News + Media Advisories)
+// ---------------------------------------------------------------------------
+
+const NATO_LISTS = [
+    'articles/news',
+    'events/media-advisories',
+];
+
+export async function fetchNato() {
+    const items = [];
+    let ok = 0;
+    for (const list of NATO_LISTS) {
+        const url = `https://www.nato.int/content/nato/en/news-and-events/${list}/jcr:content/root/container/general_search.search.json`
+            + '?searchText=&searchType=wcm&sortBy=dateDesc&pageSize=25&page=1&urlTags=&selectedTagsFilter=&languages=&startDate=&endDate=';
+        try {
+            const d = await getJson(url, { timeout: 30000 });
+            ok++;
+            for (const p of d.pages || []) {
+                const date = Date.parse(p.pageDate);
+                items.push({
+                    id: p.link || p.title,
+                    title: p.title || p.headingTitle || '',
+                    topline: p.eventType || p.pageType || '',
+                    firstSentence: String(p.description || '').slice(0, 400),
+                    date: Number.isFinite(date) ? date : Date.now(),
+                    url: p.link ? `https://www.nato.int${p.link.replace(/\?selectedLocale=$/, '')}` : null,
+                    breaking: false,
+                });
+            }
+        } catch { /* andere Liste versuchen */ }
+    }
+    if (ok === 0) throw new Error('nato.int nicht erreichbar');
+    return items;
+}
+

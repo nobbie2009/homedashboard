@@ -3,8 +3,10 @@ import {
     zScore, pointsFromZ, matchNews, newsIndicatorPoints, newsFloors, decay,
     ninaLocalLevel, ninaNationalLevel, radiationLevel, computeGroups,
     computeIndicatorLevel, combineLevels, applyHysteresis, shouldAlarm,
-    activeKontext, fillTemplate,
+    activeKontext, fillTemplate, matchRules, BUNDESTAG_RULES, NATO_RULES,
+    parseIcsWeeks, inSitzungswoche, flightPatternPoints,
 } from '../lage.js';
+import { parseRss, analyseAircraft } from '../lageSources.js';
 
 const H = 3600000;
 const now = Date.UTC(2026, 10, 3, 12, 0, 0);
@@ -145,6 +147,77 @@ const now = Date.UTC(2026, 10, 3, 12, 0, 0);
         { message: 'LAGE 2: X', data: { list: ['T'] }, n: 3 }
     );
     console.log('OK  Kontext/Vorlagen');
+}
+
+// Bundestag-Regeln
+{
+    const ids = (title, firstSentence = '') => matchRules({ title, firstSentence }, BUNDESTAG_RULES).map(r => r.id);
+    assert.deepEqual(ids('Bundestag kommt zu Sondersitzung zusammen'), ['bt-sondersitzung']);
+    assert.deepEqual(ids('Verteidigungsausschuss tagt kurzfristig', 'Der Ausschuss wurde zu einer Sondersitzung einberufen.'), ['bt-sondersitzung', 'bt-ausschuss-sicherheit']);
+    assert.deepEqual(ids('Bundestag stellt den Verteidigungsfall fest'), ['bt-feststellung']);
+    // Kleine Anfrage über den Spannungsfall ist keine Feststellung
+    assert.deepEqual(ids('Feststellung des Spannungsfalls erfragt', 'Die Fraktion erkundigt sich in einer Kleinen Anfrage, wann der Spannungsfall festgestellt wird.'), []);
+    assert.deepEqual(ids('Zahl zusätzlicher öffentlicher Schutzräume erfragt'), []);
+    console.log('OK  Bundestag-Regeln');
+}
+
+// NATO-Regeln
+{
+    const ids = (title, firstSentence = '') => matchRules({ title, firstSentence }, NATO_RULES).map(r => r.id);
+    assert.deepEqual(ids('NATO Allies hold Article 4 consultations at the request of Poland'), ['nato-art4']);
+    assert.deepEqual(ids('Extraordinary meeting of the North Atlantic Council'), ['nato-nac-extra']);
+    assert.deepEqual(ids('Allies invoke Article 5'), ['nato-art5']);
+    assert.deepEqual(ids('NATO jets scrambled after airspace violation over Estonia'), ['nato-airspace']);
+    assert.deepEqual(ids('NATO air policing jets intercept Russian aircraft over the Baltic'), ['nato-intercept']);
+    assert.deepEqual(ids('What is Article 4? NATO consultations explained'), []);
+    assert.deepEqual(ids('NATO Deputy Secretary General addresses Partnerships Symposium'), []);
+    assert.deepEqual(ids('Rutte addresses Armaments Directors', 'ensure that increased defence investment translates'), []);
+    assert.deepEqual(ids('Allied forces placed on heightened readiness'), ['nato-readiness']);
+    assert.deepEqual(ids('Allies would invoke Article 5 if attacked, Rutte says'), []);
+    console.log('OK  NATO-Regeln');
+}
+
+// Sitzungswochen
+{
+    const ics = 'BEGIN:VCALENDAR\nBEGIN:VEVENT\nDTSTART;VALUE=DATE:20261102\nDTEND;VALUE=DATE:20261107\nSUMMARY:Sitzungswoche\nEND:VEVENT\nBEGIN:VEVENT\nDTSTART;VALUE=DATE:20261116\nDTEND;VALUE=DATE:20261121\nEND:VEVENT\nEND:VCALENDAR';
+    const weeks = parseIcsWeeks(ics);
+    assert.deepEqual(weeks[0], { from: '2026-11-02', to: '2026-11-06' });
+    assert.equal(inSitzungswoche('2026-11-06', weeks), true);
+    assert.equal(inSitzungswoche('2026-11-07', weeks), false);
+    assert.equal(inSitzungswoche('2026-11-10', weeks), false);
+    console.log('OK  Sitzungswochen');
+}
+
+// RSS
+{
+    const xml = '<rss><channel><item><title>Sondersitzung &amp; mehr</title><link>https://x/1</link><description><![CDATA[<p>Text</p>]]></description><dc:date>2026-11-03T10:00:00Z</dc:date></item></channel></rss>';
+    const [it] = parseRss(xml);
+    assert.equal(it.title, 'Sondersitzung & mehr');
+    assert.equal(it.firstSentence, 'Text');
+    assert.equal(it.date, Date.parse('2026-11-03T10:00:00Z'));
+    console.log('OK  RSS');
+}
+
+// Flugdaten
+{
+    const ac = [
+        { flight: 'GAF685  ', r: '10+02', t: 'A359', lat: 50.1, lon: 22.0, alt_baro: 38000 }, // Ostflanke
+        { flight: 'GAF001', r: '14+01', t: 'GL5T', lat: 52.5, lon: 13.4, alt_baro: 20000 },
+        { flight: 'GAF999', r: '54+10', t: 'A400', lat: 48.0, lon: 11.0, alt_baro: 25000 },
+        { flight: 'NATO01', r: 'LX-N90442', t: 'E3TF', lat: 53.0, lon: 21.0, alt_baro: 30000 }, // Ostflanke
+        { flight: 'RCH1', r: '60-0364', t: 'K35R', lat: 50.0, lon: 8.0, alt_baro: 25000 },
+        { flight: 'GAFTT07', r: 'TWR', t: 'TWR' }, // ohne Position
+        { flight: 'X', r: '10+03', t: 'A359', lat: 50.9, lon: 6.9, alt_baro: 'ground' },
+    ];
+    const a = analyseAircraft(ac);
+    assert.equal(a.vipCount, 2); // A400M zählt nicht als Regierungsflieger
+    assert.equal(a.vipEastCount, 1);
+    assert.equal(a.airliftCount, 1);
+    assert.equal(a.watchedCount, 2);
+    assert.equal(a.watchedEastCount, 1);
+    assert.deepEqual(flightPatternPoints({ vipCount: 1 }).points, 0);
+    assert.deepEqual(flightPatternPoints({ vipCount: 3, vipNight: 3, vipEast: 1 }).points, 3);
+    console.log('OK  Flugdaten');
 }
 
 console.log('Alle LAGE-Tests bestanden.');

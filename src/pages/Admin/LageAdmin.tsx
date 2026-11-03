@@ -153,8 +153,9 @@ export const LageAdmin: React.FC = () => {
                 </h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mb-4 max-w-3xl">
                     Eigener, inoffizieller Indikator für die Gefahr von außen (LAGE 5 normal … LAGE 1 akut). Amtliche Warnungen
-                    (NINA, BfS-Strahlung) setzen eine Untergrenze; Flugbewegungen, Nachrichten und Suchinteresse bilden die Indikatoren.
-                    LAGE 1 ist nur über amtliche Quellen erreichbar.
+                    (NINA, BfS-Strahlung) setzen eine Untergrenze; Flugbewegungen (Flugbereitschaft, A400M, AWACS/Tanker an der Ostflanke),
+                    Bundestag (Feeds + Sitzungskalender), NATO (News + Media Advisories), Tagesschau und Suchinteresse bilden die
+                    Indikatoren. LAGE 1 ist nur über amtliche Quellen erreichbar.
                 </p>
                 <div className="grid md:grid-cols-2 gap-4 max-w-3xl">
                     <label className="flex items-center gap-3">

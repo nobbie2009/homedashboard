@@ -29,13 +29,13 @@ Unwetter und Hochwasser bleiben in den bestehenden DWD-Anzeigen.
 
 | Gruppe | Indikator | Quelle | Methode |
 |---|---|---|---|
-| LUFT | Flugbereitschaft | adsb.lol `/v2/mil` | Anzahl Regierungsflieger in der Luft, Abweichung vom 30-Tage-Normalwert |
-| LUFT | Militärluft Europa | adsb.lol `/v2/mil` | AWACS/Tanker/Aufklärer in Europa (Abweichung vom Normalwert); E-4B/E-6B in Europa = 3 |
-| LUFT | Luftraum | Tagesschau | Schlüsselwörter (gesperrt, Luftraumverletzung, Alarmrotte) |
+| LUFT | Flugbereitschaft | adsb.lol `/v2/mil` | Regierungsflieger (10+/14+/15+/16+, GAF) und A400M/C-130J (54+/55+): Abweichung vom Normalwert; +1 je Muster: nachts 0–5 Uhr, über der Ostflanke, ≥ 3 gleichzeitig |
+| LUFT | Militärluft Europa | adsb.lol `/v2/mil` | AWACS/Tanker/Aufklärer über Europa bzw. an der Ostflanke (stärkerer Ausschlag zählt); E-4B/E-6B in Europa = 3 |
+| LUFT | Luftraum | Tagesschau, NATO | Luftraumverletzung/Eindringen (2), Abfangmanöver (1), Sperrungen |
 | LUFT | Drohnen | Tagesschau | Drohne + Flughafen/Bundeswehr |
-| POLITIK | Parlament | Tagesschau | Sondersitzung Bundestag/Bundesrat |
+| POLITIK | Parlament | Bundestag-Feeds (hib, Aktuelle Themen, Pressemitteilungen) + Sitzungskalender (ICS), Tagesschau | Sondersitzung Plenum/Sicherheitsausschüsse (2), Regierungserklärung zur Lage (1); +1 außerhalb der Sitzungswoche |
 | POLITIK | Krisenstab | Tagesschau | Nationaler Sicherheitsrat, Krisenstab |
-| POLITIK | NATO | Tagesschau | Art. 4 (3 P.), Alarmbereitschaft/Mobilmachung (2 P.) |
+| POLITIK | NATO | nato.int (News + Media Advisories), Tagesschau | Art.-4-Konsultationen (3), außerordentlicher Nordatlantikrat (2), erhöhte Bereitschaft (1), Alarmbereitschaft/Mobilmachung (2) |
 | POLITIK | Diplomatie | Tagesschau | Sondergipfel, abgesagte Reisen |
 | ÖFFENTLICHKEIT | Suchinteresse | Wikipedia-Abrufzahlen | Abweichung vom 28-Tage-Normalwert für Verteidigungsfall, Schutzraum, Kaliumiodid … |
 | ÖFFENTLICHKEIT | Eilmeldungen | Tagesschau | Sicherheitsrelevante Eilmeldungen der letzten 24 h |
