@@ -14,6 +14,9 @@ self.addEventListener('push', (event) => {
         icon: '/pwa-192x192.png',
         badge: '/pwa-192x192.png',
         tag: data.tag || undefined,
+        requireInteraction: data.requireInteraction === true,
+        renotify: data.requireInteraction === true && !!data.tag,
+        vibrate: data.requireInteraction === true ? [300, 150, 300, 150, 600] : undefined,
         data: { url: data.url || '/pwa' },
     };
     event.waitUntil(self.registration.showNotification(title, options));
