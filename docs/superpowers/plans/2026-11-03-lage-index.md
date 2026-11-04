@@ -63,4 +63,4 @@ Verschlechterung sofort, Verbesserung erst nach 60 min stabil.
 3. `server/homeassistant.js` – REST-Aufrufe, Blinken
 4. `server/lageService.js` – Zeitplan, Verlauf, Zustand, Alarmierung
 5. API: `GET /api/lage`, `POST /api/lage/refresh`, Test-Popup, HA-Verbindungscheck, Zugangsdaten
-6. Frontend: `LageWidget` (ersetzt Wochenübersicht), `LageAlarmOverlay`, `LageAdmin`
+6. Frontend: Header-Button `LageHeaderButton` (öffnet `LageWidget` als Popup), `LageAlarmOverlay`, `LageAdmin`

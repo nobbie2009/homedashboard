@@ -10,7 +10,6 @@ import { ChoresWidget } from '../../components/widgets/ChoresWidget';
 import { CountdownWidget } from '../../components/widgets/CountdownWidget';
 import { MoonWidget } from '../../components/widgets/MoonWidget';
 import { WeekWidget } from '../../components/widgets/WeekWidget';
-import { LageWidget } from '../../components/widgets/LageWidget';
 import { SonosWidget } from '../../components/widgets/SonosWidget';
 
 /**
@@ -48,9 +47,6 @@ export const Home: React.FC = () => {
         flights: config.flights?.showOnDashboard !== false,
     };
 
-    // Der Lage-Index ersetzt in der Mitte die Wochenübersicht (abschaltbar).
-    const showLage = config.lage?.enabled !== false && config.lage?.showOnDashboard !== false;
-
     const bottomWidgets = BOTTOM_WIDGETS.filter(w => visibility[w.key]);
     const bottomColumns = bottomWidgets.map(w => `${w.weight}fr`).join(' ');
 
@@ -61,7 +57,7 @@ export const Home: React.FC = () => {
                 <UnifiedHeaderWidget />
             </div>
 
-            {/* Hauptreihe: Heute | Lage-Index (bzw. Woche) | Regenradar */}
+            {/* Hauptreihe: Heute | Woche | Regenradar */}
             <div
                 className="grid gap-4 overflow-hidden h-full transition-[grid-template-columns] duration-500"
                 style={{ gridTemplateColumns: todayEmpty ? '0.65fr 1.6fr 1fr' : '1fr 1.15fr 1fr' }}
@@ -70,7 +66,7 @@ export const Home: React.FC = () => {
                     <AgendaWidget onEmptyChange={handleTodayEmpty} />
                 </div>
                 <div className="overflow-hidden">
-                    {showLage ? <LageWidget /> : <WeekWidget />}
+                    <WeekWidget />
                 </div>
                 <div className="overflow-hidden">
                     <RainRadarWidget />

@@ -1,7 +1,7 @@
 import React from 'react';
 import { formatDistanceToNowStrict, format } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { ShieldAlert, Plane, Landmark, TrendingUp, Radiation, Siren, RefreshCw, Info, CalendarDays } from 'lucide-react';
+import { ShieldAlert, Plane, Landmark, TrendingUp, Radiation, Siren, RefreshCw, Info, CalendarDays, X } from 'lucide-react';
 import { useLage, LEVEL_STYLES, LageSnapshot, LageIndicator } from '../../hooks/useLage';
 
 const GROUP_ICONS: Record<string, React.ElementType> = {
@@ -107,18 +107,36 @@ const Calculation: React.FC<{ s: LageSnapshot }> = ({ s }) => {
     );
 };
 
-export const LageWidget: React.FC = () => {
+/**
+ * Lage-Übersicht. Wird als Popup aus dem Header geöffnet (`onClose` gesetzt)
+ * und kann weiterhin als Kachel eingebettet werden.
+ */
+export const LageWidget: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
     const { snapshot: s, error, refresh } = useLage();
     const [refreshing, setRefreshing] = React.useState(false);
 
-    const card = 'widget-card flex flex-col p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl backdrop-blur-sm shadow-lg w-full h-full border border-slate-300 dark:border-slate-700 overflow-hidden';
+    const card = onClose
+        ? 'flex flex-col p-5 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full h-full border border-slate-300 dark:border-slate-700 overflow-hidden'
+        : 'widget-card flex flex-col p-4 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl backdrop-blur-sm shadow-lg w-full h-full border border-slate-300 dark:border-slate-700 overflow-hidden';
+    const closeButton = onClose && (
+        <button
+            onClick={onClose}
+            className="ml-2 p-2 rounded-full bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-500"
+            aria-label="Schließen"
+        >
+            <X className="w-6 h-6" />
+        </button>
+    );
 
     if (!s || s.loading || !s.level) {
         return (
             <div className={card}>
-                <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-3 uppercase tracking-wider flex items-center gap-2">
-                    <ShieldAlert className="w-5 h-5" /> Lage-Index
-                </h3>
+                <div className="flex items-center mb-3">
+                    <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                        <ShieldAlert className="w-5 h-5" /> Lage-Index
+                    </h3>
+                    {onClose && <div className="ml-auto">{closeButton}</div>}
+                </div>
                 <div className="flex-1 flex items-center justify-center text-sm text-slate-400 animate-pulse text-center">
                     {s && !s.enabled && !s.loading ? 'Lage-Index ist abgeschaltet.' : error ? `Fehler: ${error}` : 'Lage wird ermittelt…'}
                 </div>
@@ -151,6 +169,7 @@ export const LageWidget: React.FC = () => {
                 >
                     <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
                 </button>
+                {closeButton}
             </div>
 
             {/* Stufe */}

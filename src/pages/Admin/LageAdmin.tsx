@@ -163,8 +163,8 @@ export const LageAdmin: React.FC = () => {
                         <span>Lage-Index aktiv</span>
                     </label>
                     <label className="flex items-center gap-3">
-                        <input type="checkbox" className={checkClass} checked={lage.showOnDashboard !== false} onChange={e => update({ showOnDashboard: e.target.checked })} />
-                        <span>Kachel statt Wochenübersicht auf dem Dashboard</span>
+                        <input type="checkbox" className={checkClass} checked={lage.showInHeader !== false} onChange={e => update({ showInHeader: e.target.checked })} />
+                        <span>Button im Header (öffnet die Übersicht als Popup)</span>
                     </label>
                     <div>
                         <label className={labelClass}>Regionalschlüssel Landkreis (ARS, für NINA)</label>

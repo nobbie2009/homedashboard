@@ -229,8 +229,8 @@ export interface LageHaAction {
 
 export interface LageConfig {
     enabled?: boolean;
-    /** Kachel ersetzt die Wochenübersicht auf dem Dashboard */
-    showOnDashboard?: boolean;
+    /** Button „LAGE x“ im Header, öffnet die Übersicht als Popup */
+    showInHeader?: boolean;
     /** Amtlicher Regionalschlüssel des Landkreises (NINA) */
     ars?: string;
     lat?: number;
