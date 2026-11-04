@@ -71,7 +71,7 @@ Das Standard-Passwort für den ersten Zugriff wird in den Server-Logs angezeigt 
 
 ## 🛡️ Lage-Index
 
-Eigener, **inoffizieller** Indikator für die Gefahr von außen (LAGE 5 normal … LAGE 1 akut). Ersetzt auf dem Dashboard die Wochenübersicht.
+Eigener, **inoffizieller** Indikator für die Gefahr von außen (LAGE 5 normal … LAGE 1 akut). Der Button „LAGE x“ oben rechts im Header zeigt die Stufe farbig an und öffnet die vollständige Übersicht als Popup.
 
 - **Amtliche Untergrenzen:** NINA für den Landkreis (ohne DWD/Hochwasser), MoWaS bundesweit, BfS-Strahlungsmessnetz. LAGE 1 ist nur hierüber erreichbar.
 - **Indikatoren (je 0–3 Punkte):** Luft (Flugbereitschaft, AWACS/Tanker/Aufklärer über Europa via adsb.lol, Luftraum, Drohnen), Politik (Bundestag-Feeds und Sitzungskalender, NATO-News und Media Advisories, Krisenstab, Gipfel), Öffentlichkeit (Wikipedia-Abrufzahlen, Tagesschau-Eilmeldungen).
