@@ -76,6 +76,11 @@ export async function getState(entityId) {
     return haFetch('GET', `/api/states/${encodeURIComponent(entityId)}`);
 }
 
+/** Nur lesend: alle Zustände (für die Guardian-Suche). */
+export async function getStates() {
+    return haFetch('GET', '/api/states', undefined, 20000);
+}
+
 /** Dienst aufrufen, z. B. "script.fritzfonturklingwlruf" oder "notify.mobile_app_x". */
 export async function callService(service, data = {}) {
     const [domain, name] = String(service || '').split('.');

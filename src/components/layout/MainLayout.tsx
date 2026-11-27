@@ -19,6 +19,7 @@ import { ErrorBoundary } from '../ErrorBoundary';
 import { NoteBanner } from '../widgets/NoteBanner';
 import { PrintButton } from '../PrintButton';
 import { LageHeaderButton } from '../LageHeaderButton';
+import { GuardianHeaderButton } from '../GuardianHeaderButton';
 
 const SCREENSAVER_NIGHT_IDLE_MS = 180000; // 3 minutes (clock screensaver fallback)
 const SCREENSAVER_CHECK_INTERVAL = 10000; // 10 seconds
@@ -253,6 +254,7 @@ export const MainLayout: React.FC = () => {
                     <div ref={setHeaderActions} className="flex items-center gap-2 empty:hidden" />
 
                     {config.lage?.enabled !== false && config.lage?.showInHeader !== false && <LageHeaderButton />}
+                    {config.guardian?.enabled !== false && <GuardianHeaderButton />}
 
                     {printerEnabled && (
                         <PrintButton

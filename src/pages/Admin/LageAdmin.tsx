@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { ShieldAlert, BellRing, Home as HomeIcon, Plus, Trash2, CalendarRange, PlayCircle, PlugZap } from 'lucide-react';
-import { useConfig, LageConfig, LageHaAction } from '../../contexts/ConfigContext';
+import { ShieldAlert, BellRing, Home as HomeIcon, Plus, Trash2, CalendarRange, PlayCircle, PlugZap, Shield, Search } from 'lucide-react';
+import { useConfig, LageConfig, LageHaAction, GuardianConfig } from '../../contexts/ConfigContext';
+import { GUARDIAN_STYLES } from '../../hooks/useGuardian';
 import { useSecurity } from '../../contexts/SecurityContext';
 import { getApiUrl, fetchWithTimeout } from '../../utils/api';
 
@@ -143,6 +144,19 @@ export const LageAdmin: React.FC = () => {
     };
 
     const kontext = lage.kontext || [];
+
+    const guardian: GuardianConfig = config.guardian || {};
+    const updateGuardian = (partial: Partial<GuardianConfig>) => updateConfig({ guardian: { ...guardian, ...partial } });
+    const [candidates, setCandidates] = useState<{ entityId: string; name: string | null; state: string; level: number | null }[] | null>(null);
+    const [guardianEntity, setGuardianEntity] = useState(guardian.entityId || '');
+
+    const discoverGuardian = async () => {
+        const d = await post('/api/guardian/discover', {}, 'guardian');
+        if (d) {
+            setCandidates(d.candidates || []);
+            say('guardian', d.candidates?.length ? '' : 'Keine Entity mit „guardian“ oder „eskalation“ im Namen gefunden.');
+        }
+    };
 
     return (
         <div className="space-y-10">
@@ -303,6 +317,68 @@ export const LageAdmin: React.FC = () => {
                         </button>
                     </div>
                     {msg.popup && <div className="md:col-span-2 text-xs font-mono text-slate-500">{msg.popup}</div>}
+                </div>
+            </section>
+
+            {/* Jarvis-Guardian */}
+            <section>
+                <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-2 flex items-center gap-2">
+                    <Shield className="w-5 h-5" /> Jarvis-Guardian
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4 max-w-3xl">
+                    Zeigt die Eskalationsstufe (0–5) des Jarvis-Guardian aus Home Assistant als Button „GUARDIAN x“ neben „LAGE x“.
+                    Nutzt den Home-Assistant-Zugang unten und liest nur. Ohne eingetragene Entity sucht der Server selbst nach
+                    einer Entity mit „guardian“ bzw. „eskalation“ im Namen, deren Zustand eine Zahl von 0 bis 5 ist.
+                </p>
+                <div className="grid md:grid-cols-2 gap-4 max-w-3xl">
+                    <label className="flex items-center gap-3 md:col-span-2">
+                        <input type="checkbox" className={checkClass} checked={guardian.enabled !== false} onChange={e => updateGuardian({ enabled: e.target.checked })} />
+                        <span>Guardian-Stufe im Header anzeigen</span>
+                    </label>
+                    <div className="md:col-span-2">
+                        <label className={labelClass}>Entity mit der Stufe (leer = automatisch suchen)</label>
+                        <div className="flex gap-2">
+                            <input className={inputClass} value={guardianEntity} placeholder="sensor.jarvis_guardian_stufe"
+                                onChange={e => setGuardianEntity(e.target.value)}
+                                onBlur={() => updateGuardian({ entityId: guardianEntity.trim() || undefined })} />
+                            <button className={`${btnClass} whitespace-nowrap`} onClick={discoverGuardian}>
+                                <Search className="w-4 h-4" /> In HA suchen
+                            </button>
+                        </div>
+                    </div>
+                    {msg.guardian && <div className="md:col-span-2 text-xs font-mono text-slate-500">{msg.guardian}</div>}
+                    {candidates && candidates.length > 0 && (
+                        <div className="md:col-span-2 space-y-1">
+                            {candidates.map(c => (
+                                <button key={c.entityId}
+                                    className="w-full text-left flex items-center gap-3 rounded-lg px-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                    onClick={() => { setGuardianEntity(c.entityId); updateGuardian({ entityId: c.entityId }); }}>
+                                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                                        style={{ backgroundColor: c.level !== null ? GUARDIAN_STYLES[c.level].hex : '#64748b' }}>
+                                        {c.level ?? '?'}
+                                    </span>
+                                    <span className="font-mono">{c.entityId}</span>
+                                    <span className="text-slate-500 truncate">{c.name || ''} · {c.state}</span>
+                                    {guardian.entityId === c.entityId && <span className="ml-auto text-emerald-500">✓ gewählt</span>}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    <div className="md:col-span-2">
+                        <label className={labelClass}>
+                            Kurztexte je Stufe (optional – nur nötig, wenn die Entity keinen Klartext wie „beschreibung“ mitliefert)
+                        </label>
+                        <div className="grid md:grid-cols-2 gap-2">
+                            {[0, 1, 2, 3, 4, 5].map(l => (
+                                <div key={l} className="flex items-center gap-2">
+                                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                                        style={{ backgroundColor: GUARDIAN_STYLES[l].hex }}>{l}</span>
+                                    <input className={inputClass} value={guardian.labels?.[String(l)] || ''} placeholder={GUARDIAN_STYLES[l].label}
+                                        onChange={e => updateGuardian({ labels: { ...(guardian.labels || {}), [String(l)]: e.target.value } })} />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </section>
 

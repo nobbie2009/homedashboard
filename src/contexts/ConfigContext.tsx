@@ -200,6 +200,8 @@ export interface AppConfig {
     /** Bluetooth-Küchendrucker am Pi (pocket-printer.service). */
     /** LAGE-Index (eigener Lage-Indikator, siehe server/lage.js) */
     lage?: LageConfig;
+    /** Jarvis-Guardian aus Home Assistant (Eskalationsstufe 0–5) */
+    guardian?: GuardianConfig;
     printer?: {
         /** Basis-URL der Pi-API; leer = http://192.168.178.178:8765 */
         url?: string;
@@ -225,6 +227,15 @@ export interface LageHaAction {
     /** nur bei type 'blink' */
     entity?: string;
     seconds?: number;
+}
+
+export interface GuardianConfig {
+    /** Anzeige im Header (Standard: an) */
+    enabled?: boolean;
+    /** HA-Entity mit der Stufe; leer = automatisch suchen */
+    entityId?: string;
+    /** Eigene Kurztexte je Stufe, falls die Entity keinen Klartext liefert */
+    labels?: Record<string, string>;
 }
 
 export interface LageConfig {
