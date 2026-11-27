@@ -24,6 +24,7 @@ import { getSharedAlbumPhotos, clearAlbumCache, debugSharedAlbum } from './iclou
 import { getFlights, geocode as geocodePlace, availableSources as flightSources } from './flights.js';
 import * as printer from './printer.js';
 import * as lage from './lageService.js';
+import * as guardian from './guardian.js';
 
 const app = express();
 app.use(cors());
@@ -578,6 +579,9 @@ app.post('/api/config', (req, res) => {
         try { broadcastEvent('note', appConfig.note || { text: '', updatedAt: 0 }); } catch {}
         if (req.body && 'lage' in req.body) {
             lage.reevaluate().catch(err => console.warn('[Lage] Neubewertung fehlgeschlagen:', err.message));
+        }
+        if (req.body && 'guardian' in req.body) {
+            guardian.reconfigure().catch(err => console.warn('[Guardian] Neu lesen fehlgeschlagen:', err.message));
         }
         res.json({ success: true, config: appConfig });
     } catch (err) {
@@ -2377,6 +2381,25 @@ app.post('/api/lage/ha/check', async (req, res) => {
     }
 });
 
+// --- JARVIS-GUARDIAN ---
+// Eskalationsstufe 0–5 aus Home Assistant (nur lesend, hinter der Geräte-Freigabe).
+app.get('/api/guardian', (req, res) => {
+    res.json(guardian.getSnapshot());
+});
+
+app.post('/api/guardian/refresh', async (req, res) => {
+    res.json(await guardian.reconfigure());
+});
+
+// Kandidaten-Entities für die Auswahl im Admin
+app.post('/api/guardian/discover', async (req, res) => {
+    try {
+        res.json({ success: true, candidates: await guardian.discover() });
+    } catch (e) {
+        res.status(502).json({ success: false, error: e.message });
+    }
+});
+
 // --- KEYBOARD REMOTE CONTROL ---
 let isKeyboardActive = false;
 
@@ -2646,6 +2669,10 @@ app.listen(PORT, '0.0.0.0', () => { // Bind to 0.0.0.0 for external access
         push,
         isAllowed: (id) => security.isAllowed(id),
         geocode: geocodePlace,
+    });
+    guardian.initGuardianService({
+        getConfig: () => appConfig,
+        broadcast: broadcastEvent,
     });
 
     // Run Sonos discovery at boot (non-blocking)
