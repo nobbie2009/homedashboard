@@ -149,11 +149,14 @@ export const LageAdmin: React.FC = () => {
     const updateGuardian = (partial: Partial<GuardianConfig>) => updateConfig({ guardian: { ...guardian, ...partial } });
     const [candidates, setCandidates] = useState<{ entityId: string; name: string | null; state: string; level: number | null }[] | null>(null);
     const [guardianEntity, setGuardianEntity] = useState(guardian.entityId || '');
+    const [modeCandidates, setModeCandidates] = useState<{ entityId: string; name: string | null; state: string }[] | null>(null);
+    const [modeEntity, setModeEntity] = useState(guardian.modeEntityId || '');
 
     const discoverGuardian = async () => {
         const d = await post('/api/guardian/discover', {}, 'guardian');
         if (d) {
             setCandidates(d.candidates || []);
+            setModeCandidates(d.modeCandidates || []);
             say('guardian', d.candidates?.length ? '' : 'Keine Entity mit „guardian“ oder „eskalation“ im Namen gefunden.');
         }
     };
@@ -365,8 +368,27 @@ export const LageAdmin: React.FC = () => {
                         </div>
                     )}
                     <div className="md:col-span-2">
+                        <label className={labelClass}>Entity mit dem Modus, z. B. Tag/Nacht/Urlaub (optional, leer = automatisch suchen)</label>
+                        <input className={inputClass} value={modeEntity} placeholder="input_select.jarvis_guardian_modus"
+                            onChange={e => setModeEntity(e.target.value)}
+                            onBlur={() => updateGuardian({ modeEntityId: modeEntity.trim() || undefined })} />
+                    </div>
+                    {modeCandidates && modeCandidates.length > 0 && (
+                        <div className="md:col-span-2 space-y-1">
+                            {modeCandidates.map(c => (
+                                <button key={c.entityId}
+                                    className="w-full text-left flex items-center gap-3 rounded-lg px-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                    onClick={() => { setModeEntity(c.entityId); updateGuardian({ modeEntityId: c.entityId }); }}>
+                                    <span className="font-mono">{c.entityId}</span>
+                                    <span className="text-slate-500 truncate">{c.name || ''} · {c.state}</span>
+                                    {guardian.modeEntityId === c.entityId && <span className="ml-auto text-emerald-500">✓ gewählt</span>}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    <div className="md:col-span-2">
                         <label className={labelClass}>
-                            Kurztexte je Stufe (optional – nur nötig, wenn die Entity keinen Klartext wie „beschreibung“ mitliefert)
+                            Eigene Namen je Stufe (optional – leer = Namen aus dem Guardian-Dashboard)
                         </label>
                         <div className="grid md:grid-cols-2 gap-2">
                             {[0, 1, 2, 3, 4, 5].map(l => (

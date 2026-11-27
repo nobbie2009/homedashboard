@@ -5,6 +5,7 @@
  * Konfiguration (config.json → guardian):
  *   enabled     – Anzeige aktiv (Standard: an)
  *   entityId    – Entity mit der Stufe; leer = automatisch suchen
+ *   modeEntityId – Entity mit dem Modus (Tag/Nacht/Urlaub …); leer = automatisch
  *   labels      – optionale Kurztexte je Stufe { "0": "…", … }
  */
 import * as ha from './homeassistant.js';
@@ -86,13 +87,35 @@ export function findCandidates(states) {
         .sort((a, b) => b.score - a.score);
 }
 
+const MODE_PATTERN = /modus|mode/i;
+
+/** Kandidaten für den Guardian-Modus (Textzustand, z. B. „Nacht“), beste zuerst. */
+export function findModeCandidates(states) {
+    if (!Array.isArray(states)) return [];
+    return states
+        .filter(s => s && typeof s.entity_id === 'string')
+        .filter(s => {
+            const txt = s.entity_id + ' ' + (s.attributes?.friendly_name || '');
+            return NAME_PATTERN.test(txt) && MODE_PATTERN.test(txt);
+        })
+        .map(s => {
+            const domain = s.entity_id.split('.')[0];
+            let score = 0;
+            if (['input_select', 'select', 'sensor', 'input_text'].includes(domain)) score += 5;
+            if (['automation', 'script', 'button', 'input_button'].includes(domain)) score -= 20;
+            if (s.state && !/^(unknown|unavailable)$/i.test(s.state)) score += 2;
+            return { entityId: s.entity_id, name: s.attributes?.friendly_name || null, state: s.state, score };
+        })
+        .sort((a, b) => b.score - a.score);
+}
+
 // ---------------------------------------------------------------------------
 // Dienst
 // ---------------------------------------------------------------------------
 
 let deps = null; // { getConfig, broadcast }
 let snapshot = null;
-let discovered = null; // { entityId, at }
+let discovered = null; // { entityId, modeEntityId, at }
 let timer = null;
 let polling = false;
 
@@ -101,24 +124,49 @@ export function guardianConfig() {
     return {
         enabled: cfg.enabled !== false,
         entityId: typeof cfg.entityId === 'string' ? cfg.entityId.trim() : '',
+        modeEntityId: typeof cfg.modeEntityId === 'string' ? cfg.modeEntityId.trim() : '',
         labels: cfg.labels && typeof cfg.labels === 'object' ? cfg.labels : {},
     };
 }
 
-async function resolveEntity(cfg) {
-    if (cfg.entityId) return cfg.entityId;
-    if (discovered?.entityId) return discovered.entityId;
-    if (discovered && Date.now() - discovered.at < DISCOVER_RETRY_MS) return null;
-    const states = await ha.getStates();
-    const best = findCandidates(states).find(c => c.level !== null);
-    discovered = { entityId: best?.entityId || null, at: Date.now() };
-    if (best) console.log(`[Guardian] Entity automatisch gefunden: ${best.entityId}`);
-    return discovered.entityId;
+async function resolveEntities(cfg) {
+    if (cfg.entityId && cfg.modeEntityId) return { entityId: cfg.entityId, modeEntityId: cfg.modeEntityId };
+    // Gefundenes bleibt gemerkt (bis zur nächsten Konfigurationsänderung);
+    // fehlt noch etwas, wird höchstens alle 10 Minuten neu gesucht.
+    const missing = (!cfg.entityId && !discovered?.entityId) || (!cfg.modeEntityId && !discovered?.modeEntityId);
+    const recent = discovered && Date.now() - discovered.at < DISCOVER_RETRY_MS;
+    const needSearch = !discovered || (missing && !recent);
+    if (needSearch) {
+        const states = await ha.getStates();
+        const best = findCandidates(states).find(c => c.level !== null);
+        const mode = findModeCandidates(states).find(c => c.score > 0);
+        discovered = {
+            entityId: best?.entityId || discovered?.entityId || null,
+            modeEntityId: mode?.entityId || discovered?.modeEntityId || null,
+            at: Date.now(),
+        };
+        if (best && !cfg.entityId) console.log(`[Guardian] Entity automatisch gefunden: ${best.entityId}`);
+        if (mode && !cfg.modeEntityId) console.log(`[Guardian] Modus-Entity automatisch gefunden: ${mode.entityId}`);
+    }
+    return {
+        entityId: cfg.entityId || discovered?.entityId || null,
+        modeEntityId: cfg.modeEntityId || discovered?.modeEntityId || null,
+    };
+}
+
+async function readMode(modeEntityId) {
+    if (!modeEntityId) return null;
+    try {
+        const m = await ha.getState(modeEntityId);
+        return m.state && !/^(unknown|unavailable)$/i.test(m.state) ? m.state : null;
+    } catch {
+        return null;
+    }
 }
 
 function same(a, b) {
     return a && b && a.level === b.level && a.description === b.description && a.error === b.error
-        && a.entityId === b.entityId && a.enabled === b.enabled && a.since === b.since;
+        && a.entityId === b.entityId && a.enabled === b.enabled && a.since === b.since && a.mode === b.mode;
 }
 
 export async function poll() {
@@ -132,12 +180,13 @@ export async function poll() {
         } else if (!ha.credentialStatus().configured) {
             snapshot = { enabled: true, level: null, error: 'Home Assistant ist nicht eingerichtet', updatedAt: Date.now() };
         } else {
-            const entityId = await resolveEntity(cfg);
+            const { entityId, modeEntityId } = await resolveEntities(cfg);
             if (!entityId) {
                 snapshot = { enabled: true, level: null, error: 'Keine Guardian-Entity gefunden – bitte im Admin eintragen', updatedAt: Date.now() };
             } else {
                 const s = await ha.getState(entityId);
                 const level = levelOf(s);
+                const mode = (await readMode(modeEntityId)) ?? (typeof s.attributes?.modus === 'string' ? s.attributes.modus : null);
                 snapshot = {
                     enabled: true,
                     entityId,
@@ -145,6 +194,8 @@ export async function poll() {
                     name: s.attributes?.friendly_name || null,
                     level,
                     rawState: s.state,
+                    mode,
+                    modeEntityId,
                     description: level === null ? null : describe(s, level, cfg.labels),
                     labels: cfg.labels,
                     since: s.last_changed ? Date.parse(s.last_changed) : null,
@@ -180,7 +231,7 @@ export function reconfigure() {
 
 export async function discover() {
     const states = await ha.getStates();
-    return findCandidates(states).slice(0, 20);
+    return { candidates: findCandidates(states).slice(0, 20), modeCandidates: findModeCandidates(states).slice(0, 10) };
 }
 
 export function initGuardianService(d) {

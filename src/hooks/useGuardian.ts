@@ -12,20 +12,50 @@ export interface GuardianSnapshot {
     level: number | null;
     rawState?: string;
     description?: string | null;
+    /** Modus des Guardian, z. B. „Nacht“ */
+    mode?: string | null;
+    modeEntityId?: string | null;
     labels?: Record<string, string>;
     since?: number | null;
     error?: string | null;
     updatedAt: number | null;
 }
 
-/** Farben je Guardian-Stufe – 0 ruhig (grün) bis 5 höchste Eskalation (violett). */
-export const GUARDIAN_STYLES: Record<number, { hex: string; label: string }> = {
-    0: { hex: '#10b981', label: 'Ruhe' },
-    1: { hex: '#0ea5e9', label: 'Beobachten' },
-    2: { hex: '#fbbf24', label: 'Erhöht' },
-    3: { hex: '#f97316', label: 'Hoch' },
-    4: { hex: '#dc2626', label: 'Sehr hoch' },
-    5: { hex: '#a21caf', label: 'Maximal' },
+/**
+ * Stufen des Jarvis-Guardian (Echtzeit-Personenerkennung rund ums Haus per
+ * Kamera + KI). Texte nach dem Guardian-Dashboard in Home Assistant.
+ */
+export const GUARDIAN_STYLES: Record<number, { hex: string; label: string; when: string; action: string }> = {
+    0: {
+        hex: '#10b981', label: 'Normal',
+        when: 'Niemand in einer Schutzzone, Tiere, Autos auf der Straße, Passanten',
+        action: 'Nur Aufzeichnung (Synology + Frigate). Keine Meldung.',
+    },
+    1: {
+        hex: '#0ea5e9', label: 'Früherkennung',
+        when: 'Person auf dem Grundstück (Rasen, Gehweg, Vorgarten). Tagsüber nur, wenn sie an einem Auto ist.',
+        action: 'Mitteilung mit Bild aufs Handy. Tagsüber still, nachts mit Ton.',
+    },
+    2: {
+        hex: '#fbbf24', label: 'Person am Auto',
+        when: 'Nachts, abwesend oder im Urlaub: Person am Tesla-Stellplatz oder in der Auffahrt beim Kombi',
+        action: 'Dringende Mitteilung, Flutlicht der Kamera 3 Min an (wenn dunkel), Jarvis-Durchsage wenn jemand zu Hause ist.',
+    },
+    3: {
+        hex: '#f97316', label: 'Verweilt',
+        when: 'Person bleibt länger als 10 Sekunden direkt am Auto',
+        action: 'Neue dringende Mitteilung „verweilt am Fahrzeug“, Flutlicht, Knöpfe für Licht und Sirene.',
+    },
+    4: {
+        hex: '#dc2626', label: 'Dringend',
+        when: 'Bleibt nach Stufe 3 noch 30 s am Auto, 3 Meldungen in 5 Minuten oder Modus „Manueller Alarm“',
+        action: 'Kritische Mitteilung (durchbricht Lautlos), alle Flutlichter an, Durchsage. Sirene nur per Knopf.',
+    },
+    5: {
+        hex: '#a21caf', label: 'ALARMFALL',
+        when: 'Nur von Hand: NS-Panel, Dashboard oder Knopf „ALARMFALL auslösen“ in einer Meldung',
+        action: 'Alle Kamera-Flutlichter, Scheinwerfer vorn und Hauslichter an – bleibt an, bis er beendet wird.',
+    },
 };
 
 const POLL_MS = 60_000;

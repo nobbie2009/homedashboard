@@ -30,8 +30,9 @@ export const GuardianHeaderButton: React.FC = () => {
 
     const level = snapshot?.level ?? null;
     const st = level !== null ? GUARDIAN_STYLES[level] : null;
-    const labelFor = (l: number) =>
-        snapshot?.labels?.[String(l)] || (l === level && snapshot?.description) || GUARDIAN_STYLES[l].label;
+    const labelFor = (l: number) => snapshot?.labels?.[String(l)]?.trim() || GUARDIAN_STYLES[l].label;
+    // Klartext aus HA nur zeigen, wenn er mehr sagt als der Stufenname
+    const extra = level !== null && snapshot?.description && snapshot.description !== labelFor(level) ? snapshot.description : null;
 
     return (
         <>
@@ -42,14 +43,16 @@ export const GuardianHeaderButton: React.FC = () => {
                     "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700",
                     level !== null && level >= 4 && "animate-pulse"
                 )}
-                title={snapshot?.description ? `Jarvis-Guardian: ${snapshot.description}` : 'Jarvis-Guardian'}
+                title={level !== null ? `Jarvis-Guardian: Stufe ${level} · ${labelFor(level)}${snapshot?.mode ? ` · Modus ${snapshot.mode}` : ''}` : 'Jarvis-Guardian'}
             >
                 {st ? (
                     <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: st.hex }} />
                 ) : (
                     <Shield className="w-4 h-4" />
                 )}
-                <span className="whitespace-nowrap">{level !== null ? `GUARDIAN ${level}` : 'Guardian'}</span>
+                <span className="whitespace-nowrap">
+                    {level === 5 ? 'ALARMFALL' : level !== null ? `GUARDIAN ${level}` : 'Guardian'}
+                </span>
             </button>
 
             {open && createPortal(
@@ -58,7 +61,7 @@ export const GuardianHeaderButton: React.FC = () => {
                     onClick={() => setOpen(false)}
                 >
                     <div
-                        className="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl p-6 text-slate-800 dark:text-slate-100"
+                        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl p-6 text-slate-800 dark:text-slate-100"
                         onClick={e => e.stopPropagation()}
                     >
                         <div className="flex items-start justify-between gap-4 mb-5">
@@ -66,7 +69,10 @@ export const GuardianHeaderButton: React.FC = () => {
                                 <Shield className="w-7 h-7" style={{ color: st?.hex }} />
                                 <div>
                                     <div className="text-xl font-bold">Jarvis-Guardian</div>
-                                    <div className="text-xs text-slate-500">Eskalationsstufe aus Home Assistant</div>
+                                    <div className="text-xs text-slate-500">
+                                        Echtzeit-Erkennung rund ums Haus (Kamera + KI)
+                                        {snapshot?.mode && <> · Modus <span className="font-semibold text-slate-700 dark:text-slate-200">{snapshot.mode}</span></>}
+                                    </div>
                                 </div>
                             </div>
                             <div className="flex items-center gap-1">
@@ -83,12 +89,14 @@ export const GuardianHeaderButton: React.FC = () => {
                             </div>
                         </div>
 
-                        {st ? (
+                        {st && level !== null ? (
                             <div className="flex items-center gap-4 rounded-xl p-4 mb-5" style={{ backgroundColor: `${st.hex}1f` }}>
                                 <div className="text-5xl font-black tabular-nums" style={{ color: st.hex }}>{level}</div>
                                 <div className="min-w-0">
-                                    <div className="text-lg font-semibold">{snapshot?.description || st.label}</div>
-                                    {snapshot?.since && <div className="text-xs text-slate-500">seit {fmtSince(snapshot.since)}</div>}
+                                    <div className="text-lg font-semibold">{labelFor(level)}</div>
+                                    {extra && <div className="text-sm">{extra}</div>}
+                                    <div className="text-sm text-slate-600 dark:text-slate-300">{st.action}</div>
+                                    {snapshot?.since && <div className="text-xs text-slate-500 mt-1">seit {fmtSince(snapshot.since)}</div>}
                                 </div>
                             </div>
                         ) : (
@@ -101,22 +109,28 @@ export const GuardianHeaderButton: React.FC = () => {
                             {[0, 1, 2, 3, 4, 5].map(l => (
                                 <div
                                     key={l}
-                                    className={clsx(
-                                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm",
-                                        l === level ? "font-semibold" : "opacity-60"
-                                    )}
+                                    className={clsx("flex items-start gap-3 rounded-lg px-3 py-2 text-sm", l !== level && "opacity-60")}
                                     style={l === level ? { boxShadow: `0 0 0 2px ${GUARDIAN_STYLES[l].hex}` } : undefined}
                                 >
-                                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                                    <span className="w-6 h-6 mt-0.5 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
                                         style={{ backgroundColor: GUARDIAN_STYLES[l].hex }}>{l}</span>
-                                    <span className="truncate">{labelFor(l)}</span>
+                                    <div className="min-w-0">
+                                        <div className="font-semibold">{labelFor(l)}</div>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400">{GUARDIAN_STYLES[l].when}</div>
+                                    </div>
                                 </div>
                             ))}
+                        </div>
+
+                        <div className="mt-4 text-xs text-slate-500 dark:text-slate-400 space-y-1">
+                            <div><span className="font-semibold">Abschwächung:</span> eigenes Kennzeichen erkannt oder vor weniger als 10 Minuten heimgekommen → eine Stufe weniger.</div>
+                            <div><span className="font-semibold">Sirene:</span> nie automatisch, nur per Knopf.</div>
                         </div>
 
                         {snapshot?.entityId && (
                             <div className="mt-4 text-[11px] text-slate-400 font-mono">
                                 {snapshot.entityId}{snapshot.autoDetected ? ' (automatisch gefunden)' : ''}
+                                {snapshot.modeEntityId ? ` · ${snapshot.modeEntityId}` : ''}
                                 {snapshot.error && level !== null ? ` · ${snapshot.error}` : ''}
                             </div>
                         )}

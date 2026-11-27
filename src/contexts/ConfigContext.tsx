@@ -234,6 +234,8 @@ export interface GuardianConfig {
     enabled?: boolean;
     /** HA-Entity mit der Stufe; leer = automatisch suchen */
     entityId?: string;
+    /** HA-Entity mit dem Modus (Tag/Nacht/Urlaub …); leer = automatisch suchen */
+    modeEntityId?: string;
     /** Eigene Kurztexte je Stufe, falls die Entity keinen Klartext liefert */
     labels?: Record<string, string>;
 }
