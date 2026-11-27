@@ -2394,7 +2394,7 @@ app.post('/api/guardian/refresh', async (req, res) => {
 // Kandidaten-Entities für die Auswahl im Admin
 app.post('/api/guardian/discover', async (req, res) => {
     try {
-        res.json({ success: true, candidates: await guardian.discover() });
+        res.json({ success: true, ...(await guardian.discover()) });
     } catch (e) {
         res.status(502).json({ success: false, error: e.message });
     }

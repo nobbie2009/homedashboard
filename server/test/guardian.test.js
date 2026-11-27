@@ -31,3 +31,16 @@ assert.equal(c[0].level, 2);
 assert.equal(c[c.length - 1].entityId, 'automation.jarvis_guardian');
 
 console.log('guardian tests ok');
+
+// Modus
+{
+    const { findModeCandidates } = await import('../guardian.js');
+    const m = findModeCandidates([
+        { entity_id: 'input_select.jarvis_guardian_modus', state: 'Nacht', attributes: {} },
+        { entity_id: 'sensor.jarvis_guardian_stufe', state: '0', attributes: {} },
+        { entity_id: 'automation.guardian_modus_wechsel', state: 'on', attributes: {} },
+    ]);
+    assert.equal(m[0].entityId, 'input_select.jarvis_guardian_modus');
+    assert.equal(m.length, 2);
+    console.log('guardian mode tests ok');
+}

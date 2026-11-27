@@ -78,7 +78,7 @@ Eigener, **inoffizieller** Indikator für die Gefahr von außen (LAGE 5 normal �
 - **Alarm** (Standard ab LAGE 2): Popup auf allen Dashboards; bei aktivierter Alarmierung zusätzlich Web-Push und Home-Assistant-Aktionen (Jarvis-Ansage, LED blinkt rot, FritzFon-Rundruf, kritische Benachrichtigung).
 - Einstellungen unter **Admin → Lage-Index**. Der Home-Assistant-Token liegt nur auf dem Server (`server/data/ha_credentials.json` oder `HOMEASSISTANT_URL`/`HOMEASSISTANT_TOKEN` in `.env`).
 - Berechnung im Detail: `docs/superpowers/plans/2026-11-03-lage-index.md`, Tests: `node server/test/lage.test.js`.
-- **Jarvis-Guardian:** Daneben zeigt „GUARDIAN x“ die Eskalationsstufe (0–5) des Jarvis-Guardian aus Home Assistant (nur lesend, alle 30 s bzw. sofort per SSE). Die Entity wird automatisch gesucht (Name enthält „guardian“/„eskalation“, Zustand 0–5) oder unter **Admin → Lage-Index → Jarvis-Guardian** gewählt. Klartext kommt aus dem Attribut `beschreibung`/`description` o. ä. oder aus eigenen Kurztexten. Tests: `node server/test/guardian.test.js`.
+- **Jarvis-Guardian:** Daneben zeigt „GUARDIAN x“ die Eskalationsstufe (0–5) des Jarvis-Guardian aus Home Assistant (nur lesend, alle 30 s bzw. sofort per SSE). Die Entity wird automatisch gesucht (Name enthält „guardian“/„eskalation“, Zustand 0–5) oder unter **Admin → Lage-Index → Jarvis-Guardian** gewählt. Das Popup zeigt Stufennamen (Normal, Früherkennung, Person am Auto, Verweilt, Dringend, ALARMFALL) mit „Wann“ und „Was passiert“ sowie den Modus (z. B. Nacht), falls eine Modus-Entity gefunden wird. Tests: `node server/test/guardian.test.js`.
 
 ---
 
