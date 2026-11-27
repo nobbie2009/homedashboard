@@ -25,15 +25,15 @@ function extractToken(input) {
     const trimmed = String(input).trim();
 
     // share.icloud.com/photos/<token>
-    let m = trimmed.match(/share\.icloud\.com\/photos\/([A-Za-z0-9]+)/);
+    let m = trimmed.match(/share\.icloud\.com\/photos\/([A-Za-z0-9_-]+)/);
     if (m) return m[1];
 
     // www.icloud.com/sharedalbum/#<token>
-    m = trimmed.match(/icloud\.com\/sharedalbum\/#?([A-Za-z0-9]+)/);
+    m = trimmed.match(/icloud\.com\/sharedalbum\/#?([A-Za-z0-9_-]+)/);
     if (m) return m[1];
 
     // Bare token
-    if (/^[A-Za-z0-9]+$/.test(trimmed)) return trimmed;
+    if (/^[A-Za-z0-9_-]+$/.test(trimmed)) return trimmed;
 
     return null;
 }
@@ -132,7 +132,7 @@ async function discoverHostViaShareUrl(token, hopBudget = 5) {
         const hostMatches = s.match(/p\d{2,3}-sharedstreams\.icloud\.com/g);
         if (hostMatches) hostMatches.forEach(m => hosts.add(m));
         // Legacy share token in URL fragments / paths, e.g. .../sharedalbum/#B0xyz...
-        const tokenMatches = s.match(/sharedalbum\/?#?([A-Za-z0-9]{12,})/g);
+        const tokenMatches = s.match(/sharedalbum\/?#?([A-Za-z0-9_-]{12,})/g);
         if (tokenMatches) {
             for (const m of tokenMatches) {
                 const t = m.replace(/.*sharedalbum\/?#?/, '');

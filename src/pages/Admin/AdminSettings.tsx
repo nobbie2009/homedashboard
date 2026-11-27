@@ -1077,7 +1077,7 @@ const AdminSettings: React.FC = () => {
                                             </label>
                                             <input
                                                 type="text"
-                                                placeholder="https://share.icloud.com/photos/0..."
+                                                placeholder="https://www.icloud.com/sharedalbum/#... oder https://share.icloud.com/photos/..."
                                                 value={config.screensaver?.photoAlbumUrl || ''}
                                                 onChange={(e) => updateConfig({
                                                     screensaver: { ...config.screensaver!, photoAlbumUrl: e.target.value }
@@ -1085,7 +1085,7 @@ const AdminSettings: React.FC = () => {
                                                 className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 w-full"
                                             />
                                             <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                                                Ein in der Fotos-App freigegebenes Album. Der Link beginnt mit <code>https://share.icloud.com/photos/</code>.
+                                                Ein in der Fotos-App geteiltes Album mit aktivierter „Öffentliche Website“. Akzeptiert werden <code>https://www.icloud.com/sharedalbum/#…</code> und <code>https://share.icloud.com/photos/…</code>.
                                             </p>
                                         </div>
                                         <div>
